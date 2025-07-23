@@ -1,0 +1,109 @@
+import { createClient } from "@supabase/supabase-js"
+import type { User } from "./types"
+
+// Create a service role client for admin operations
+const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
+
+interface TelegramUser {
+  id: number
+  first_name: string
+  last_name?: string
+  username?: string
+  photo_url?: string
+  auth_date: number
+  hash: string
+}
+
+export async function signInWithTelegram(telegramUser: TelegramUser): Promise<User> {
+  try {
+    console.log("Attempting to sign in with Telegram user:", telegramUser)
+
+    // Use the admin client to bypass RLS for user creation/updates
+    const { data: existingUser, error: selectError } = await supabaseAdmin
+      .from("users")
+      .select("*")
+      .eq("telegram_id", telegramUser.id)
+      .single()
+
+    console.log("Existing user query result:", { existingUser, selectError })
+
+    if (existingUser) {
+      // Update existing user with latest info
+      const { data, error } = await supabaseAdmin
+        .from("users")
+        .update({
+          username: telegramUser.username || `user_${telegramUser.id}`,
+          first_name: telegramUser.first_name,
+          last_name: telegramUser.last_name,
+          avatar_url: telegramUser.photo_url,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("telegram_id", telegramUser.id)
+        .select()
+        .single()
+
+      console.log("Update user result:", { data, error })
+
+      if (error) throw error
+
+      return {
+        id: data.id,
+        name: `${data.first_name} ${data.last_name || ""}`.trim(),
+        username: data.username,
+        avatar: data.avatar_url || "",
+        telegram_id: data.telegram_id,
+        first_name: data.first_name,
+        last_name: data.last_name,
+      }
+    } else {
+      // Create new user using admin client
+      console.log("Creating new user...")
+      const { data, error } = await supabaseAdmin
+        .from("users")
+        .insert({
+          telegram_id: telegramUser.id,
+          username: telegramUser.username || `user_${telegramUser.id}`,
+          first_name: telegramUser.first_name,
+          last_name: telegramUser.last_name,
+          avatar_url: telegramUser.photo_url,
+        })
+        .select()
+        .single()
+
+      console.log("Create user result:", { data, error })
+
+      if (error) throw error
+
+      return {
+        id: data.id,
+        name: `${data.first_name} ${data.last_name || ""}`.trim(),
+        username: data.username,
+        avatar: data.avatar_url || "",
+        telegram_id: data.telegram_id,
+        first_name: data.first_name,
+        last_name: data.last_name,
+      }
+    }
+  } catch (error) {
+    console.error("Error signing in with Telegram:", error)
+    throw error
+  }
+}
+
+export async function signOut() {
+  localStorage.removeItem("currentUser")
+}
+
+export function getCurrentUser(): User | null {
+  try {
+    const savedUser = localStorage.getItem("currentUser")
+    return savedUser ? JSON.parse(savedUser) : null
+  } catch {
+    localStorage.removeItem("currentUser")
+    return null
+  }
+}
+
+export function saveCurrentUser(user: User) {
+  localStorage.setItem("currentUser", JSON.stringify(user))
+}

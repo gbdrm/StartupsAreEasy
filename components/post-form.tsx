@@ -1,0 +1,143 @@
+"use client"
+
+import type React from "react"
+
+import { useState } from "react"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Textarea } from "@/components/ui/textarea"
+import { ImageIcon, LinkIcon, Send } from "lucide-react"
+import { POST_TYPES, type PostType, type User } from "@/lib/types"
+
+interface PostFormProps {
+  user: User | null
+  onSubmit: (data: {
+    type: PostType
+    content: string
+    link?: string
+    image?: string
+  }) => void
+}
+
+export function PostForm({ user, onSubmit }: PostFormProps) {
+  const [type, setType] = useState<PostType>("idea")
+  const [content, setContent] = useState("")
+  const [link, setLink] = useState("")
+  const [image, setImage] = useState("")
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!content.trim() || !user) return
+
+    setIsSubmitting(true)
+
+    await onSubmit({
+      type,
+      content: content.trim(),
+      link: link.trim() || undefined,
+      image: image.trim() || undefined,
+    })
+
+    // Reset form
+    setContent("")
+    setLink("")
+    setImage("")
+    setType("idea")
+    setIsSubmitting(false)
+  }
+
+  if (!user) {
+    return (
+      <Card>
+        <CardContent className="pt-6">
+          <div className="text-center text-muted-foreground">
+            <p>Login with Telegram to create posts</p>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Send className="h-5 w-5" />
+          Share with the community
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="post-type">Post Type</Label>
+            <Select value={type} onValueChange={(value: PostType) => setType(value)}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {Object.entries(POST_TYPES).map(([key, { emoji, label }]) => (
+                  <SelectItem key={key} value={key}>
+                    <span className="flex items-center gap-2">
+                      <span>{emoji}</span>
+                      <span>{label}</span>
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="content">Content *</Label>
+            <Textarea
+              id="content"
+              placeholder="Share your thoughts..."
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              className="min-h-[100px] resize-none"
+              required
+            />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="link" className="flex items-center gap-2">
+                <LinkIcon className="h-4 w-4" />
+                Link (optional)
+              </Label>
+              <Input
+                id="link"
+                type="url"
+                placeholder="https://..."
+                value={link}
+                onChange={(e) => setLink(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="image" className="flex items-center gap-2">
+                <ImageIcon className="h-4 w-4" />
+                Image URL (optional)
+              </Label>
+              <Input
+                id="image"
+                type="url"
+                placeholder="https://..."
+                value={image}
+                onChange={(e) => setImage(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <Button type="submit" className="w-full" disabled={!content.trim() || isSubmitting}>
+            {isSubmitting ? "Posting..." : "Post"}
+          </Button>
+        </form>
+      </CardContent>
+    </Card>
+  )
+}
