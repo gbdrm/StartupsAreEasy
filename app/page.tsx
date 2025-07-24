@@ -50,13 +50,11 @@ export default function HomePage() {
       const postsData = await getPosts(currentUser?.id)
       setPosts(postsData)
 
-      // Load comments for all posts
-      const allComments: Comment[] = []
-      for (const post of postsData) {
-        const postComments = await getComments(post.id)
-        allComments.push(...postComments)
-      }
-      setComments(allComments)
+      // Load comments for all posts in parallel
+      const commentsArrays = await Promise.all(
+        postsData.map((post) => getComments(post.id)),
+      )
+      setComments(commentsArrays.flat())
     } catch (err) {
       console.error("Error loading posts:", err)
       setError("Failed to load posts. Please try again.")
