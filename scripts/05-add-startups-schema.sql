@@ -57,29 +57,50 @@ ALTER TABLE startups ENABLE ROW LEVEL SECURITY;
 ALTER TABLE startup_members ENABLE ROW LEVEL SECURITY;
 ALTER TABLE startup_followers ENABLE ROW LEVEL SECURITY;
 
+-- Helper functions used by RLS policies
+CREATE OR REPLACE FUNCTION is_startup_member(p_startup_id uuid, p_user_id uuid)
+RETURNS boolean
+LANGUAGE sql
+SECURITY DEFINER AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM startup_members
+     WHERE startup_id = p_startup_id
+       AND user_id = p_user_id
+       AND is_active = true
+  );
+$$;
+
+CREATE OR REPLACE FUNCTION is_startup_founder(p_startup_id uuid, p_user_id uuid)
+RETURNS boolean
+LANGUAGE sql
+SECURITY DEFINER AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM startup_members
+     WHERE startup_id = p_startup_id
+       AND user_id = p_user_id
+       AND is_active = true
+       AND role IN ('founder', 'co-founder')
+  );
+$$;
+
+GRANT EXECUTE ON FUNCTION is_startup_member(uuid, uuid) TO PUBLIC;
+GRANT EXECUTE ON FUNCTION is_startup_founder(uuid, uuid) TO PUBLIC;
+
 -- RLS Policies for startups
 CREATE POLICY "Anyone can view public startups" ON startups 
   FOR SELECT USING (is_public = true);
 
-CREATE POLICY "Startup members can view their startup" ON startups 
+CREATE POLICY "Startup members can view their startup" ON startups
   FOR SELECT USING (
-    id IN (
-      SELECT startup_id FROM startup_members 
-      WHERE user_id = auth.uid() AND is_active = true
-    )
+    is_startup_member(startups.id, auth.uid())
   );
 
 CREATE POLICY "Authenticated users can create startups" ON startups 
   FOR INSERT WITH CHECK (auth.uid() IS NOT NULL);
 
-CREATE POLICY "Startup founders can update their startup" ON startups 
+CREATE POLICY "Startup founders can update their startup" ON startups
   FOR UPDATE USING (
-    id IN (
-      SELECT startup_id FROM startup_members 
-      WHERE user_id = auth.uid() 
-      AND role IN ('founder', 'co-founder') 
-      AND is_active = true
-    )
+    is_startup_founder(startups.id, auth.uid())
   );
 
 -- RLS Policies for startup_members
@@ -92,25 +113,14 @@ CREATE POLICY "Anyone can view startup members of public startups" ON startup_me
     )
   );
 
-CREATE POLICY "Startup members can view all members of their startup" ON startup_members 
+CREATE POLICY "Startup members can view all members of their startup" ON startup_members
   FOR SELECT USING (
-    EXISTS (
-      SELECT 1 FROM startup_members sm
-      WHERE sm.startup_id = startup_members.startup_id
-        AND sm.user_id = auth.uid()
-        AND sm.is_active = true
-    )
+    is_startup_member(startup_members.startup_id, auth.uid())
   );
 
-CREATE POLICY "Startup founders can manage members" ON startup_members 
+CREATE POLICY "Startup founders can manage members" ON startup_members
   FOR ALL USING (
-    EXISTS (
-      SELECT 1 FROM startup_members sm
-      WHERE sm.startup_id = startup_members.startup_id
-        AND sm.user_id = auth.uid()
-        AND sm.is_active = true
-        AND sm.role IN ('founder', 'co-founder')
-    )
+    is_startup_founder(startup_members.startup_id, auth.uid())
   );
 
 CREATE POLICY "Users can join startups" ON startup_members 
