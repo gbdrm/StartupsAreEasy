@@ -11,12 +11,12 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { ImageIcon, LinkIcon, Send } from "lucide-react"
-import { POST_TYPES, type PostType, type User } from "@/lib/types"
+import type { User } from "@/lib/types"
 
 interface PostFormProps {
   user: User | null
   onSubmit: (data: {
-    type: PostType
+    type: "post"
     content: string
     link?: string
     image?: string
@@ -24,7 +24,6 @@ interface PostFormProps {
 }
 
 export function PostForm({ user, onSubmit }: PostFormProps) {
-  const [type, setType] = useState<PostType>("idea")
   const [content, setContent] = useState("")
   const [link, setLink] = useState("")
   const [image, setImage] = useState("")
@@ -39,7 +38,7 @@ export function PostForm({ user, onSubmit }: PostFormProps) {
     setIsSubmitting(true)
 
     await onSubmit({
-      type,
+      type: "post",
       content: content.trim(),
       link: link.trim() || undefined,
       image: image.trim() || undefined,
@@ -49,7 +48,6 @@ export function PostForm({ user, onSubmit }: PostFormProps) {
     setContent("")
     setLink("")
     setImage("")
-    setType("idea")
     setIsSubmitting(false)
     setIsExpanded(false)
   }
@@ -92,25 +90,6 @@ export function PostForm({ user, onSubmit }: PostFormProps) {
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="post-type">Post Type</Label>
-            <Select value={type} onValueChange={(value: PostType) => setType(value)}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {Object.entries(POST_TYPES).map(([key, { emoji, label }]) => (
-                  <SelectItem key={key} value={key}>
-                    <span className="flex items-center gap-2">
-                      <span>{emoji}</span>
-                      <span>{label}</span>
-                    </span>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
           <div className="space-y-2">
             <Label htmlFor="content">Content *</Label>
             <Textarea
