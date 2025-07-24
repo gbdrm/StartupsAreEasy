@@ -42,3 +42,9 @@ SUPABASE_SERVICE_KEY=your-supabase-service-role-key
 The `SUPABASE_SERVICE_KEY` is used server-side by `lib/auth.ts` to perform
 privileged operations while `NEXT_PUBLIC_SUPABASE_ANON_KEY` is used by the
 browser client.
+
+## Database setup
+
+Execute the SQL files under the `scripts` directory in order.  The latest
+migration `07-update-startup-policies.sql` adds helper functions for checking
+startup membership and updates related row level security policies.
