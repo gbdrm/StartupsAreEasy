@@ -3,6 +3,7 @@
 import type React from "react"
 
 import { useState } from "react"
+import { useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -28,6 +29,8 @@ export function PostForm({ user, onSubmit }: PostFormProps) {
   const [link, setLink] = useState("")
   const [image, setImage] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isExpanded, setIsExpanded] = useState(false)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -48,7 +51,14 @@ export function PostForm({ user, onSubmit }: PostFormProps) {
     setImage("")
     setType("idea")
     setIsSubmitting(false)
+    setIsExpanded(false)
   }
+
+  useEffect(() => {
+    if (isExpanded && textareaRef.current) {
+      textareaRef.current.focus()
+    }
+  }, [isExpanded])
 
   if (!user) {
     return (
@@ -57,6 +67,16 @@ export function PostForm({ user, onSubmit }: PostFormProps) {
           <div className="text-center text-muted-foreground">
             <p>Login to create posts</p>
           </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  if (!isExpanded) {
+    return (
+      <Card>
+        <CardContent className="py-4 cursor-pointer" onClick={() => setIsExpanded(true)}>
+          <div className="text-muted-foreground">What's on your mind?</div>
         </CardContent>
       </Card>
     )
@@ -100,6 +120,7 @@ export function PostForm({ user, onSubmit }: PostFormProps) {
               onChange={(e) => setContent(e.target.value)}
               className="min-h-[100px] resize-none"
               required
+              ref={textareaRef}
             />
           </div>
 
