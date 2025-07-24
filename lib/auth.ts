@@ -1,10 +1,11 @@
 import { createClient } from "@supabase/supabase-js"
 import type { User } from "./types"
+import { supabase } from "./supabase"
 
 // Create a service role client for admin operations
 const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
 
-interface TelegramUser {
+export type TelegramUser = {
   id: number
   first_name: string
   last_name?: string
@@ -109,20 +110,32 @@ export async function signInWithTelegram(telegramUser: TelegramUser): Promise<Us
   }
 }
 
-export async function signOut() {
-  localStorage.removeItem("currentUser")
-}
+export async function getCurrentUserProfile() {
+  // Get the authenticated user from Supabase Auth
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser()
+  if (authError || !user) return null
 
-export function getCurrentUser(): User | null {
-  try {
-    const savedUser = localStorage.getItem("currentUser")
-    return savedUser ? JSON.parse(savedUser) : null
-  } catch {
-    localStorage.removeItem("currentUser")
-    return null
+  // Load profile data from profiles table
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .select("id, username, first_name, last_name, avatar_url")
+    .eq("id", user.id)
+    .single()
+  if (profileError || !profile) return null
+
+  return {
+    id: user.id,
+    email: user.email,
+    username: profile.username,
+    first_name: profile.first_name,
+    last_name: profile.last_name,
+    avatar_url: profile.avatar_url,
   }
 }
 
-export function saveCurrentUser(user: User) {
-  localStorage.setItem("currentUser", JSON.stringify(user))
+export async function signOut() {
+  await supabase.auth.signOut()
 }

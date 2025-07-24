@@ -12,11 +12,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea"
 import { ImageIcon, LinkIcon, Send } from "lucide-react"
 import type { User } from "@/lib/types"
+import type { PostType } from "@/lib/types"
 
 interface PostFormProps {
   user: User | null
   onSubmit: (data: {
-    type: "post"
+    type: PostType
     content: string
     link?: string
     image?: string

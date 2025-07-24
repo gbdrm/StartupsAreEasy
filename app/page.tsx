@@ -9,7 +9,8 @@ import { Separator } from "@/components/ui/separator"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Loader2 } from "lucide-react"
 import { getPosts, createPost, toggleLike, getComments, createComment } from "@/lib/posts"
-import { signInWithTelegram, signOut, getCurrentUser, saveCurrentUser } from "@/lib/auth"
+import { signInWithTelegram, signOut, getCurrentUserProfile } from "@/lib/auth"
+import Link from "next/link"
 
 interface TelegramUser {
   id: number
@@ -28,12 +29,13 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  // Load user from localStorage on mount
+  // Load user from Supabase Auth on mount
   useEffect(() => {
-    const savedUser = getCurrentUser()
-    if (savedUser) {
-      setCurrentUser(savedUser)
+    async function fetchUser() {
+      const user = await getCurrentUserProfile()
+      setCurrentUser(user)
     }
+    fetchUser()
   }, [])
 
   // Load posts
@@ -70,7 +72,6 @@ export default function HomePage() {
       const user = await signInWithTelegram(telegramUser)
       console.log("Login successful, user:", user)
       setCurrentUser(user)
-      saveCurrentUser(user)
     } catch (err) {
       console.error("Error logging in:", err)
       setError(`Failed to log in: ${err instanceof Error ? err.message : "Unknown error"}`)
@@ -180,9 +181,10 @@ export default function HomePage() {
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container flex h-16 items-center justify-between">
-          <div className="flex items-center gap-2 ml-4">
+          <div className="flex items-center gap-4 ml-4">
             <h1 className="text-xl font-bold">Startups Are Easy</h1>
             <span className="text-2xl">🚀</span>
+            <Link href="/startups" className="text-blue-600 hover:underline text-sm">Startups</Link>
           </div>
           <AuthButton user={currentUser} onLogin={handleLogin} onLogout={handleLogout} />
         </div>
