@@ -55,7 +55,7 @@ export function PostForm({ user, onSubmit }: PostFormProps) {
       <Card>
         <CardContent className="pt-6">
           <div className="text-center text-muted-foreground">
-            <p>Login with Telegram to create posts</p>
+            <p>Login to create posts</p>
           </div>
         </CardContent>
       </Card>
