@@ -3,14 +3,13 @@
 import { useState, useEffect } from "react"
 import { PostForm } from "@/components/post-form"
 import { PostCard } from "@/components/post-card"
-import { AuthButton } from "@/components/auth-button"
+import { Header } from "@/components/header"
 import type { Post, Comment, User, PostType } from "@/lib/types"
 import { Separator } from "@/components/ui/separator"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Loader2 } from "lucide-react"
 import { getPosts, createPost, toggleLike, getComments, createComment } from "@/lib/posts"
 import { signInWithTelegram, signOut, getCurrentUserProfile } from "@/lib/auth"
-import Link from "next/link"
 
 interface TelegramUser {
   id: number
@@ -50,13 +49,11 @@ export default function HomePage() {
       const postsData = await getPosts(currentUser?.id)
       setPosts(postsData)
 
-      // Load comments for all posts
-      const allComments: Comment[] = []
-      for (const post of postsData) {
-        const postComments = await getComments(post.id)
-        allComments.push(...postComments)
-      }
-      setComments(allComments)
+      // Load comments for all posts in parallel
+      const commentsArrays = await Promise.all(
+        postsData.map((post) => getComments(post.id)),
+      )
+      setComments(commentsArrays.flat())
     } catch (err) {
       console.error("Error loading posts:", err)
       setError("Failed to load posts. Please try again.")
@@ -179,16 +176,7 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container flex h-16 items-center justify-between">
-          <div className="flex items-center gap-4 ml-4">
-            <h1 className="text-xl font-bold">Startups Are Easy</h1>
-            <span className="text-2xl">🚀</span>
-            <Link href="/startups" className="text-blue-600 hover:underline text-sm">Startups</Link>
-          </div>
-          <AuthButton user={currentUser} onLogin={handleLogin} onLogout={handleLogout} />
-        </div>
-      </header>
+      <Header user={currentUser} onLogin={handleLogin} onLogout={handleLogout} />
 
       <main className="container max-w-2xl mx-auto py-8 px-4">
         <div className="space-y-6">

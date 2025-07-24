@@ -28,3 +28,17 @@ Continue building your app on:
 2. Deploy your chats from the v0 interface
 3. Changes are automatically pushed to this repository
 4. Vercel deploys the latest version from this repository
+
+## Environment variables
+
+Create a `.env.local` file in the project root with the following keys:
+
+```bash
+NEXT_PUBLIC_SUPABASE_URL=your-supabase-url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
+SUPABASE_SERVICE_KEY=your-supabase-service-role-key
+```
+
+The `SUPABASE_SERVICE_KEY` is used server-side by `lib/auth.ts` to perform
+privileged operations while `NEXT_PUBLIC_SUPABASE_ANON_KEY` is used by the
+browser client.
