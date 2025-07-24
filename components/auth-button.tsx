@@ -74,8 +74,8 @@ export function AuthButton({ user, onLogin, onLogout }: AuthButtonProps) {
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" className="relative h-10 w-10 rounded-full">
           <Avatar className="h-10 w-10">
-            <AvatarImage src={user.avatar || "/placeholder.svg"} alt={user.name} />
-            <AvatarFallback>{user.name.charAt(0)}</AvatarFallback>
+            <AvatarImage src={user.avatar || undefined} alt={user.name} />
+            <AvatarFallback name={user.name} userId={user.id} />
           </Avatar>
         </Button>
       </DropdownMenuTrigger>

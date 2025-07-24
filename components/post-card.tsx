@@ -43,8 +43,8 @@ export function PostCard({ post, user, comments, onLike, onComment }: PostCardPr
       <CardHeader className="pb-3">
         <div className="flex items-start gap-3">
           <Avatar className="h-10 w-10">
-            <AvatarImage src={post.user.avatar || "/placeholder.svg"} alt={post.user.name} />
-            <AvatarFallback>{post.user.name.charAt(0)}</AvatarFallback>
+            <AvatarImage src={post.user.avatar || undefined} alt={post.user.name} />
+            <AvatarFallback name={post.user.name} userId={post.user.id} />
           </Avatar>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
@@ -124,8 +124,8 @@ export function PostCard({ post, user, comments, onLike, onComment }: PostCardPr
             {user && (
               <form onSubmit={handleComment} className="flex gap-2 mb-4">
                 <Avatar className="h-8 w-8">
-                  <AvatarImage src={user.avatar || "/placeholder.svg"} alt={user.name} />
-                  <AvatarFallback>{user.name.charAt(0)}</AvatarFallback>
+                  <AvatarImage src={user.avatar || undefined} alt={user.name} />
+                  <AvatarFallback name={user.name} userId={user.id} />
                 </Avatar>
                 <div className="flex-1 flex gap-2">
                   <Input
@@ -145,8 +145,8 @@ export function PostCard({ post, user, comments, onLike, onComment }: PostCardPr
               {comments.map((comment) => (
                 <div key={comment.id} className="flex gap-3">
                   <Avatar className="h-8 w-8">
-                    <AvatarImage src={comment.user.avatar || "/placeholder.svg"} alt={comment.user.name} />
-                    <AvatarFallback>{comment.user.name.charAt(0)}</AvatarFallback>
+                    <AvatarImage src={comment.user.avatar || undefined} alt={comment.user.name} />
+                    <AvatarFallback name={comment.user.name} userId={comment.user.id} />
                   </Avatar>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
