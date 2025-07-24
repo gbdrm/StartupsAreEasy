@@ -2,11 +2,7 @@ import { createClient } from "@supabase/supabase-js"
 import type { User } from "./types"
 import { supabase } from "./supabase"
 
-// Create a service role client for admin operations
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+const supabaseClient = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
 
 export type TelegramUser = {
   id: number
@@ -21,7 +17,7 @@ export type TelegramUser = {
 export async function signInWithTelegram(telegramUser: TelegramUser): Promise<User> {
   // Local development override: sign in as NEXT_PUBLIC_DEFAULT_USER_ID if set
   if (process.env.NEXT_PUBLIC_DEFAULT_USER_ID) {
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await supabaseClient
       .from("users")
       .select("*")
       .eq("id", process.env.NEXT_PUBLIC_DEFAULT_USER_ID)
@@ -42,7 +38,7 @@ export async function signInWithTelegram(telegramUser: TelegramUser): Promise<Us
     console.log("Attempting to sign in with Telegram user:", telegramUser)
 
     // Use the admin client to bypass RLS for user creation/updates
-    const { data: existingUser, error: selectError } = await supabaseAdmin
+    const { data: existingUser, error: selectError } = await supabaseClient
       .from("users")
       .select("*")
       .eq("telegram_id", telegramUser.id)
@@ -52,7 +48,7 @@ export async function signInWithTelegram(telegramUser: TelegramUser): Promise<Us
 
     if (existingUser) {
       // Update existing user with latest info
-      const { data, error } = await supabaseAdmin
+      const { data, error } = await supabaseClient
         .from("users")
         .update({
           username: telegramUser.username || `user_${telegramUser.id}`,
@@ -81,7 +77,7 @@ export async function signInWithTelegram(telegramUser: TelegramUser): Promise<Us
     } else {
       // Create new user using admin client
       console.log("Creating new user...")
-      const { data, error } = await supabaseAdmin
+      const { data, error } = await supabaseClient
         .from("users")
         .insert({
           telegram_id: telegramUser.id,
