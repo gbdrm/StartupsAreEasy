@@ -2,7 +2,7 @@ import { createClient } from "@supabase/supabase-js"
 import type { User } from "./types"
 
 // Create a service role client for admin operations
-const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
+const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
 
 interface TelegramUser {
   id: number
