@@ -17,91 +17,52 @@ export type TelegramUser = {
 export async function signInWithTelegram(telegramUser: TelegramUser): Promise<User> {
   // Local development override: sign in as NEXT_PUBLIC_DEFAULT_USER_ID if set
   if (process.env.NEXT_PUBLIC_DEFAULT_USER_ID) {
-    const { data, error } = await supabaseClient
-      .from("users")
-      .select("*")
+    const { data: profile, error } = await supabase
+      .from("profiles")
+      .select("id, username, first_name, last_name, avatar_url")
       .eq("id", process.env.NEXT_PUBLIC_DEFAULT_USER_ID)
       .single();
-    if (error || !data) throw new Error("Could not find default user for local dev");
+    if (error || !profile) throw new Error("Could not find default profile for local dev");
     return {
-      id: data.id,
-      name: `${data.first_name} ${data.last_name || ""}`.trim(),
-      username: data.username,
-      avatar: data.avatar_url || "",
-      telegram_id: data.telegram_id,
-      first_name: data.first_name,
-      last_name: data.last_name,
+      id: profile.id,
+      name: `${profile.first_name ?? ""} ${profile.last_name ?? ""}`.trim(),
+      username: profile.username ?? "",
+      avatar: profile.avatar_url ?? "",
+      first_name: profile.first_name,
+      last_name: profile.last_name,
     };
   }
 
   try {
-    console.log("Attempting to sign in with Telegram user:", telegramUser)
+    // Get the current authenticated user from Supabase Auth
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
+    if (authError || !user) throw new Error("No authenticated user found. Please sign in with Supabase Auth.")
 
-    // Use the admin client to bypass RLS for user creation/updates
-    const { data: existingUser, error: selectError } = await supabaseClient
-      .from("users")
-      .select("*")
-      .eq("telegram_id", telegramUser.id)
+    // Upsert profile info for this user
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .upsert({
+        id: user.id,
+        username: telegramUser.username || `user_${telegramUser.id}`,
+        first_name: telegramUser.first_name,
+        last_name: telegramUser.last_name,
+        avatar_url: telegramUser.photo_url,
+        updated_at: new Date().toISOString(),
+      })
+      .select()
       .single()
+    if (profileError) throw profileError
 
-    console.log("Existing user query result:", { existingUser, selectError })
-
-    if (existingUser) {
-      // Update existing user with latest info
-      const { data, error } = await supabaseClient
-        .from("users")
-        .update({
-          username: telegramUser.username || `user_${telegramUser.id}`,
-          first_name: telegramUser.first_name,
-          last_name: telegramUser.last_name,
-          avatar_url: telegramUser.photo_url,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("telegram_id", telegramUser.id)
-        .select()
-        .single()
-
-      console.log("Update user result:", { data, error })
-
-      if (error) throw error
-
-      return {
-        id: data.id,
-        name: `${data.first_name} ${data.last_name || ""}`.trim(),
-        username: data.username,
-        avatar: data.avatar_url || "",
-        telegram_id: data.telegram_id,
-        first_name: data.first_name,
-        last_name: data.last_name,
-      }
-    } else {
-      // Create new user using admin client
-      console.log("Creating new user...")
-      const { data, error } = await supabaseClient
-        .from("users")
-        .insert({
-          telegram_id: telegramUser.id,
-          username: telegramUser.username || `user_${telegramUser.id}`,
-          first_name: telegramUser.first_name,
-          last_name: telegramUser.last_name,
-          avatar_url: telegramUser.photo_url,
-        })
-        .select()
-        .single()
-
-      console.log("Create user result:", { data, error })
-
-      if (error) throw error
-
-      return {
-        id: data.id,
-        name: `${data.first_name} ${data.last_name || ""}`.trim(),
-        username: data.username,
-        avatar: data.avatar_url || "",
-        telegram_id: data.telegram_id,
-        first_name: data.first_name,
-        last_name: data.last_name,
-      }
+    return {
+      id: user.id,
+      name: `${profile.first_name ?? ""} ${profile.last_name ?? ""}`.trim(),
+      username: profile.username ?? "",
+      avatar: profile.avatar_url ?? "",
+      first_name: profile.first_name,
+      last_name: profile.last_name,
     }
   } catch (error) {
     console.error("Error signing in with Telegram:", error)
