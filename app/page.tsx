@@ -181,7 +181,7 @@ export default function HomePage() {
       <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container flex h-16 items-center justify-between">
           <div className="flex items-center gap-2">
-            <h1 className="text-xl font-bold">StartupFeed</h1>
+            <h1 className="text-xl font-bold">Startups Are Easy</h1>
             <span className="text-2xl">🚀</span>
           </div>
           <AuthButton user={currentUser} onLogin={handleLogin} onLogout={handleLogout} />
