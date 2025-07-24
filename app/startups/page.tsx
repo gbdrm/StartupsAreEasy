@@ -1,13 +1,12 @@
 "use client"
 
-import { AuthButton } from "@/components/auth-button"
+import { Header } from "@/components/header"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { supabase } from "@/lib/supabase"
 import { signInWithTelegram, getCurrentUserProfile, signOut } from "@/lib/auth"
 import type { User } from "@/lib/types"
 import type { TelegramUser } from "@/lib/auth"
 import { Loader2 } from "lucide-react"
-import Link from "next/link"
 import { useEffect, useState } from "react"
 
 interface Startup {
@@ -130,16 +129,7 @@ export default function StartupsPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container flex h-16 items-center justify-between">
-          <div className="flex items-center gap-4 ml-4">
-            <h1 className="text-xl font-bold">Startups Are Easy</h1>
-            <span className="text-2xl">🚀</span>
-            <Link href="/startups" className="text-blue-600 hover:underline text-sm">Startups</Link>
-          </div>
-          <AuthButton user={currentUser} onLogin={handleLogin} onLogout={handleLogout} />
-        </div>
-      </header>
+      <Header user={currentUser} onLogin={handleLogin} onLogout={handleLogout} />
       <main className="container max-w-3xl mx-auto py-8 px-4">
         <h1 className="text-3xl font-bold mb-8 text-center">Discover Startups</h1>
         {currentUser && (
