@@ -15,6 +15,25 @@ interface TelegramUser {
 }
 
 export async function signInWithTelegram(telegramUser: TelegramUser): Promise<User> {
+  // Local development override: sign in as NEXT_PUBLIC_DEFAULT_USER_ID if set
+  if (process.env.NEXT_PUBLIC_DEFAULT_USER_ID) {
+    const { data, error } = await supabaseAdmin
+      .from("users")
+      .select("*")
+      .eq("id", process.env.NEXT_PUBLIC_DEFAULT_USER_ID)
+      .single();
+    if (error || !data) throw new Error("Could not find default user for local dev");
+    return {
+      id: data.id,
+      name: `${data.first_name} ${data.last_name || ""}`.trim(),
+      username: data.username,
+      avatar: data.avatar_url || "",
+      telegram_id: data.telegram_id,
+      first_name: data.first_name,
+      last_name: data.last_name,
+    };
+  }
+
   try {
     console.log("Attempting to sign in with Telegram user:", telegramUser)
 

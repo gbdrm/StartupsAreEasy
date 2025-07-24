@@ -21,6 +21,7 @@ import { LogOut } from "lucide-react"
 import type { User } from "@/lib/types"
 import { TelegramLogin } from "./telegram-login"
 import { useState } from "react"
+const isFakeLogin = typeof process !== 'undefined' && !!process.env.NEXT_PUBLIC_DEFAULT_USER_ID;
 
 interface TelegramUser {
   id: number
@@ -51,7 +52,11 @@ export function AuthButton({ user, onLogin, onLogout }: AuthButtonProps) {
     return (
       <Dialog open={showLoginDialog} onOpenChange={setShowLoginDialog}>
         <DialogTrigger asChild>
-          <Button className="bg-[#0088cc] hover:bg-[#0077b3]">Login with Telegram</Button>
+          <Button
+            className={isFakeLogin ? "bg-yellow-500 hover:bg-yellow-600 text-black" : "bg-[#0088cc] hover:bg-[#0077b3]"}
+          >
+            {isFakeLogin ? "Login Fake" : "Login with Telegram"}
+          </Button>
         </DialogTrigger>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -59,10 +64,29 @@ export function AuthButton({ user, onLogin, onLogout }: AuthButtonProps) {
             <DialogDescription>Click the button below to authenticate with your Telegram account.</DialogDescription>
           </DialogHeader>
           <div className="flex justify-center py-4">
-            <TelegramLogin
-              botName="startups_are_easy_bot" // Replace with your actual bot username
-              onAuth={handleTelegramAuth}
-            />
+            {isFakeLogin ? (
+              <button
+                className="bg-yellow-500 hover:bg-yellow-600 text-black font-semibold px-4 py-2 rounded"
+                onClick={() => {
+                  handleTelegramAuth({
+                    id: 0,
+                    first_name: "Fake",
+                    last_name: "User",
+                    username: "fakeuser",
+                    photo_url: "",
+                    auth_date: Date.now(),
+                    hash: "fakehash"
+                  });
+                }}
+              >
+                Sign in as Fake User
+              </button>
+            ) : (
+              <TelegramLogin
+                botName="startups_are_easy_bot"
+                onAuth={handleTelegramAuth}
+              />
+            )}
           </div>
         </DialogContent>
       </Dialog>
