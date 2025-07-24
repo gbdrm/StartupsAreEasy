@@ -10,6 +10,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Loader2 } from "lucide-react"
 import { getPosts, createPost, toggleLike, getComments, createComment } from "@/lib/posts"
 import { signInWithTelegram, signOut, getCurrentUserProfile } from "@/lib/auth"
+import Link from "next/link"
 
 interface TelegramUser {
   id: number

@@ -8,6 +8,7 @@ import type { User } from "@/lib/types"
 import type { TelegramUser } from "@/lib/auth"
 import { Loader2 } from "lucide-react"
 import { useEffect, useState } from "react"
+import Link from "next/link"
 
 interface Startup {
   id: string
@@ -131,7 +132,9 @@ export default function StartupsPage() {
     <div className="min-h-screen bg-background">
       <Header user={currentUser} onLogin={handleLogin} onLogout={handleLogout} />
       <main className="container max-w-3xl mx-auto py-8 px-4">
-        <h1 className="text-3xl font-bold mb-8 text-center">Discover Startups</h1>
+        <h1 className="text-3xl font-bold mb-8 text-center">
+          <Link href="/" className="text-xl font-bold hover:underline">Startups Are Easy</Link>
+        </h1>
         {currentUser && (
           <div className="flex justify-center mb-8">
             <button
