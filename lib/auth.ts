@@ -29,6 +29,7 @@ export type TelegramUser = {
 }
 
 export async function signInWithTelegram(telegramUser: TelegramUser): Promise<User> {
+  // ✅ Local dev override
   if (process.env.NEXT_PUBLIC_DEFAULT_USER_ID) {
     const { data: profile, error } = await supabase
       .from("profiles")
@@ -46,29 +47,28 @@ export async function signInWithTelegram(telegramUser: TelegramUser): Promise<Us
     };
   }
 
+  // 📡 Edge function: get custom JWT
   const res = await fetch("https://jymlmpzzjlepgqbimzdf.functions.supabase.co/telegram-login", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(telegramUser),
   });
+
   if (!res.ok) throw new Error("Telegram login failed");
 
   const { access_token } = await res.json();
   if (!access_token) throw new Error("No access_token returned from edge function");
 
-  // ✅ Встановлюємо сесію — ключовий момент!
+  // ✅ Set session with custom JWT
   const { error: sessionError } = await supabase.auth.setSession({ access_token, refresh_token: "" });
   if (sessionError) throw new Error(`Failed to set session: ${sessionError.message}`);
 
-  // 🔍 Перевіряємо користувача
+  // 👤 Get authenticated user
   const { data: userData, error: userError } = await supabase.auth.getUser();
   if (userError || !userData?.user) throw new Error("No authenticated user found after setting JWT.");
   const user = userData.user;
 
-  // Опціонально зберігаємо токен локально
-  localStorage.setItem("sb-access-token", access_token);
-
-  // 🔁 Upsert профілю
+  // 🧾 Upsert profile
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
     .upsert({
