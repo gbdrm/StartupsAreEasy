@@ -34,7 +34,7 @@ export async function signInWithTelegram(telegramUser: TelegramUser): Promise<Us
   }
 
   // Use Supabase Edge Function to get JWT and set session
-  const res = await fetch("/functions/v1/telegram-login", {
+  const res = await fetch("https://jymlmpzzjlepgqbimzdf.supabase.co/functions/v1/telegram-login", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(telegramUser),
