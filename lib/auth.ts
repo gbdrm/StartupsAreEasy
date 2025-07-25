@@ -1,8 +1,23 @@
+
 import { createClient } from "@supabase/supabase-js"
 import type { User } from "./types"
-import { supabase } from "./supabase"
+import { supabase as baseSupabase } from "./supabase"
 
-const supabaseClient = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
+let supabase = baseSupabase;
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+
+function setSupabaseAuthClient(access_token?: string) {
+  if (access_token) {
+    supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      global: {
+        headers: { Authorization: `Bearer ${access_token}` },
+      },
+    });
+  } else {
+    supabase = baseSupabase;
+  }
+}
 
 export type TelegramUser = {
   id: number
@@ -33,25 +48,26 @@ export async function signInWithTelegram(telegramUser: TelegramUser): Promise<Us
     };
   }
 
-  // Use Supabase Edge Function to get JWT and set session
+  // Use Supabase Edge Function to get JWT
   const res = await fetch("https://jymlmpzzjlepgqbimzdf.functions.supabase.co/telegram-login", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(telegramUser),
-  })
-  if (!res.ok) throw new Error("Telegram login failed")
-  const { access_token, refresh_token = "" } = await res.json()
-  if (!access_token) throw new Error("No access_token returned from edge function")
+  });
+  if (!res.ok) throw new Error("Telegram login failed");
+  const { access_token } = await res.json();
+  if (!access_token) throw new Error("No access_token returned from edge function");
 
-  // Set Supabase Auth session
-  await supabase.auth.setSession({ access_token, refresh_token })
+  // Store JWT in localStorage (for session restoration)
+  localStorage.setItem("sb-access-token", access_token);
 
-  // Get the current authenticated user from Supabase Auth
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser()
-  if (authError || !user) throw new Error("No authenticated user found after setting session.")
+  // Re-create Supabase client with Authorization header
+  setSupabaseAuthClient(access_token);
+
+  // Retrieve authenticated user
+  const { data: userData, error: userError } = await supabase.auth.getUser();
+  if (userError || !userData?.user) throw new Error("No authenticated user found after setting JWT.");
+  const user = userData.user;
 
   // Upsert profile info for this user
   const { data: profile, error: profileError } = await supabase
@@ -65,8 +81,8 @@ export async function signInWithTelegram(telegramUser: TelegramUser): Promise<Us
       updated_at: new Date().toISOString(),
     })
     .select()
-    .single()
-  if (profileError) throw profileError
+    .single();
+  if (profileError) throw profileError;
 
   return {
     id: user.id,
@@ -75,24 +91,26 @@ export async function signInWithTelegram(telegramUser: TelegramUser): Promise<Us
     avatar: profile.avatar_url ?? "",
     first_name: profile.first_name,
     last_name: profile.last_name,
-  }
+  };
 }
 
 export async function getCurrentUserProfile() {
+  // Restore JWT from localStorage if present
+  const access_token = localStorage.getItem("sb-access-token");
+  setSupabaseAuthClient(access_token || undefined);
+
   // Get the authenticated user from Supabase Auth
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser()
-  if (authError || !user) return null
+  const { data: userData, error: authError } = await supabase.auth.getUser();
+  if (authError || !userData?.user) return null;
+  const user = userData.user;
 
   // Load profile data from profiles table
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
     .select("id, username, first_name, last_name, avatar_url")
     .eq("id", user.id)
-    .single()
-  if (profileError || !profile) return null
+    .single();
+  if (profileError || !profile) return null;
 
   return {
     id: user.id,
@@ -101,9 +119,10 @@ export async function getCurrentUserProfile() {
     first_name: profile.first_name,
     last_name: profile.last_name,
     avatar_url: profile.avatar_url,
-  }
+  };
 }
 
 export async function signOut() {
-  await supabase.auth.signOut()
+  localStorage.removeItem("sb-access-token");
+  setSupabaseAuthClient();
 }
