@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import type { User } from "./types";
-import { supabase } from "./supabase"; // base client created once
+import { supabase } from "./supabase";
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
 export type TelegramUser = {
   id: number;
@@ -11,6 +12,42 @@ export type TelegramUser = {
   auth_date: number;
   hash: string;
 };
+
+export async function loginWithTelegram(initData: string) {
+  try {
+    const res = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/telegram-login`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ initData }),
+    });
+
+    if (!res.ok) {
+      console.error('[ERROR] Telegram login failed with status:', res.status);
+      return false;
+    }
+
+    const { access_token } = await res.json();
+    const supabase = createClientComponentClient();
+
+    const { error } = await supabase.auth.setSession({
+      access_token,
+      refresh_token: '', // custom JWT, so no refresh
+    });
+
+    if (error) {
+      console.error('[ERROR] setSession failed:', error);
+      return false;
+    }
+
+    console.log('[INFO] Telegram login success');
+    return true;
+  } catch (e) {
+    console.error('[ERROR] Telegram login exception:', e);
+    return false;
+  }
+}
 
 export async function signInWithTelegram(telegramUser: TelegramUser): Promise<User> {
   if (process.env.NEXT_PUBLIC_DEFAULT_USER_ID) {
