@@ -30,7 +30,7 @@ export async function signInWithTelegram(telegramUser: TelegramUser): Promise<Us
     };
   }
 
-  const res = await fetch("https://jymlmpzzjlepgqbimzdf.functions.supabase.co/telegram-login", {
+  const res = await fetch("https://jymlmpzzjlepgqbimzdf.functions.supabase.co/tg-login", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(telegramUser),
