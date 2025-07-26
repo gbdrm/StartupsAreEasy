@@ -13,7 +13,6 @@ export type TelegramUser = {
 };
 
 export async function signInWithTelegram(telegramUser: TelegramUser): Promise<User> {
-  const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
   if (process.env.NEXT_PUBLIC_DEFAULT_USER_ID) {
     const { data: profile, error } = await supabase
       .from("profiles")
