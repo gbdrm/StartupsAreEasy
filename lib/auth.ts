@@ -1,7 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import type { User } from "./types";
-import { supabase } from "./supabase";
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { supabase } from "./supabase"; // base client created once
 
 export type TelegramUser = {
   id: number;
@@ -13,43 +12,8 @@ export type TelegramUser = {
   hash: string;
 };
 
-export async function loginWithTelegram(initData: string) {
-  try {
-    const res = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/telegram-login`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ initData }),
-    });
-
-    if (!res.ok) {
-      console.error('[ERROR] Telegram login failed with status:', res.status);
-      return false;
-    }
-
-    const { access_token } = await res.json();
-    const supabase = createClientComponentClient();
-
-    const { error } = await supabase.auth.setSession({
-      access_token,
-      refresh_token: '', // custom JWT, so no refresh
-    });
-
-    if (error) {
-      console.error('[ERROR] setSession failed:', error);
-      return false;
-    }
-
-    console.log('[INFO] Telegram login success');
-    return true;
-  } catch (e) {
-    console.error('[ERROR] Telegram login exception:', e);
-    return false;
-  }
-}
-
 export async function signInWithTelegram(telegramUser: TelegramUser): Promise<User> {
+  const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
   if (process.env.NEXT_PUBLIC_DEFAULT_USER_ID) {
     const { data: profile, error } = await supabase
       .from("profiles")
@@ -74,11 +38,11 @@ export async function signInWithTelegram(telegramUser: TelegramUser): Promise<Us
   });
 
   if (!res.ok) throw new Error("Telegram login failed");
+  const { access_token } = await res.json();
+  if (!access_token) throw new Error("No access_token returned from edge function");
 
-  const { access_token, refresh_token } = await res.json();
-  if (!access_token || !refresh_token) throw new Error("Tokens missing from edge function");
-
-  const { error: sessionError } = await supabase.auth.setSession({ access_token, refresh_token });
+  // Set Supabase Auth session (refresh_token is empty string)
+  const { error: sessionError } = await supabase.auth.setSession({ access_token, refresh_token: '' });
   if (sessionError) throw new Error(`Failed to set session: ${sessionError.message}`);
 
   const { data: userData, error: userError } = await supabase.auth.getUser();
