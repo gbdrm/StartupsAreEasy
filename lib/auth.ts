@@ -1,23 +1,5 @@
-import { createClient } from "@supabase/supabase-js";
+import { supabase } from "./supabase";
 import type { User } from "./types";
-
-import { supabase as baseSupabase } from "./supabase"; // base client for unauthenticated calls
-
-let supabase = baseSupabase;
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-
-function setSupabaseAuthClient(access_token?: string) {
-  if (access_token) {
-    supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      global: {
-        headers: { Authorization: `Bearer ${access_token}` },
-      },
-    });
-  } else {
-    supabase = baseSupabase;
-  }
-}
 
 export type TelegramUser = {
   id: number;
@@ -32,7 +14,7 @@ export type TelegramUser = {
 export async function signInWithTelegram(telegramUser: TelegramUser): Promise<User> {
   // Local dev override
   if (process.env.NEXT_PUBLIC_DEFAULT_USER_ID) {
-    const { data: profile, error } = await baseSupabase
+    const { data: profile, error } = await supabase
       .from("profiles")
       .select("id, username, first_name, last_name, avatar_url")
       .eq("id", process.env.NEXT_PUBLIC_DEFAULT_USER_ID)
@@ -60,7 +42,9 @@ export async function signInWithTelegram(telegramUser: TelegramUser): Promise<Us
 
   // Store JWT in localStorage
   localStorage.setItem("sb-access-token", access_token);
-  setSupabaseAuthClient(access_token);
+
+  // Set session on the single client
+  await supabase.auth.setSession({ access_token, refresh_token: "" });
 
   // Get user from JWT
   const { data: userData, error: userError } = await supabase.auth.getUser();
@@ -95,7 +79,9 @@ export async function signInWithTelegram(telegramUser: TelegramUser): Promise<Us
 export async function getCurrentUserProfile() {
   // Restore JWT from localStorage if present
   const access_token = localStorage.getItem("sb-access-token");
-  setSupabaseAuthClient(access_token || undefined);
+  if (access_token) {
+    await supabase.auth.setSession({ access_token, refresh_token: "" });
+  }
 
   const { data: userData, error: authError } = await supabase.auth.getUser();
   if (authError || !userData?.user) return null;
@@ -120,5 +106,5 @@ export async function getCurrentUserProfile() {
 
 export async function signOut() {
   localStorage.removeItem("sb-access-token");
-  setSupabaseAuthClient();
+  await supabase.auth.signOut();
 }
