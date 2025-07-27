@@ -31,25 +31,43 @@ export async function signInWithTelegram(telegramUser: TelegramUser): Promise<Us
   }
 
   // Call backend to get JWT
+  console.log('[DEBUG] Calling backend with Telegram data:', telegramUser);
   const res = await fetch("https://jymlmpzzjlepgqbimzdf.functions.supabase.co/tg-login", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(telegramUser),
   });
-  if (!res.ok) throw new Error("Telegram login failed");
-  const { access_token } = await res.json();
-  if (!access_token) throw new Error("No access_token returned from edge function");
+  if (!res.ok) {
+    console.error('[ERROR] Backend response not OK:', res.status, await res.text());
+    throw new Error("Telegram login failed");
+  }
+  const { access_token, refresh_token } = await res.json();
+  console.log('[DEBUG] Received tokens:', {
+    access_token: access_token?.slice(0, 20) + '...', // only log beginning of token for security
+    has_refresh_token: !!refresh_token
+  });
 
-  // Store JWT in localStorage
+  // Decode JWT for debugging
+  decodeJwt(access_token); // This will show us the actual content of the JWT
+
+  // Store JWT in localStorage and set session
   localStorage.setItem("sb-access-token", access_token);
-
-  // Set session on the single client
-  await supabase.auth.setSession({ access_token, refresh_token: "" });
+  console.log('[DEBUG] About to set Supabase session');
+  const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
+    access_token,
+    refresh_token
+  });
+  console.log('[DEBUG] setSession result:', { data: sessionData, error: sessionError });
 
   // Get user from JWT
   const { data: userData, error: userError } = await supabase.auth.getUser();
-  if (userError || !userData?.user) throw new Error("No authenticated user found after setting JWT");
+  console.log('[DEBUG] getUser result:', { data: userData, error: userError });
+  if (userError || !userData?.user) {
+    console.error('[ERROR] No authenticated user after setting session');
+    throw new Error("No authenticated user found after setting JWT");
+  }
   const user = userData.user;
+  console.log('[DEBUG] Successfully got user:', { id: user.id, email: user.email });
 
   // Upsert profile info
   const { data: profile, error: profileError } = await supabase
@@ -107,4 +125,12 @@ export async function getCurrentUserProfile() {
 export async function signOut() {
   localStorage.removeItem("sb-access-token");
   await supabase.auth.signOut();
+}
+
+function decodeJwt(token: string) {
+  const [header, payload] = token.split('.').slice(0, 2).map(part =>
+    JSON.parse(atob(part.replace(/-/g, '+').replace(/_/g, '/')))
+  );
+  console.log('[DEBUG] Decoded JWT:', { header, payload });
+  return { header, payload };
 }
