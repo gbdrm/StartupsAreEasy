@@ -3,7 +3,7 @@
 import { Header } from "@/components/header"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { ExternalLink, MessageCircle } from "lucide-react"
+import { ExternalLink, MessageCircle, Github } from "lucide-react"
 import { useAuth } from "@/hooks/use-auth"
 
 export default function AboutPage() {
@@ -77,8 +77,11 @@ export default function AboutPage() {
                 Want feedback on an idea? Want to see what others are building?
                 Join our Telegram group — it's where a lot of the energy lives.
               </p>
+              <p>
+                This project is open source! Check out the code, contribute features, or report bugs on GitHub.
+              </p>
               
-              <div className="flex gap-4 pt-4">
+              <div className="flex flex-col sm:flex-row gap-4 pt-4">
                 <Button asChild>
                   <a 
                     href="https://t.me/startupsareeasy" 
@@ -88,6 +91,19 @@ export default function AboutPage() {
                   >
                     <MessageCircle className="h-4 w-4" />
                     Join Telegram Group
+                    <ExternalLink className="h-4 w-4" />
+                  </a>
+                </Button>
+                
+                <Button variant="outline" asChild>
+                  <a 
+                    href="https://github.com/gbdrm/StartupsAreEasy/" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2"
+                  >
+                    <Github className="h-4 w-4" />
+                    View on GitHub
                     <ExternalLink className="h-4 w-4" />
                   </a>
                 </Button>

@@ -58,33 +58,6 @@ export default function StartupsPage() {
     fetchStartups()
   }, [])
 
-  useEffect(() => {
-    async function fetchUser() {
-      const user = await getCurrentUserProfile()
-      setCurrentUser(user)
-    }
-    fetchUser()
-  }, [])
-
-  const handleLogin = async (telegramUser: TelegramUser) => {
-    try {
-      setError(null)
-      const user = await signInWithTelegram(telegramUser)
-      setCurrentUser(user)
-    } catch (err) {
-      setError(`Failed to log in: ${err instanceof Error ? err.message : "Unknown error"}`)
-    }
-  }
-
-  const handleLogout = async () => {
-    try {
-      await signOut()
-      setCurrentUser(null)
-    } catch (err) {
-      // Optionally handle error
-    }
-  }
-
   const handleCreateStartup = async (e: React.FormEvent) => {
     e.preventDefault()
     setCreating(true)
