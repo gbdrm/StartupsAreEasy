@@ -38,7 +38,7 @@ export async function signInWithTelegram(telegramUser: TelegramUser): Promise<Us
   }
 
   // Call backend to get JWT
-  const res = await fetch("https://jymlmpzzjlepgqbimzdf.functions.supabase.co/tg-login", {
+  const res = await fetch(API_ENDPOINTS.TELEGRAM_LOGIN, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(telegramUser),

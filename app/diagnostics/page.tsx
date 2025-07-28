@@ -263,7 +263,8 @@ export default function DiagnosticsPage() {
         SUPABASE_URL: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
         SUPABASE_ANON_KEY: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
         DEFAULT_USER_ID: !!process.env.NEXT_PUBLIC_DEFAULT_USER_ID,
-        TELEGRAM_BOT_TOKEN: !!process.env.NEXT_PUBLIC_TELEGRAM_BOT_TOKEN || !!process.env.TELEGRAM_BOT_TOKEN
+        TELEGRAM_BOT_TOKEN: !!process.env.TELEGRAM_BOT_TOKEN,
+        TELEGRAM_FUNCTION_URL: !!process.env.NEXT_PUBLIC_TELEGRAM_FUNCTION_URL
       }
 
       const missingEnvVars = Object.entries(envChecks).filter(([key, exists]) => !exists).map(([key]) => key)
@@ -272,8 +273,8 @@ export default function DiagnosticsPage() {
         name: '[Client] Environment Variables',
         status: missingEnvVars.length === 0 ? 'success' : 'warning',
         message: missingEnvVars.length === 0 
-          ? 'All required client environment variables are set'
-          : `Missing: ${missingEnvVars.join(', ')}`,
+          ? 'All environment variables are set'
+          : `Missing (optional): ${missingEnvVars.join(', ')}`,
         details: envChecks
       })
 
@@ -306,7 +307,25 @@ export default function DiagnosticsPage() {
 
       // Test 12: Test Telegram login endpoint (Client-side)
       try {
-        const response = await fetch('https://jymlmpzzjlepgqbimzdf.supabase.co/functions/v1/telegram', {
+        // Use environment variable if available, otherwise construct from Supabase URL
+        let telegramUrl = process.env.NEXT_PUBLIC_TELEGRAM_FUNCTION_URL
+        
+        if (!telegramUrl) {
+          const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+          if (!supabaseUrl) {
+            throw new Error('NEXT_PUBLIC_SUPABASE_URL not found')
+          }
+          
+          // Extract the project reference from the Supabase URL to construct the function URL
+          const urlParts = supabaseUrl.match(/https:\/\/([^.]+)\.supabase\.co/)
+          if (!urlParts) {
+            throw new Error('Invalid Supabase URL format')
+          }
+          const projectRef = urlParts[1]
+          telegramUrl = `https://${projectRef}.functions.supabase.co/tg-login`
+        }
+        
+        const response = await fetch(telegramUrl, {
           method: 'GET'
         })
         
@@ -316,7 +335,12 @@ export default function DiagnosticsPage() {
           message: response.status === 405 
             ? 'Telegram function is accessible (returns 405 for GET as expected)'
             : `Telegram function returned status: ${response.status}`,
-          details: { status: response.status, statusText: response.statusText }
+          details: { 
+            url: telegramUrl,
+            usingEnvVar: !!process.env.NEXT_PUBLIC_TELEGRAM_FUNCTION_URL,
+            status: response.status, 
+            statusText: response.statusText 
+          }
         })
       } catch (err: any) {
         results.push({

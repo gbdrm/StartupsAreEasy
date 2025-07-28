@@ -19,5 +19,5 @@ export const STORAGE_KEYS = {
 
 // API Endpoints
 export const API_ENDPOINTS = {
-    TELEGRAM_LOGIN: "https://jymlmpzzjlepgqbimzdf.functions.supabase.co/tg-login"
+    TELEGRAM_LOGIN: process.env.NEXT_PUBLIC_TELEGRAM_FUNCTION_URL || "https://jymlmpzzjlepgqbimzdf.functions.supabase.co/tg-login"
 } as const
