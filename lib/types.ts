@@ -1,4 +1,4 @@
-export type PostType = "post" | "idea" | "started" | "progress" | "fail" | "link"
+export type PostType = "post" | "idea" | "launch" | "progress" | "question"
 
 export interface User {
   id: string
@@ -34,8 +34,7 @@ export interface Comment {
 export const POST_TYPES = {
   post: { emoji: "📝", label: "Post" },
   idea: { emoji: "💡", label: "Idea" },
-  started: { emoji: "🚀", label: "Started" },
+  launch: { emoji: "🚀", label: "Launch" },
   progress: { emoji: "✅", label: "Progress" },
-  fail: { emoji: "❌", label: "Fail" },
-  link: { emoji: "🔗", label: "Link" },
+  question: { emoji: "🙋‍♂️", label: "Question" },
 } as const

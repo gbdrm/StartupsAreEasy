@@ -16,9 +16,11 @@ export function Header({ user, onLogin, onLogout }: HeaderProps) {
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-16 items-center justify-between">
         <div className="flex items-center gap-4 ml-4">
-          <h1 className="text-xl font-bold">Startups Are Easy</h1>
+          <Link href="/" className="text-xl font-bold hover:text-gray-700 transition-colors">
+            Startups Are Easy
+          </Link>
           <span className="text-2xl">🚀</span>
-          <Link href="/startups" className="text-blue-600 hover:underline text-sm">
+          <Link href="/startups" className="text-xl font-semibold hover:text-gray-700 transition-colors">
             Startups
           </Link>
         </div>
