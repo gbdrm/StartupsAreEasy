@@ -1,27 +1,34 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { PostForm } from "@/components/post-form"
+import { EnhancedPostForm } from "@/components/enhanced-post-form"
 import { PostCard } from "@/components/post-card"
 import { Header } from "@/components/header"
-import type { Post, Comment, PostType } from "@/lib/types"
+import type { Post, Comment, PostType, PostFormData, Startup } from "@/lib/types"
 import { Separator } from "@/components/ui/separator"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Loader2 } from "lucide-react"
-import { getPosts, createPost, toggleLike, getComments, createComment } from "@/lib/posts"
+import { Button } from "@/components/ui/button"
+import { Loader2, Plus } from "lucide-react"
+import { getPosts, toggleLike, getComments, createComment } from "@/lib/posts"
+import { createEnhancedPost, getUserStartupsForPosts } from "@/lib/enhanced-posts"
 import { useAuth } from "@/hooks/use-auth"
-import Link from "next/link"
 
 export default function HomePage() {
   const { user: currentUser, login: handleLogin, logout: handleLogout } = useAuth()
   const [posts, setPosts] = useState<Post[]>([])
   const [comments, setComments] = useState<Comment[]>([])
+  const [userStartups, setUserStartups] = useState<Startup[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [showPostForm, setShowPostForm] = useState(false)
+  const [isCreatingPost, setIsCreatingPost] = useState(false)
 
-  // Load posts
+  // Load posts and user startups
   useEffect(() => {
     loadPosts()
+    if (currentUser) {
+      loadUserStartups()
+    }
   }, [currentUser])
 
   const loadPosts = async () => {
@@ -44,26 +51,38 @@ export default function HomePage() {
     }
   }
 
-  const handleCreatePost = async (data: {
-    type: PostType
-    content: string
-    link?: string
-  }) => {
+  const loadUserStartups = async () => {
+    if (!currentUser) return
+    try {
+      const startups = await getUserStartupsForPosts(currentUser.id)
+      setUserStartups(startups)
+    } catch (err) {
+      console.error("Error loading user startups:", err)
+    }
+  }
+
+  const handleCreatePost = async (data: PostFormData) => {
     if (!currentUser) return
 
     try {
-      await createPost({
-        userId: currentUser.id,
-        type: data.type,
-        content: data.content,
-        link: data.link,
-      })
+      setIsCreatingPost(true)
+      setError(null)
+      
+      const { post } = await createEnhancedPost(data, currentUser.id)
 
-      // Reload posts to show the new one
-      await loadPosts()
+      // Add the new post to the top of the list
+      setPosts(prevPosts => [post, ...prevPosts])
+      
+      // Reload user startups in case new ones were created
+      await loadUserStartups()
+      
+      // Hide the form
+      setShowPostForm(false)
     } catch (err) {
       console.error("Error creating post:", err)
       setError("Failed to create post. Please try again.")
+    } finally {
+      setIsCreatingPost(false)
     }
   }
 
@@ -144,7 +163,29 @@ export default function HomePage() {
             </Alert>
           )}
 
-          <PostForm user={currentUser} onSubmit={handleCreatePost} />
+          {/* Create Post Button */}
+          {currentUser && !showPostForm && (
+            <div className="flex justify-center">
+              <Button
+                onClick={() => setShowPostForm(true)}
+                className="flex items-center gap-2"
+                size="lg"
+              >
+                <Plus className="h-4 w-4" />
+                Create Post
+              </Button>
+            </div>
+          )}
+
+          {/* Enhanced Post Form */}
+          {showPostForm && currentUser && (
+            <EnhancedPostForm
+              onSubmit={handleCreatePost}
+              userStartups={userStartups}
+              isSubmitting={isCreatingPost}
+              onCancel={() => setShowPostForm(false)}
+            />
+          )}
 
           <Separator />
 

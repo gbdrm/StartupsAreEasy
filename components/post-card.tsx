@@ -65,6 +65,28 @@ export function PostCard({ post, user, comments, onLike, onComment }: PostCardPr
       </CardHeader>
 
       <CardContent className="pt-0">
+        {/* Show startup info for idea/launch/progress posts */}
+        {post.startup && (post.type === "idea" || post.type === "launch" || post.type === "progress") && (
+          <div className="mb-3 p-3 bg-muted rounded-lg">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-lg">
+                {post.type === "idea" && "💡"}
+                {post.type === "launch" && "🚀"}
+                {post.type === "progress" && "📈"}
+              </span>
+              <h3 className="font-semibold">{post.startup.name}</h3>
+              {post.startup.stage && (
+                <span className="text-xs bg-background px-2 py-1 rounded">
+                  {post.startup.stage}
+                </span>
+              )}
+            </div>
+            {post.startup.description && (
+              <p className="text-sm text-muted-foreground">{post.startup.description}</p>
+            )}
+          </div>
+        )}
+
         <p className="text-sm leading-relaxed whitespace-pre-wrap">{post.content}</p>
 
         {post.link && (
