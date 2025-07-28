@@ -3,9 +3,7 @@
 import { Header } from "@/components/header"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { supabase } from "@/lib/supabase"
-import { signInWithTelegram, getCurrentUserProfile, signOut } from "@/lib/auth"
-import type { User } from "@/lib/types"
-import type { TelegramUser } from "@/lib/auth"
+import { useAuth } from "@/hooks/use-auth"
 import { Loader2 } from "lucide-react"
 import { useEffect, useState } from "react"
 import Link from "next/link"
@@ -26,10 +24,10 @@ interface Startup {
 }
 
 export default function StartupsPage() {
+  const { user: currentUser, login: handleLogin, logout: handleLogout } = useAuth()
   const [startups, setStartups] = useState<Startup[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [currentUser, setCurrentUser] = useState<User | null>(null)
   const [showForm, setShowForm] = useState(false)
   const [formData, setFormData] = useState({ name: "", description: "", website_url: "" })
   const [creating, setCreating] = useState(false)

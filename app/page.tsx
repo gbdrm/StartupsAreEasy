@@ -4,39 +4,20 @@ import { useState, useEffect } from "react"
 import { PostForm } from "@/components/post-form"
 import { PostCard } from "@/components/post-card"
 import { Header } from "@/components/header"
-import type { Post, Comment, User, PostType } from "@/lib/types"
+import type { Post, Comment, PostType } from "@/lib/types"
 import { Separator } from "@/components/ui/separator"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Loader2 } from "lucide-react"
 import { getPosts, createPost, toggleLike, getComments, createComment } from "@/lib/posts"
-import { signInWithTelegram, signOut, getCurrentUserProfile } from "@/lib/auth"
+import { useAuth } from "@/hooks/use-auth"
 import Link from "next/link"
 
-interface TelegramUser {
-  id: number
-  first_name: string
-  last_name?: string
-  username?: string
-  photo_url?: string
-  auth_date: number
-  hash: string
-}
-
 export default function HomePage() {
-  const [currentUser, setCurrentUser] = useState<User | null>(null)
+  const { user: currentUser, login: handleLogin, logout: handleLogout } = useAuth()
   const [posts, setPosts] = useState<Post[]>([])
   const [comments, setComments] = useState<Comment[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-
-  // Load user from Supabase Auth on mount
-  useEffect(() => {
-    async function fetchUser() {
-      const user = await getCurrentUserProfile()
-      setCurrentUser(user)
-    }
-    fetchUser()
-  }, [])
 
   // Load posts
   useEffect(() => {
@@ -60,26 +41,6 @@ export default function HomePage() {
       setError("Failed to load posts. Please try again.")
     } finally {
       setLoading(false)
-    }
-  }
-
-  const handleLogin = async (telegramUser: TelegramUser) => {
-    try {
-      setError(null)
-      const user = await signInWithTelegram(telegramUser)
-      setCurrentUser(user)
-    } catch (err) {
-      console.error("Error logging in:", err)
-      setError(`Failed to log in: ${err instanceof Error ? err.message : "Unknown error"}`)
-    }
-  }
-
-  const handleLogout = async () => {
-    try {
-      await signOut()
-      setCurrentUser(null)
-    } catch (err) {
-      console.error("Error logging out:", err)
     }
   }
 

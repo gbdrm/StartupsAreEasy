@@ -23,6 +23,10 @@ export function Header({ user, onLogin, onLogout }: HeaderProps) {
           <Link href="/startups" className="text-xl font-semibold hover:text-gray-700 transition-colors">
             Startups
           </Link>
+          
+          <Link href="/about" className="text-xl font-semibold hover:text-gray-700 transition-colors">
+            About
+          </Link>
         </div>
         <AuthButton user={user} onLogin={onLogin} onLogout={onLogout} />
       </div>
