@@ -96,7 +96,7 @@ export async function createEnhancedPost(
         .select(`
       *,
       user:profiles(*),
-      startup:startups(*)
+      startup:startups!posts_startup_id_fkey(*)
     `)
         .single();
 
