@@ -335,17 +335,28 @@ export default function DiagnosticsPage() {
           method: 'GET'
         })
         
+        // Try to get response body for more details
+        let responseBody = null
+        try {
+          responseBody = await response.json()
+        } catch {
+          // Response might not be JSON
+        }
+        
         results.push({
           name: '[Client] Telegram Function',
-          status: response.status === 405 ? 'success' : 'warning', // 405 = Method Not Allowed is expected for GET
-          message: response.status === 405 
-            ? 'Telegram function is accessible (returns 405 for GET as expected)'
-            : `Telegram function returned status: ${response.status}`,
+          status: response.status === 200 ? 'success' : (response.status === 405 ? 'warning' : 'error'),
+          message: response.status === 200 
+            ? 'Telegram function is accessible and responding correctly'
+            : response.status === 405 
+              ? 'Telegram function is accessible (returns 405 for GET as expected)'
+              : `Telegram function returned status: ${response.status}`,
           details: { 
             url: telegramUrl,
             usingEnvVar: !!process.env.NEXT_PUBLIC_TELEGRAM_FUNCTION_URL,
             status: response.status, 
-            statusText: response.statusText 
+            statusText: response.statusText,
+            responseBody: responseBody
           }
         })
       } catch (err: any) {

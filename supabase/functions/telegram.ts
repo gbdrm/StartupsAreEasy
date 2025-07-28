@@ -19,14 +19,14 @@ function base64url(input) {
 serve(async (req) => {
     try {
         console.log('[INFO] Telegram function called with method:', req.method);
-        
+
         if (req.method === 'OPTIONS') {
             return new Response('ok', {
                 status: 200,
                 headers: corsHeaders
             });
         }
-        
+
         if (req.method === 'GET') {
             // Simple health check endpoint
             return new Response(JSON.stringify({
@@ -47,7 +47,7 @@ serve(async (req) => {
                 }
             });
         }
-        
+
         // Check environment variables
         if (!supabaseUrl || !supabaseServiceRoleKey || !jwtSecretRaw || !botToken) {
             console.error('[ERROR] Missing environment variables:', {
@@ -64,7 +64,7 @@ serve(async (req) => {
                 }
             });
         }
-        
+
         const bodyText = await req.text();
         console.log('[INFO] Raw request body:', bodyText);
         if (!bodyText) {
@@ -135,6 +135,13 @@ serve(async (req) => {
         }
         if (!list?.users?.length) {
             console.log('[INFO] User not found, creating...');
+            
+            // Add detailed logging before user creation
+            console.log('[DEBUG] About to create user with:');
+            console.log('[DEBUG] - Email:', email);
+            console.log('[DEBUG] - User metadata:', JSON.stringify(user_metadata));
+            console.log('[DEBUG] - App metadata: { provider: "telegram" }');
+            
             const { data: newUser, error: createError } = await supabase.auth.admin.createUser({
                 email,
                 email_confirmed: true,
@@ -143,18 +150,37 @@ serve(async (req) => {
                     provider: 'telegram'
                 }
             });
+            
             if (createError) {
                 console.error('[ERROR] Failed to create user:', createError);
-                throw createError;
+                console.error('[ERROR] Error details:', JSON.stringify(createError, null, 2));
+                console.error('[ERROR] Error name:', createError.name);
+                console.error('[ERROR] Error message:', createError.message);
+                console.error('[ERROR] Error status:', createError.status);
+                console.error('[ERROR] Error code:', createError.code);
+                
+                // Return a more detailed error response
+                return new Response(JSON.stringify({
+                    error: 'User creation failed',
+                    message: createError.message,
+                    code: createError.code,
+                    details: createError
+                }), {
+                    status: 500,
+                    headers: {
+                        ...corsHeaders,
+                        'Content-Type': 'application/json'
+                    }
+                });
             }
-            
+
             userId = newUser.user?.id;
-            
+
             if (!userId) {
                 console.error('[ERROR] Could not get user ID from created user');
                 throw new Error('Could not get user ID from created user');
             }
-            
+
             // Create profile record
             console.log('[INFO] Creating profile for user:', userId);
             const { error: profileError } = await supabase
@@ -165,7 +191,7 @@ serve(async (req) => {
                     first_name: first_name,
                     telegram_id: telegram_id ? parseInt(telegram_id) : null
                 });
-            
+
             if (profileError) {
                 console.error('[ERROR] Failed to create profile:', profileError);
                 throw profileError;
@@ -233,14 +259,14 @@ serve(async (req) => {
         });
     } catch (err) {
         console.error('[ERROR] Telegram login failed:', err);
-        
+
         // Return more detailed error information for debugging
         const errorResponse = {
             error: 'Internal error',
             message: err instanceof Error ? err.message : 'Unknown error',
             timestamp: new Date().toISOString()
         };
-        
+
         return new Response(JSON.stringify(errorResponse), {
             status: 500,
             headers: {
