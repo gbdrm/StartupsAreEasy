@@ -44,7 +44,6 @@ export function AuthButton({ user, onLogin, onLogout }: AuthButtonProps) {
   const [showLoginDialog, setShowLoginDialog] = useState(false)
 
   const handleTelegramAuth = (telegramUser: TelegramUser) => {
-    console.log("Telegram auth data received:", telegramUser)
     onLogin(telegramUser)
     setShowLoginDialog(false)
   }

@@ -65,10 +65,8 @@ export default function HomePage() {
 
   const handleLogin = async (telegramUser: TelegramUser) => {
     try {
-      console.log("Login attempt with:", telegramUser)
       setError(null)
       const user = await signInWithTelegram(telegramUser)
-      console.log("Login successful, user:", user)
       setCurrentUser(user)
     } catch (err) {
       console.error("Error logging in:", err)

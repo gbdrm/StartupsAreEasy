@@ -12,7 +12,7 @@ import { Heart, MessageCircle, ExternalLink, Send } from "lucide-react"
 import { POST_TYPES, type Post, type Comment, type User } from "@/lib/types"
 import { formatDistanceToNow } from "date-fns"
 import Image from "next/image"
-import Link from "next/link"
+import { UserLink } from "./user-link"
 
 interface PostCardProps {
   post: Post
@@ -43,20 +43,11 @@ export function PostCard({ post, user, comments, onLike, onComment }: PostCardPr
     <Card>
       <CardHeader className="pb-3">
         <div className="flex items-start gap-3">
-          <Link href={`/profile/${post.user.username}`}>
-            <Avatar className="h-10 w-10 cursor-pointer hover:opacity-80 transition-opacity">
-              <AvatarImage src={post.user.avatar || undefined} alt={post.user.name} />
-              <AvatarFallback name={post.user.name} userId={post.user.id} />
-            </Avatar>
-          </Link>
+          <UserLink user={post.user} showAvatar avatarSize="lg" />
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <Link href={`/profile/${post.user.username}`} className="hover:underline">
-                <p className="font-semibold text-sm">{post.user.name}</p>
-              </Link>
-              <Link href={`/profile/${post.user.username}`} className="hover:underline">
-                <p className="text-muted-foreground text-sm">@{post.user.username}</p>
-              </Link>
+              <UserLink user={post.user} showName />
+              <UserLink user={post.user} showUsername />
               <span className="text-muted-foreground text-sm">·</span>
               <p className="text-muted-foreground text-sm">
                 {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
@@ -151,17 +142,10 @@ export function PostCard({ post, user, comments, onLike, onComment }: PostCardPr
             <div className="space-y-3">
               {comments.map((comment) => (
                 <div key={comment.id} className="flex gap-3">
-                  <Link href={`/profile/${comment.user.username}`}>
-                    <Avatar className="h-8 w-8 cursor-pointer hover:opacity-80 transition-opacity">
-                      <AvatarImage src={comment.user.avatar || undefined} alt={comment.user.name} />
-                      <AvatarFallback name={comment.user.name} userId={comment.user.id} />
-                    </Avatar>
-                  </Link>
+                  <UserLink user={comment.user} showAvatar avatarSize="sm" />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <Link href={`/profile/${comment.user.username}`} className="hover:underline">
-                        <p className="font-semibold text-sm">{comment.user.name}</p>
-                      </Link>
+                      <UserLink user={comment.user} showName />
                       <p className="text-muted-foreground text-xs">
                         {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}
                       </p>

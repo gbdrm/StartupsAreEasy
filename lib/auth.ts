@@ -1,4 +1,5 @@
 import { supabase } from "./supabase";
+import { HAS_FAKE_LOGIN, STORAGE_KEYS, API_ENDPOINTS } from "./constants";
 import type { User } from "./types";
 
 export type TelegramUser = {
@@ -13,7 +14,7 @@ export type TelegramUser = {
 
 export async function signInWithTelegram(telegramUser: TelegramUser): Promise<User> {
   // Local dev override
-  if (process.env.NEXT_PUBLIC_DEFAULT_USER_ID) {
+  if (HAS_FAKE_LOGIN) {
     const { data: profile, error } = await supabase
       .from("profiles")
       .select("id, username, first_name, last_name, avatar_url")
@@ -31,49 +32,43 @@ export async function signInWithTelegram(telegramUser: TelegramUser): Promise<Us
       last_name: profile.last_name,
     };
     localStorage.setItem("fake-user-session", JSON.stringify(fakeUserData));
-    console.log('[FAKE AUTH] Stored fake session for:', fakeUserData.name);
+
 
     return fakeUserData;
   }
 
   // Call backend to get JWT
-  console.log('[DEBUG] Calling backend with Telegram data:', telegramUser);
   const res = await fetch("https://jymlmpzzjlepgqbimzdf.functions.supabase.co/tg-login", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(telegramUser),
   });
   if (!res.ok) {
-    console.error('[ERROR] Backend response not OK:', res.status, await res.text());
+    const errorText = await res.text();
+    console.error('Telegram login failed:', res.status, errorText);
     throw new Error("Telegram login failed");
   }
   const { access_token, refresh_token } = await res.json();
-  console.log('[DEBUG] Received tokens:', {
-    access_token: access_token?.slice(0, 20) + '...', // only log beginning of token for security
-    has_refresh_token: !!refresh_token
-  });
-
-  // Decode JWT for debugging
-  decodeJwt(access_token); // This will show us the actual content of the JWT
 
   // Store JWT in localStorage and set session
   localStorage.setItem("sb-access-token", access_token);
-  console.log('[DEBUG] About to set Supabase session');
   const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
     access_token,
     refresh_token
   });
-  console.log('[DEBUG] setSession result:', { data: sessionData, error: sessionError });
+
+  if (sessionError) {
+    console.error('Session error:', sessionError);
+    throw new Error("Failed to set session");
+  }
 
   // Get user from JWT
   const { data: userData, error: userError } = await supabase.auth.getUser();
-  console.log('[DEBUG] getUser result:', { data: userData, error: userError });
   if (userError || !userData?.user) {
-    console.error('[ERROR] No authenticated user after setting session');
+    console.error('No authenticated user after setting session:', userError);
     throw new Error("No authenticated user found after setting JWT");
   }
   const user = userData.user;
-  console.log('[DEBUG] Successfully got user:', { id: user.id, email: user.email });
 
   // Upsert profile info
   const { data: profile, error: profileError } = await supabase
@@ -103,19 +98,16 @@ export async function signInWithTelegram(telegramUser: TelegramUser): Promise<Us
 export async function getCurrentUserProfile(): Promise<User | null> {
   // Check for fake session first (local dev)
   if (process.env.NEXT_PUBLIC_DEFAULT_USER_ID) {
-    console.log('[FAKE AUTH] Checking for fake session...');
     const fakeSession = localStorage.getItem("fake-user-session");
     if (fakeSession) {
       try {
         const userData = JSON.parse(fakeSession);
-        console.log('[FAKE AUTH] Found fake session:', userData.name);
         return userData;
       } catch (error) {
         console.error("Error parsing fake session:", error);
         localStorage.removeItem("fake-user-session");
       }
     }
-    console.log('[FAKE AUTH] No fake session found');
     return null;
   }
 
@@ -157,12 +149,4 @@ export async function signOut() {
   // Production logout
   localStorage.removeItem("sb-access-token");
   await supabase.auth.signOut();
-}
-
-function decodeJwt(token: string) {
-  const [header, payload] = token.split('.').slice(0, 2).map(part =>
-    JSON.parse(atob(part.replace(/-/g, '+').replace(/_/g, '/')))
-  );
-  console.log('[DEBUG] Decoded JWT:', { header, payload });
-  return { header, payload };
 }
