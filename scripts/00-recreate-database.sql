@@ -360,21 +360,3 @@ GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO authenticated;
 GRANT USAGE ON SCHEMA public TO anon;
 GRANT SELECT ON profiles, startups, posts, likes, comments TO anon;
 GRANT EXECUTE ON FUNCTION get_posts_with_details(UUID) TO anon;
-
--- ===================================================================
--- SAMPLE DATA (Optional - for testing)
--- ===================================================================
-
--- Create a development user manually after running this script:
--- 1. Go to your Supabase Dashboard -> Authentication -> Users
--- 2. Create a new user or note an existing user's ID
--- 3. Insert a profile for that user:
---
--- INSERT INTO profiles (id, username, first_name, last_name, avatar_url) 
--- VALUES (
---     'YOUR-USER-ID-HERE'::UUID, 
---     'devuser', 
---     'Dev', 
---     'User', 
---     'https://via.placeholder.com/150'
--- ) ON CONFLICT (id) DO NOTHING;
