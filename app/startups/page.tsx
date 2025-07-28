@@ -62,19 +62,8 @@ export default function StartupsPage() {
 
   useEffect(() => {
     async function fetchUser() {
-      const profile = await getCurrentUserProfile()
-      if (profile) {
-        setCurrentUser({
-          id: profile.id,
-          name: `${profile.first_name ?? ""} ${profile.last_name ?? ""}`.trim(),
-          username: profile.username ?? "",
-          avatar: profile.avatar_url ?? "",
-          first_name: profile.first_name,
-          last_name: profile.last_name,
-        })
-      } else {
-        setCurrentUser(null)
-      }
+      const user = await getCurrentUserProfile()
+      setCurrentUser(user)
     }
     fetchUser()
   }, [])

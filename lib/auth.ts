@@ -20,7 +20,9 @@ export async function signInWithTelegram(telegramUser: TelegramUser): Promise<Us
       .eq("id", process.env.NEXT_PUBLIC_DEFAULT_USER_ID)
       .single();
     if (error || !profile) throw new Error("Could not find default profile for local dev");
-    return {
+
+    // Store fake session data in localStorage for persistence
+    const fakeUserData = {
       id: profile.id,
       name: `${profile.first_name ?? ""} ${profile.last_name ?? ""}`.trim(),
       username: profile.username ?? "",
@@ -28,6 +30,10 @@ export async function signInWithTelegram(telegramUser: TelegramUser): Promise<Us
       first_name: profile.first_name,
       last_name: profile.last_name,
     };
+    localStorage.setItem("fake-user-session", JSON.stringify(fakeUserData));
+    console.log('[FAKE AUTH] Stored fake session for:', fakeUserData.name);
+
+    return fakeUserData;
   }
 
   // Call backend to get JWT
@@ -94,7 +100,26 @@ export async function signInWithTelegram(telegramUser: TelegramUser): Promise<Us
   };
 }
 
-export async function getCurrentUserProfile() {
+export async function getCurrentUserProfile(): Promise<User | null> {
+  // Check for fake session first (local dev)
+  if (process.env.NEXT_PUBLIC_DEFAULT_USER_ID) {
+    console.log('[FAKE AUTH] Checking for fake session...');
+    const fakeSession = localStorage.getItem("fake-user-session");
+    if (fakeSession) {
+      try {
+        const userData = JSON.parse(fakeSession);
+        console.log('[FAKE AUTH] Found fake session:', userData.name);
+        return userData;
+      } catch (error) {
+        console.error("Error parsing fake session:", error);
+        localStorage.removeItem("fake-user-session");
+      }
+    }
+    console.log('[FAKE AUTH] No fake session found');
+    return null;
+  }
+
+  // Production auth flow
   // Restore JWT from localStorage if present
   const access_token = localStorage.getItem("sb-access-token");
   if (access_token) {
@@ -114,15 +139,22 @@ export async function getCurrentUserProfile() {
 
   return {
     id: user.id,
-    email: user.email,
-    username: profile.username,
+    name: `${profile.first_name ?? ""} ${profile.last_name ?? ""}`.trim(),
+    username: profile.username ?? "",
+    avatar: profile.avatar_url ?? "",
     first_name: profile.first_name,
     last_name: profile.last_name,
-    avatar_url: profile.avatar_url,
   };
 }
 
 export async function signOut() {
+  // Clear fake session for local dev
+  if (process.env.NEXT_PUBLIC_DEFAULT_USER_ID) {
+    localStorage.removeItem("fake-user-session");
+    return;
+  }
+
+  // Production logout
   localStorage.removeItem("sb-access-token");
   await supabase.auth.signOut();
 }
