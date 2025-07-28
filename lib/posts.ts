@@ -169,7 +169,6 @@ export async function getComments(postId: string) {
           first_name,
           last_name,
           avatar_url
-          avatar_url
         )
       `)
       .eq("post_id", postId)
