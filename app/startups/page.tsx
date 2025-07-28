@@ -63,10 +63,15 @@ export default function StartupsPage() {
     setCreating(true)
     setError(null)
     try {
+      if (!currentUser) {
+        throw new Error("You must be logged in to create a startup")
+      }
+      
       const { data, error } = await supabase.from("startups").insert({
         name: formData.name,
         description: formData.description,
         website_url: formData.website_url,
+        user_id: currentUser.id,
         is_public: true,
       }).select().single()
       if (error) throw error

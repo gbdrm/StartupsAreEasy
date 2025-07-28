@@ -1,6 +1,16 @@
 export type PostType = "post" | "idea" | "launch" | "progress"
 export type StartupStage = "idea" | "planning" | "building" | "mvp" | "beta" | "launched" | "scaling" | "acquired" | "paused"
 
+// Post form data for the enhanced form
+export interface PostFormData {
+  type: PostType
+  content?: string
+  link?: string
+  startup_name?: string
+  startup_description?: string
+  existing_startup_id?: string
+}
+
 export interface User {
   id: string
   name: string

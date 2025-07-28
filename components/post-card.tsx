@@ -73,10 +73,10 @@ export function PostCard({ post, user, comments, onLike, onComment }: PostCardPr
               href={post.link}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 text-sm text-blue-600 hover:text-blue-800 hover:underline"
+              className="flex items-center gap-2 w-full p-3 text-sm text-blue-600 hover:text-blue-800 hover:bg-blue-50 dark:hover:bg-blue-950/50 border border-blue-200 dark:border-blue-800 rounded-lg transition-colors"
             >
-              <ExternalLink className="h-4 w-4" />
-              {new URL(post.link).hostname}
+              <ExternalLink className="h-4 w-4 flex-shrink-0" />
+              <span className="truncate">{new URL(post.link).hostname}</span>
             </a>
           </div>
         )}
