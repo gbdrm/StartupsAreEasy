@@ -51,7 +51,7 @@ async function getPostsBasic(userId?: string) {
       link_url,
       image_url,
       created_at,
-      user:users(
+      user:profiles(
         id,
         username,
         first_name,
@@ -163,11 +163,12 @@ export async function getComments(postId: string) {
         id,
         content,
         created_at,
-        user:users(
+        user:profiles(
           id,
           username,
           first_name,
           last_name,
+          avatar_url
           avatar_url
         )
       `)
