@@ -1,0 +1,209 @@
+import { supabase } from "./supabase"
+import type { Startup, StartupStage, User } from "./types"
+
+export async function getStartups(userId?: string): Promise<Startup[]> {
+    let query = supabase
+        .from("startups")
+        .select(`
+      *,
+      user:user_id (
+        id,
+        name,
+        username,
+        avatar,
+        telegram_id,
+        first_name,
+        last_name
+      )
+    `)
+        .eq("is_public", true)
+        .order("created_at", { ascending: false })
+
+    const { data, error } = await query
+
+    if (error) {
+        console.error("Error fetching startups:", error)
+        throw error
+    }
+
+    return data || []
+}
+
+export async function getStartupsByStage(stage: StartupStage): Promise<Startup[]> {
+    const { data, error } = await supabase
+        .from("startups")
+        .select(`
+      *,
+      user:user_id (
+        id,
+        name,
+        username,
+        avatar,
+        telegram_id,
+        first_name,
+        last_name
+      )
+    `)
+        .eq("is_public", true)
+        .eq("stage", stage)
+        .order("created_at", { ascending: false })
+
+    if (error) {
+        console.error("Error fetching startups by stage:", error)
+        throw error
+    }
+
+    return data || []
+}
+
+export async function getUserStartups(userId: string): Promise<Startup[]> {
+    const { data, error } = await supabase
+        .from("startups")
+        .select(`
+      *,
+      user:user_id (
+        id,
+        name,
+        username,
+        avatar,
+        telegram_id,
+        first_name,
+        last_name
+      )
+    `)
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false })
+
+    if (error) {
+        console.error("Error fetching user startups:", error)
+        throw error
+    }
+
+    return data || []
+}
+
+export async function createStartup(startup: {
+    userId?: string  // Made optional since existing table might not require it
+    name: string
+    description?: string
+    website_url?: string
+    industry?: string
+    stage?: StartupStage
+    target_market?: string
+    estimated_timeline?: string
+    looking_for?: string[]
+    is_public?: boolean
+}): Promise<Startup> {
+    const insertData: any = {
+        name: startup.name,
+        description: startup.description,
+        website_url: startup.website_url,
+        industry: startup.industry,
+        stage: startup.stage || "idea",
+        target_market: startup.target_market,
+        estimated_timeline: startup.estimated_timeline,
+        looking_for: startup.looking_for,
+        is_public: startup.is_public ?? true,
+    }
+
+    // Only add user_id if provided and the column exists
+    if (startup.userId) {
+        insertData.user_id = startup.userId
+    }
+
+    const { data, error } = await supabase
+        .from("startups")
+        .insert(insertData)
+        .select(`
+      *,
+      user:user_id (
+        id,
+        name,
+        username,
+        avatar,
+        telegram_id,
+        first_name,
+        last_name
+      )
+    `)
+        .single()
+
+    if (error) {
+        console.error("Error creating startup:", error)
+        throw error
+    }
+
+    return data
+}
+
+export async function updateStartup(
+    startupId: string,
+    updates: Partial<Omit<Startup, "id" | "user_id" | "created_at" | "updated_at">>
+): Promise<Startup> {
+    const { data, error } = await supabase
+        .from("startups")
+        .update(updates)
+        .eq("id", startupId)
+        .select(`
+      *,
+      user:user_id (
+        id,
+        name,
+        username,
+        avatar,
+        telegram_id,
+        first_name,
+        last_name
+      )
+    `)
+        .single()
+
+    if (error) {
+        console.error("Error updating startup:", error)
+        throw error
+    }
+
+    return data
+}
+
+export async function deleteStartup(startupId: string): Promise<void> {
+    const { error } = await supabase
+        .from("startups")
+        .delete()
+        .eq("id", startupId)
+
+    if (error) {
+        console.error("Error deleting startup:", error)
+        throw error
+    }
+}
+
+export async function getStartupBySlug(slug: string): Promise<Startup | null> {
+    const { data, error } = await supabase
+        .from("startups")
+        .select(`
+      *,
+      user:user_id (
+        id,
+        name,
+        username,
+        avatar,
+        telegram_id,
+        first_name,
+        last_name
+      )
+    `)
+        .eq("slug", slug)
+        .eq("is_public", true)
+        .single()
+
+    if (error) {
+        if (error.code === "PGRST116") {
+            return null // Not found
+        }
+        console.error("Error fetching startup by slug:", error)
+        throw error
+    }
+
+    return data
+}
