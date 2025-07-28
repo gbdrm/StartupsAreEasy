@@ -12,6 +12,7 @@ import { Heart, MessageCircle, ExternalLink, Send } from "lucide-react"
 import { POST_TYPES, type Post, type Comment, type User } from "@/lib/types"
 import { formatDistanceToNow } from "date-fns"
 import Image from "next/image"
+import Link from "next/link"
 
 interface PostCardProps {
   post: Post
@@ -42,14 +43,20 @@ export function PostCard({ post, user, comments, onLike, onComment }: PostCardPr
     <Card>
       <CardHeader className="pb-3">
         <div className="flex items-start gap-3">
-          <Avatar className="h-10 w-10">
-            <AvatarImage src={post.user.avatar || undefined} alt={post.user.name} />
-            <AvatarFallback name={post.user.name} userId={post.user.id} />
-          </Avatar>
+          <Link href={`/profile/${post.user.id}`}>
+            <Avatar className="h-10 w-10 cursor-pointer hover:opacity-80 transition-opacity">
+              <AvatarImage src={post.user.avatar || undefined} alt={post.user.name} />
+              <AvatarFallback name={post.user.name} userId={post.user.id} />
+            </Avatar>
+          </Link>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <p className="font-semibold text-sm">{post.user.name}</p>
-              <p className="text-muted-foreground text-sm">@{post.user.username}</p>
+              <Link href={`/profile/${post.user.id}`} className="hover:underline">
+                <p className="font-semibold text-sm">{post.user.name}</p>
+              </Link>
+              <Link href={`/profile/${post.user.id}`} className="hover:underline">
+                <p className="text-muted-foreground text-sm">@{post.user.username}</p>
+              </Link>
               <span className="text-muted-foreground text-sm">·</span>
               <p className="text-muted-foreground text-sm">
                 {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
@@ -144,13 +151,17 @@ export function PostCard({ post, user, comments, onLike, onComment }: PostCardPr
             <div className="space-y-3">
               {comments.map((comment) => (
                 <div key={comment.id} className="flex gap-3">
-                  <Avatar className="h-8 w-8">
-                    <AvatarImage src={comment.user.avatar || undefined} alt={comment.user.name} />
-                    <AvatarFallback name={comment.user.name} userId={comment.user.id} />
-                  </Avatar>
+                  <Link href={`/profile/${comment.user.id}`}>
+                    <Avatar className="h-8 w-8 cursor-pointer hover:opacity-80 transition-opacity">
+                      <AvatarImage src={comment.user.avatar || undefined} alt={comment.user.name} />
+                      <AvatarFallback name={comment.user.name} userId={comment.user.id} />
+                    </Avatar>
+                  </Link>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <p className="font-semibold text-sm">{comment.user.name}</p>
+                      <Link href={`/profile/${comment.user.id}`} className="hover:underline">
+                        <p className="font-semibold text-sm">{comment.user.name}</p>
+                      </Link>
                       <p className="text-muted-foreground text-xs">
                         {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}
                       </p>

@@ -17,10 +17,11 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { LogOut } from "lucide-react"
+import { LogOut, User as UserIcon } from "lucide-react"
 import type { User } from "@/lib/types"
 import { TelegramLogin } from "./telegram-login"
 import { useState } from "react"
+import Link from "next/link"
 const isFakeLogin = typeof process !== 'undefined' && !!process.env.NEXT_PUBLIC_DEFAULT_USER_ID;
 
 interface TelegramUser {
@@ -111,6 +112,12 @@ export function AuthButton({ user, onLogin, onLogout }: AuthButtonProps) {
           </div>
         </div>
         <DropdownMenuSeparator />
+        <DropdownMenuItem asChild>
+          <Link href={`/profile/${user.id}`}>
+            <UserIcon className="mr-2 h-4 w-4" />
+            <span>View Profile</span>
+          </Link>
+        </DropdownMenuItem>
         <DropdownMenuItem onClick={onLogout}>
           <LogOut className="mr-2 h-4 w-4" />
           <span>Log out</span>
