@@ -218,11 +218,17 @@ export default function DiagnosticsPage() {
           .select('username')
           .limit(1)
         
+        // Don't test insert as it will fail with null id constraint
+        // The RLS policy would block it anyway for anonymous users
+        
         results.push({
           name: '[Client] RLS Policies',
           status: 'success',
           message: 'RLS policies allow public read access from client',
-          details: { profilesReadable: !error }
+          details: { 
+            profilesReadable: !error,
+            note: 'Insert test skipped to avoid constraint violations'
+          }
         })
       } catch (err: any) {
         results.push({

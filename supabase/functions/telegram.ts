@@ -7,7 +7,7 @@ const botToken = Deno.env.get('TELEGRAM_BOT_TOKEN');
 if (!jwtSecretRaw) throw new Error('JWT secret not set');
 const jwtSecret = new TextEncoder().encode(jwtSecretRaw);
 const corsHeaders = {
-    'Access-Control-Allow-Origin': 'https://startupsareeasy.com',
+    'Access-Control-Allow-Origin': '*', // Allow all origins for now
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     'Access-Control-Max-Age': '86400'
@@ -18,12 +18,53 @@ function base64url(input) {
 }
 serve(async (req) => {
     try {
+        console.log('[INFO] Telegram function called with method:', req.method);
+        
         if (req.method === 'OPTIONS') {
             return new Response('ok', {
                 status: 200,
                 headers: corsHeaders
             });
         }
+        
+        if (req.method === 'GET') {
+            // Simple health check endpoint
+            return new Response(JSON.stringify({
+                status: 'ok',
+                message: 'Telegram function is running',
+                env_check: {
+                    supabaseUrl: !!supabaseUrl,
+                    supabaseServiceRoleKey: !!supabaseServiceRoleKey,
+                    jwtSecretRaw: !!jwtSecretRaw,
+                    botToken: !!botToken
+                },
+                timestamp: new Date().toISOString()
+            }), {
+                status: 200,
+                headers: {
+                    ...corsHeaders,
+                    'Content-Type': 'application/json'
+                }
+            });
+        }
+        
+        // Check environment variables
+        if (!supabaseUrl || !supabaseServiceRoleKey || !jwtSecretRaw || !botToken) {
+            console.error('[ERROR] Missing environment variables:', {
+                supabaseUrl: !!supabaseUrl,
+                supabaseServiceRoleKey: !!supabaseServiceRoleKey,
+                jwtSecretRaw: !!jwtSecretRaw,
+                botToken: !!botToken
+            });
+            return new Response('Server configuration error', {
+                status: 500,
+                headers: {
+                    ...corsHeaders,
+                    'Content-Type': 'application/json'
+                }
+            });
+        }
+        
         const bodyText = await req.text();
         console.log('[INFO] Raw request body:', bodyText);
         if (!bodyText) {
@@ -79,16 +120,22 @@ serve(async (req) => {
         const username = parsed.get('username') || '';
         const email = `telegram-${telegram_id}@telegram.local`;
         console.log(`[INFO] Using email: ${email}`);
-        let userId: string | undefined;
-        let user_metadata = { telegram_id, username, first_name };
-        const { data: list, error: listError } = await supabase.auth.admin.listUsers({ email });
+        let userId;
+        let user_metadata = {
+            telegram_id,
+            username,
+            first_name
+        };
+        const { data: list, error: listError } = await supabase.auth.admin.listUsers({
+            email
+        });
         if (listError) {
             console.error('[ERROR] Failed to list users:', listError);
             throw listError;
         }
         if (!list?.users?.length) {
             console.log('[INFO] User not found, creating...');
-            const { error: createError } = await supabase.auth.admin.createUser({
+            const { data: newUser, error: createError } = await supabase.auth.admin.createUser({
                 email,
                 email_confirmed: true,
                 user_metadata,
@@ -100,13 +147,29 @@ serve(async (req) => {
                 console.error('[ERROR] Failed to create user:', createError);
                 throw createError;
             }
-            // Fetch the user again to get the UUID
-            const { data: newList, error: newListError } = await supabase.auth.admin.listUsers({ email });
-            if (newListError) {
-                console.error('[ERROR] Failed to fetch new user:', newListError);
-                throw newListError;
+            
+            userId = newUser.user?.id;
+            
+            if (!userId) {
+                console.error('[ERROR] Could not get user ID from created user');
+                throw new Error('Could not get user ID from created user');
             }
-            userId = newList?.users?.[0]?.id;
+            
+            // Create profile record
+            console.log('[INFO] Creating profile for user:', userId);
+            const { error: profileError } = await supabase
+                .from('profiles')
+                .insert({
+                    id: userId,
+                    username: username || `user_${telegram_id}`,
+                    first_name: first_name,
+                    telegram_id: telegram_id ? parseInt(telegram_id) : null
+                });
+            
+            if (profileError) {
+                console.error('[ERROR] Failed to create profile:', profileError);
+                throw profileError;
+            }
         } else {
             userId = list.users[0].id;
             // Optionally update user_metadata if needed
@@ -132,7 +195,7 @@ serve(async (req) => {
             role: 'authenticated',
             aud: 'authenticated',
             iss: 'supabase',
-            exp: now + 60 * 60 * 24 * 30, // 30 days
+            exp: now + 60 * 60 * 24 * 30,
             iat: now,
             email_verified: true,
             phone_verified: false,
@@ -158,7 +221,6 @@ serve(async (req) => {
         console.log('[INFO] JWT created');
         // Generate a refresh token (you might want to store this in your database)
         const refresh_token = crypto.randomUUID();
-
         return new Response(JSON.stringify({
             access_token,
             refresh_token
@@ -171,7 +233,15 @@ serve(async (req) => {
         });
     } catch (err) {
         console.error('[ERROR] Telegram login failed:', err);
-        return new Response('Internal error', {
+        
+        // Return more detailed error information for debugging
+        const errorResponse = {
+            error: 'Internal error',
+            message: err instanceof Error ? err.message : 'Unknown error',
+            timestamp: new Date().toISOString()
+        };
+        
+        return new Response(JSON.stringify(errorResponse), {
             status: 500,
             headers: {
                 ...corsHeaders,
