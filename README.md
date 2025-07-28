@@ -1,50 +1,32 @@
-# Public social feed app
+# Startups Are Easy
 
-*Automatically synced with your [v0.dev](https://v0.dev) deployments*
+StartupsAreEasy is a home for people who love starting things — even when they're messy, weird, or half-baked. Here, we celebrate the spark, not just the launch.
 
-[![Deployed on Vercel](https://img.shields.io/badge/Deployed%20on-Vercel-black?style=for-the-badge&logo=vercel)](https://vercel.com/gbdrms-projects/v0-public-social-feed-app)
-[![Built with v0](https://img.shields.io/badge/Built%20with-v0.dev-black?style=for-the-badge)](https://v0.dev/chat/projects/7gpaho5owMo)
+We believe that building doesn't have to be hard, lonely, or overplanned. Sometimes the best ideas begin with a quick note, a conversation, or a weekend experiment. That's what this space is for.
 
-## Overview
+🚀 What you can do here
+💡 Share ideas — even if you don't know what to do with them yet
 
-This repository will stay in sync with your deployed chats on [v0.dev](https://v0.dev).
-Any changes you make to your deployed app will be automatically pushed to this repository from [v0.dev](https://v0.dev).
+🚀 Start projects — and mark the moment you begin
 
-## Deployment
+✅ Track progress — every step counts
 
-Your project is live at:
+🙋 Ask questions — and learn out loud
 
-**[https://vercel.com/gbdrms-projects/v0-public-social-feed-app](https://vercel.com/gbdrms-projects/v0-public-social-feed-app)**
+📢 Share things — tools, links, lessons, anything that helps
 
-## Build your app
+You can like, comment, and support others who are figuring it out too. It's not about being perfect. It's about moving forward.
 
-Continue building your app on:
+🤝 Why we exist
+Because too many people wait until it's "ready."
 
-**[https://v0.dev/chat/projects/7gpaho5owMo](https://v0.dev/chat/projects/7gpaho5owMo)**
+Because too many cool things never see the light.
 
-## How It Works
+Because starting should feel fun, social, and easy — not like a pitch deck.
 
-1. Create and modify your project using [v0.dev](https://v0.dev)
-2. Deploy your chats from the v0 interface
-3. Changes are automatically pushed to this repository
-4. Vercel deploys the latest version from this repository
+StartupsAreEasy is here to make creativity visible, momentum natural, and failure a normal part of the ride.
 
-## Environment variables
+💬 Join the community
+Want feedback on an idea? Want to see what others are building? Join our Telegram group — it's where a lot of the energy lives.
 
-Create a `.env.local` file in the project root with the following keys:
-
-```bash
-NEXT_PUBLIC_SUPABASE_URL=your-supabase-url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
-SUPABASE_SERVICE_KEY=your-supabase-service-role-key
-```
-
-The `SUPABASE_SERVICE_KEY` is used server-side by `lib/auth.ts` to perform
-privileged operations while `NEXT_PUBLIC_SUPABASE_ANON_KEY` is used by the
-browser client.
-
-## Database setup
-
-Execute the SQL files under the `scripts` directory in order.  The latest
-migration `07-update-startup-policies.sql` adds helper functions for checking
-startup membership and updates related row level security policies.
+[https://t.me/startupsareeasy](https://t.me/startupsareeasy)
