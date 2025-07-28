@@ -31,7 +31,7 @@ export async function signInWithTelegram(telegramUser: TelegramUser): Promise<Us
       first_name: profile.first_name,
       last_name: profile.last_name,
     };
-    localStorage.setItem("fake-user-session", JSON.stringify(fakeUserData));
+    localStorage.setItem(STORAGE_KEYS.FAKE_USER_SESSION, JSON.stringify(fakeUserData));
 
 
     return fakeUserData;

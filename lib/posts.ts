@@ -100,7 +100,6 @@ export async function createPost(data: {
   type: PostType
   content: string
   link?: string
-  image?: string
 }) {
   try {
     const { data: post, error } = await supabase
@@ -110,7 +109,6 @@ export async function createPost(data: {
         type: data.type,
         content: data.content,
         link_url: data.link,
-        image_url: data.image,
       })
       .select()
       .single()

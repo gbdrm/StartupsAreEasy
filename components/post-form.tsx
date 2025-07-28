@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { ImageIcon, LinkIcon, Send } from "lucide-react"
+import { LinkIcon, Send } from "lucide-react"
 import type { User } from "@/lib/types"
 import type { PostType } from "@/lib/types"
 import { POST_TYPES } from "@/lib/types"
@@ -19,7 +19,6 @@ interface PostFormProps {
     type: PostType
     content: string
     link?: string
-    image?: string
   }) => void
 }
 
@@ -27,7 +26,6 @@ export function PostForm({ user, onSubmit }: PostFormProps) {
   const [type, setType] = useState<PostType>("post")
   const [content, setContent] = useState("")
   const [link, setLink] = useState("")
-  const [image, setImage] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isExpanded, setIsExpanded] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -42,13 +40,11 @@ export function PostForm({ user, onSubmit }: PostFormProps) {
       type,
       content: content.trim(),
       link: link.trim() || undefined,
-      image: image.trim() || undefined,
     })
 
     // Reset form
     setContent("")
     setLink("")
-    setImage("")
     setIsSubmitting(false)
     setIsExpanded(false)
   }
@@ -134,20 +130,6 @@ export function PostForm({ user, onSubmit }: PostFormProps) {
                 placeholder="https://..."
                 value={link}
                 onChange={(e) => setLink(e.target.value)}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="image" className="flex items-center gap-2">
-                <ImageIcon className="h-4 w-4" />
-                Image URL (optional)
-              </Label>
-              <Input
-                id="image"
-                type="url"
-                placeholder="https://..."
-                value={image}
-                onChange={(e) => setImage(e.target.value)}
               />
             </div>
           </div>

@@ -87,7 +87,6 @@ export default function HomePage() {
     type: PostType
     content: string
     link?: string
-    image?: string
   }) => {
     if (!currentUser) return
 
@@ -97,7 +96,6 @@ export default function HomePage() {
         type: data.type,
         content: data.content,
         link: data.link,
-        image: data.image,
       })
 
       // Reload posts to show the new one
