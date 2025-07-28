@@ -19,7 +19,7 @@ export function Header({ user, onLogin, onLogout }: HeaderProps) {
           <Link href="/" className="text-xl font-bold hover:text-gray-700 transition-colors">
             Startups Are Easy
           </Link>
-          <span className="text-2xl">🚀</span>
+          
           <Link href="/startups" className="text-xl font-semibold hover:text-gray-700 transition-colors">
             Startups
           </Link>

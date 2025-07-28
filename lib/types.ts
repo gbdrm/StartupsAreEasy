@@ -1,4 +1,4 @@
-export type PostType = "post" | "idea" | "launch" | "progress" | "question"
+export type PostType = "post" | "idea" | "launch" | "progress"
 
 export interface User {
   id: string
@@ -36,5 +36,4 @@ export const POST_TYPES = {
   idea: { emoji: "💡", label: "Idea" },
   launch: { emoji: "🚀", label: "Launch" },
   progress: { emoji: "✅", label: "Progress" },
-  question: { emoji: "🙋‍♂️", label: "Question" },
 } as const
