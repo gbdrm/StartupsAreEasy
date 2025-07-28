@@ -43,7 +43,7 @@ export function PostCard({ post, user, comments, onLike, onComment }: PostCardPr
     <Card>
       <CardHeader className="pb-3">
         <div className="flex items-start gap-3">
-          <Link href={`/profile/${post.user.id}`}>
+          <Link href={`/profile/${post.user.username}`}>
             <Avatar className="h-10 w-10 cursor-pointer hover:opacity-80 transition-opacity">
               <AvatarImage src={post.user.avatar || undefined} alt={post.user.name} />
               <AvatarFallback name={post.user.name} userId={post.user.id} />
@@ -51,10 +51,10 @@ export function PostCard({ post, user, comments, onLike, onComment }: PostCardPr
           </Link>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <Link href={`/profile/${post.user.id}`} className="hover:underline">
+              <Link href={`/profile/${post.user.username}`} className="hover:underline">
                 <p className="font-semibold text-sm">{post.user.name}</p>
               </Link>
-              <Link href={`/profile/${post.user.id}`} className="hover:underline">
+              <Link href={`/profile/${post.user.username}`} className="hover:underline">
                 <p className="text-muted-foreground text-sm">@{post.user.username}</p>
               </Link>
               <span className="text-muted-foreground text-sm">·</span>
@@ -151,7 +151,7 @@ export function PostCard({ post, user, comments, onLike, onComment }: PostCardPr
             <div className="space-y-3">
               {comments.map((comment) => (
                 <div key={comment.id} className="flex gap-3">
-                  <Link href={`/profile/${comment.user.id}`}>
+                  <Link href={`/profile/${comment.user.username}`}>
                     <Avatar className="h-8 w-8 cursor-pointer hover:opacity-80 transition-opacity">
                       <AvatarImage src={comment.user.avatar || undefined} alt={comment.user.name} />
                       <AvatarFallback name={comment.user.name} userId={comment.user.id} />
@@ -159,7 +159,7 @@ export function PostCard({ post, user, comments, onLike, onComment }: PostCardPr
                   </Link>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <Link href={`/profile/${comment.user.id}`} className="hover:underline">
+                      <Link href={`/profile/${comment.user.username}`} className="hover:underline">
                         <p className="font-semibold text-sm">{comment.user.name}</p>
                       </Link>
                       <p className="text-muted-foreground text-xs">

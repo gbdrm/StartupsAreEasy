@@ -29,7 +29,7 @@ interface ProfileData extends User {
 export default function ProfilePage() {
   const params = useParams()
   const router = useRouter()
-  const userId = params.userId as string
+  const username = params.username as string
   
   const [currentUser, setCurrentUser] = useState<User | null>(null)
   const [profileUser, setProfileUser] = useState<ProfileData | null>(null)
@@ -49,21 +49,21 @@ export default function ProfilePage() {
 
   // Load profile user and their posts
   useEffect(() => {
-    if (userId) {
+    if (username) {
       loadProfile()
     }
-  }, [userId, currentUser])
+  }, [username, currentUser])
 
   const loadProfile = async () => {
     try {
       setLoading(true)
       setError(null)
 
-      // Fetch profile data
+      // Fetch profile data by username
       const { data: profile, error: profileError } = await supabase
         .from("profiles")
         .select("id, username, first_name, last_name, avatar_url, bio, location, website, created_at")
-        .eq("id", userId)
+        .eq("username", username)
         .single()
 
       if (profileError || !profile) {
@@ -89,7 +89,7 @@ export default function ProfilePage() {
 
       // Fetch user's posts
       const userPosts = await getPosts(currentUser?.id)
-      const filteredPosts = userPosts.filter(post => post.user.id === userId)
+      const filteredPosts = userPosts.filter(post => post.user.id === profile.id)
       setPosts(filteredPosts)
 
       // Load comments for posts

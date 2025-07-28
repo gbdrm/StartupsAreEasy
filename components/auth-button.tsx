@@ -113,7 +113,7 @@ export function AuthButton({ user, onLogin, onLogout }: AuthButtonProps) {
         </div>
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
-          <Link href={`/profile/${user.id}`}>
+          <Link href={`/profile/${user.username}`}>
             <UserIcon className="mr-2 h-4 w-4" />
             <span>View Profile</span>
           </Link>
