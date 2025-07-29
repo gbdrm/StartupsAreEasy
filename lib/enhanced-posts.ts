@@ -95,12 +95,34 @@ export async function createEnhancedPost(
         })
         .select(`
       *,
-      user:profiles(*),
-      startup:startups!posts_startup_id_fkey(*)
+      startup:startups(*)
     `)
         .single();
 
     if (postError) throw postError;
+
+    // Fetch user profile separately since we can't use the foreign key join yet
+    const { data: userProfile, error: profileError } = await supabase
+        .from("profiles")
+        .select("id, username, first_name, last_name, avatar_url")
+        .eq("id", userId)
+        .single();
+
+    if (profileError) throw profileError;
+
+    // Add user info to the post data
+    const enrichedPost = {
+        ...postData,
+        user: {
+            id: userProfile.id,
+            name: `${userProfile.first_name} ${userProfile.last_name || ""}`.trim(),
+            username: userProfile.username,
+            avatar: userProfile.avatar_url,
+        },
+        likes_count: 0,
+        comments_count: 0,
+        liked_by_user: false,
+    };
 
     // Update startup with launch post reference if it's a launch
     if (formData.type === "launch" && startup) {
@@ -110,7 +132,7 @@ export async function createEnhancedPost(
             .eq("id", startup.id);
     }
 
-    return { post: postData, startup };
+    return { post: enrichedPost, startup };
 }
 
 // Get user's startups for post creation
