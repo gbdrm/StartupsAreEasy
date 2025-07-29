@@ -166,37 +166,49 @@ export async function toggleLike(postId: string, userId: string) {
 
 export async function getComments(postId: string) {
   try {
-    const { data, error } = await supabase
+    // First get comments with user_id
+    const { data: comments, error } = await supabase
       .from("comments")
       .select(`
         id,
         content,
         created_at,
-        user:profiles(
-          id,
-          username,
-          first_name,
-          last_name,
-          avatar_url
-        )
+        user_id
       `)
       .eq("post_id", postId)
       .order("created_at", { ascending: true })
 
     if (error) throw error
 
-    return data.map((comment: any) => ({
-      id: comment.id,
-      post_id: postId,
-      content: comment.content,
-      created_at: comment.created_at,
-      user: {
-        id: comment.user.id,
-        name: `${comment.user.first_name} ${comment.user.last_name || ""}`.trim(),
-        username: comment.user.username,
-        avatar: comment.user.avatar_url,
-      },
-    })) as Comment[]
+    // Get unique user IDs
+    const userIds = [...new Set(comments.map(comment => comment.user_id))]
+
+    // Fetch user profiles separately
+    const { data: profiles, error: profilesError } = await supabase
+      .from("profiles")
+      .select("id, username, first_name, last_name, avatar_url")
+      .in("id", userIds)
+
+    if (profilesError) throw profilesError
+
+    // Create a map for quick profile lookup
+    const profileMap = new Map(profiles.map(profile => [profile.id, profile]))
+
+    return comments.map((comment: any) => {
+      const profile = profileMap.get(comment.user_id)
+      return {
+        id: comment.id,
+        post_id: postId,
+        content: comment.content,
+        created_at: comment.created_at,
+        user: {
+          id: comment.user_id,
+          name: profile ? `${profile.first_name} ${profile.last_name || ""}`.trim() : "Unknown User",
+          username: profile?.username || "unknown",
+          avatar: profile?.avatar_url,
+        },
+      }
+    }) as Comment[]
   } catch (error) {
     console.error("Error fetching comments:", error)
     throw error
