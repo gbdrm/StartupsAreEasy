@@ -135,13 +135,13 @@ serve(async (req) => {
         }
         if (!list?.users?.length) {
             console.log('[INFO] User not found, creating...');
-            
+
             // Add detailed logging before user creation
             console.log('[DEBUG] About to create user with:');
             console.log('[DEBUG] - Email:', email);
             console.log('[DEBUG] - User metadata:', JSON.stringify(user_metadata));
             console.log('[DEBUG] - App metadata: { provider: "telegram" }');
-            
+
             const { data: newUser, error: createError } = await supabase.auth.admin.createUser({
                 email,
                 email_confirmed: true,
@@ -150,7 +150,7 @@ serve(async (req) => {
                     provider: 'telegram'
                 }
             });
-            
+
             if (createError) {
                 console.error('[ERROR] Failed to create user:', createError);
                 console.error('[ERROR] Error details:', JSON.stringify(createError, null, 2));
@@ -158,7 +158,7 @@ serve(async (req) => {
                 console.error('[ERROR] Error message:', createError.message);
                 console.error('[ERROR] Error status:', createError.status);
                 console.error('[ERROR] Error code:', createError.code);
-                
+
                 // Return a more detailed error response
                 return new Response(JSON.stringify({
                     error: 'User creation failed',
@@ -181,19 +181,23 @@ serve(async (req) => {
                 throw new Error('Could not get user ID from created user');
             }
 
-            // Create profile record
-            console.log('[INFO] Creating profile for user:', userId);
+            // Create or update profile record
+            // Use upsert to handle case where trigger already created a profile
+            console.log('[INFO] Creating/updating profile for user:', userId);
             const { error: profileError } = await supabase
                 .from('profiles')
-                .insert({
+                .upsert({
                     id: userId,
                     username: username || `user_${telegram_id}`,
                     first_name: first_name,
-                    telegram_id: telegram_id ? parseInt(telegram_id) : null
+                    telegram_id: telegram_id ? parseInt(telegram_id) : null,
+                    updated_at: new Date().toISOString()
+                }, {
+                    onConflict: 'id'
                 });
 
             if (profileError) {
-                console.error('[ERROR] Failed to create profile:', profileError);
+                console.error('[ERROR] Failed to upsert profile:', profileError);
                 throw profileError;
             }
         } else {
