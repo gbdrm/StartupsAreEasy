@@ -3,14 +3,8 @@ import type { PostFormData, Startup, Post } from "./types";
 
 // Helper to get the right Supabase client based on environment
 function getSupabaseClient() {
-    // For local development with fake login, use a service role client to bypass RLS
-    if (process.env.NEXT_PUBLIC_DEFAULT_USER_ID && process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY) {
-        const { createClient } = require("@supabase/supabase-js");
-        return createClient(
-            process.env.NEXT_PUBLIC_SUPABASE_URL!,
-            process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY!
-        );
-    }
+    // Always use the regular client for consistency
+    // The RLS policies should be fixed to handle both authenticated and fake login cases
     return supabase;
 }
 
@@ -107,13 +101,24 @@ export async function createEnhancedPost(
             link: formData.link,
             startup_id: startup?.id,
         })
-        .select(`
-      *,
-      startup:startups!posts_startup_id_fkey(*)
-    `)
+        .select('*')
         .single();
 
     if (postError) throw postError;
+
+    // Fetch startup and user profile separately to avoid foreign key ambiguity
+    let startupInfo = null;
+    if (startup?.id) {
+        const { data: startupData, error: startupFetchError } = await client
+            .from("startups")
+            .select("*")
+            .eq("id", startup.id)
+            .single();
+
+        if (!startupFetchError) {
+            startupInfo = startupData;
+        }
+    }
 
     // Fetch user profile separately since we can't use the foreign key join yet
     const { data: userProfile, error: profileError } = await client
@@ -124,9 +129,10 @@ export async function createEnhancedPost(
 
     if (profileError) throw profileError;
 
-    // Add user info to the post data
+    // Add user info and startup info to the post data
     const enrichedPost = {
         ...postData,
+        startup: startupInfo,
         user: {
             id: userProfile.id,
             name: `${userProfile.first_name} ${userProfile.last_name || ""}`.trim(),
