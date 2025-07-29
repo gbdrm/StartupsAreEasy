@@ -1,17 +1,31 @@
 import { supabase } from "./supabase";
 import type { PostFormData, Startup, Post } from "./types";
 
+// Helper to get the right Supabase client based on environment
+function getSupabaseClient() {
+    // For local development with fake login, use a service role client to bypass RLS
+    if (process.env.NEXT_PUBLIC_DEFAULT_USER_ID && process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY) {
+        const { createClient } = require("@supabase/supabase-js");
+        return createClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY!
+        );
+    }
+    return supabase;
+}
+
 // Enhanced post creation that handles different post types
 export async function createEnhancedPost(
     formData: PostFormData,
     userId: string
 ): Promise<{ post: Post; startup?: Startup }> {
     let startup: Startup | undefined;
+    const client = getSupabaseClient();
 
     // Handle startup creation/selection based on post type
     if (formData.type === "idea") {
         // Create new startup in idea stage
-        const { data: startupData, error: startupError } = await supabase
+        const { data: startupData, error: startupError } = await client
             .from("startups")
             .insert({
                 name: formData.startup_name!,
@@ -28,7 +42,7 @@ export async function createEnhancedPost(
     } else if (formData.type === "launch") {
         if (formData.existing_startup_id) {
             // Update existing startup to launched stage
-            const { data: startupData, error: startupError } = await supabase
+            const { data: startupData, error: startupError } = await client
                 .from("startups")
                 .update({
                     stage: "launched",
@@ -44,7 +58,7 @@ export async function createEnhancedPost(
             startup = startupData;
         } else {
             // Create new startup directly in launched stage
-            const { data: startupData, error: startupError } = await supabase
+            const { data: startupData, error: startupError } = await client
                 .from("startups")
                 .insert({
                     name: formData.startup_name!,
@@ -63,7 +77,7 @@ export async function createEnhancedPost(
         }
     } else if (formData.type === "progress" && formData.existing_startup_id) {
         // Get the existing startup for the post
-        const { data: startupData, error: startupError } = await supabase
+        const { data: startupData, error: startupError } = await client
             .from("startups")
             .select("*")
             .eq("id", formData.existing_startup_id)
@@ -84,7 +98,7 @@ export async function createEnhancedPost(
         postContent = formData.content || `🚀 **${startup.name}** is now live!\n\n${startup.description}`;
     }
 
-    const { data: postData, error: postError } = await supabase
+    const { data: postData, error: postError } = await client
         .from("posts")
         .insert({
             user_id: userId,
@@ -95,14 +109,14 @@ export async function createEnhancedPost(
         })
         .select(`
       *,
-      startup:startups(*)
+      startup:startups!posts_startup_id_fkey(*)
     `)
         .single();
 
     if (postError) throw postError;
 
     // Fetch user profile separately since we can't use the foreign key join yet
-    const { data: userProfile, error: profileError } = await supabase
+    const { data: userProfile, error: profileError } = await client
         .from("profiles")
         .select("id, username, first_name, last_name, avatar_url")
         .eq("id", userId)
@@ -126,7 +140,7 @@ export async function createEnhancedPost(
 
     // Update startup with launch post reference if it's a launch
     if (formData.type === "launch" && startup) {
-        await supabase
+        await client
             .from("startups")
             .update({ launch_post_id: postData.id })
             .eq("id", startup.id);

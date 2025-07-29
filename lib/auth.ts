@@ -33,6 +33,18 @@ export async function signInWithTelegram(telegramUser: TelegramUser): Promise<Us
     };
     localStorage.setItem(STORAGE_KEYS.FAKE_USER_SESSION, JSON.stringify(fakeUserData));
 
+    // For fake login, we need to set the Supabase session to make RLS work
+    // Create a fake JWT token for local development
+    try {
+      // Try to get an actual session for the default user
+      // This requires the user to exist in auth.users
+      const { data, error } = await supabase.auth.getUser();
+      if (error || !data.user) {
+        console.warn('No Supabase session found for fake login. RLS policies may not work correctly.');
+      }
+    } catch (err) {
+      console.warn('Could not verify Supabase session for fake login:', err);
+    }
 
     return fakeUserData;
   }
