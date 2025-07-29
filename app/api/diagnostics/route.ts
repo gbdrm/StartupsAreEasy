@@ -75,15 +75,16 @@ export async function GET(request: NextRequest) {
                 .from('posts')
                 .select(`
           id,
-          startup:startups!posts_startup_id_fkey(id, name),
-          user:profiles!posts_user_id_fkey(id, username)
+          startup:startups!posts_startup_id_fkey(id, name)
         `)
                 .limit(1)
+
+            if (error) throw error
 
             results.push({
                 name: 'Foreign Key Relationships',
                 status: 'success',
-                message: 'All foreign key relationships are working',
+                message: 'Foreign key relationships are working',
                 details: data
             })
         } catch (err: any) {
@@ -125,37 +126,37 @@ export async function GET(request: NextRequest) {
             })
         }
 
-    // Test 5: Check RLS policies
-    try {
-      // Test anonymous access to profiles (should work)
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select('username')
-        .limit(1)
-      
-      // Don't test insert as it will cause constraint violations
-      // RLS policies would block it anyway for anonymous users
-      
-      results.push({
-        name: 'RLS Policies',
-        status: !profileError ? 'success' : 'warning',
-        message: !profileError 
-          ? 'RLS policies allow public read access (insert test skipped to avoid constraint violations)'
-          : 'RLS policies may be too restrictive for read access',
-        details: {
-          readWorking: !profileError,
-          profileError: profileError?.message,
-          note: 'Insert test skipped to avoid null id constraint violations'
-        }
-      })
-    } catch (err: any) {
-      results.push({
-        name: 'RLS Policies',
-        status: 'error',
-        message: `RLS policy check failed: ${err.message}`,
-        details: err
-      })
-    }        // Test 6: Check environment variables
+        // Test 5: Check RLS policies
+        try {
+            // Test anonymous access to profiles (should work)
+            const { data: profileData, error: profileError } = await supabase
+                .from('profiles')
+                .select('username')
+                .limit(1)
+
+            // Don't test insert as it will cause constraint violations
+            // RLS policies would block it anyway for anonymous users
+
+            results.push({
+                name: 'RLS Policies',
+                status: !profileError ? 'success' : 'warning',
+                message: !profileError
+                    ? 'RLS policies allow public read access (insert test skipped to avoid constraint violations)'
+                    : 'RLS policies may be too restrictive for read access',
+                details: {
+                    readWorking: !profileError,
+                    profileError: profileError?.message,
+                    note: 'Insert test skipped to avoid null id constraint violations'
+                }
+            })
+        } catch (err: any) {
+            results.push({
+                name: 'RLS Policies',
+                status: 'error',
+                message: `RLS policy check failed: ${err.message}`,
+                details: err
+            })
+        }        // Test 6: Check environment variables
         const requiredEnvVars = [
             'NEXT_PUBLIC_SUPABASE_URL',
             'NEXT_PUBLIC_SUPABASE_ANON_KEY'

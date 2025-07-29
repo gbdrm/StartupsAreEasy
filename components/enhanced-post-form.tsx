@@ -254,7 +254,7 @@ export function EnhancedPostForm({ onSubmit, userStartups, isSubmitting, onCance
   return (
     <Card className="w-full max-w-2xl mx-auto">
       <CardHeader>
-        <CardTitle>Create New Post</CardTitle>
+        <CardTitle>Create a </CardTitle>
         <div className="flex gap-2">
           {(["post", "idea", "launch", "progress"] as PostType[]).map(type => (
             <Button

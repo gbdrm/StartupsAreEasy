@@ -42,30 +42,40 @@ export async function getPosts(userId?: string) {
 
 // Fallback function for basic posts query
 async function getPostsBasic(userId?: string) {
+  // First get posts with startup info
   const { data: posts, error } = await supabase
     .from("posts")
     .select(`
       id,
+      user_id,
       type,
       content,
-      link_url,
-      image_url,
+      link,
+      image,
       created_at,
-      user:profiles(
-        id,
-        username,
-        first_name,
-        last_name,
-        avatar_url
-      )
+      startup:startups(id, name, stage)
     `)
     .order("created_at", { ascending: false })
 
   if (error) throw error
 
+  // Get user profiles separately to avoid the foreign key issue
+  const userIds = [...new Set(posts.map(post => post.user_id))]
+  const { data: profiles, error: profilesError } = await supabase
+    .from("profiles")
+    .select("id, username, first_name, last_name, avatar_url")
+    .in("id", userIds)
+
+  if (profilesError) throw profilesError
+
+  // Create a map for quick profile lookup
+  const profileMap = new Map(profiles.map(profile => [profile.id, profile]))
+
   // Get likes and comments counts separately
   const postsWithCounts = await Promise.all(
     posts.map(async (post: any) => {
+      const profile = profileMap.get(post.user_id)
+
       const [likesResult, commentsResult, userLikeResult] = await Promise.all([
         supabase.from("likes").select("id", { count: "exact" }).eq("post_id", post.id),
         supabase.from("comments").select("id", { count: "exact" }).eq("post_id", post.id),
@@ -75,19 +85,20 @@ async function getPostsBasic(userId?: string) {
       return {
         id: post.id,
         user: {
-          id: post.user.id,
-          name: `${post.user.first_name} ${post.user.last_name || ""}`.trim(),
-          username: post.user.username,
-          avatar: post.user.avatar_url,
+          id: post.user_id,
+          name: profile ? `${profile.first_name} ${profile.last_name || ""}`.trim() : "Unknown User",
+          username: profile?.username || "unknown",
+          avatar: profile?.avatar_url,
         },
         type: post.type,
         content: post.content,
-        link: post.link_url,
-        image: post.image_url,
+        link: post.link,
+        image: post.image,
+        startup: post.startup,
         created_at: post.created_at,
         likes_count: likesResult.count || 0,
         comments_count: commentsResult.count || 0,
-        liked_by_user: !!userLikeResult.data,
+        liked_by_user: !!userLikeResult?.data,
       }
     }),
   )
@@ -108,7 +119,7 @@ export async function createPost(data: {
         user_id: data.userId,
         type: data.type,
         content: data.content,
-        link_url: data.link,
+        link: data.link,
       })
       .select()
       .single()

@@ -181,24 +181,52 @@ serve(async (req) => {
                 throw new Error('Could not get user ID from created user');
             }
 
-            // Create or update profile record
-            // Use upsert to handle case where trigger already created a profile
-            console.log('[INFO] Creating/updating profile for user:', userId);
-            const { error: profileError } = await supabase
+            // Check if profile already exists (likely created by trigger)
+            console.log('[INFO] Checking if profile exists for user:', userId);
+            const { data: existingProfile, error: checkError } = await supabase
                 .from('profiles')
-                .upsert({
-                    id: userId,
-                    username: username || `user_${telegram_id}`,
-                    first_name: first_name,
-                    telegram_id: telegram_id ? parseInt(telegram_id) : null,
-                    updated_at: new Date().toISOString()
-                }, {
-                    onConflict: 'id'
-                });
+                .select('id, username, telegram_id')
+                .eq('id', userId)
+                .single();
 
-            if (profileError) {
-                console.error('[ERROR] Failed to upsert profile:', profileError);
-                throw profileError;
+            if (checkError && checkError.code !== 'PGRST116') {
+                console.error('[ERROR] Failed to check existing profile:', checkError);
+                throw checkError;
+            }
+
+            if (existingProfile) {
+                // Profile exists (created by trigger), update it with Telegram data
+                console.log('[INFO] Profile exists, updating with Telegram data for user:', userId);
+                const { error: updateError } = await supabase
+                    .from('profiles')
+                    .update({
+                        username: username || existingProfile.username,
+                        first_name: first_name,
+                        telegram_id: telegram_id ? parseInt(telegram_id) : existingProfile.telegram_id,
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('id', userId);
+
+                if (updateError) {
+                    console.error('[ERROR] Failed to update profile:', updateError);
+                    throw updateError;
+                }
+            } else {
+                // Profile doesn't exist (trigger failed?), create it
+                console.log('[INFO] Profile doesn\'t exist, creating for user:', userId);
+                const { error: insertError } = await supabase
+                    .from('profiles')
+                    .insert({
+                        id: userId,
+                        username: username || `user_${telegram_id}`,
+                        first_name: first_name,
+                        telegram_id: telegram_id ? parseInt(telegram_id) : null
+                    });
+
+                if (insertError) {
+                    console.error('[ERROR] Failed to insert profile:', insertError);
+                    throw insertError;
+                }
             }
         } else {
             userId = list.users[0].id;
