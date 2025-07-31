@@ -87,7 +87,24 @@ SELECT
 FROM posts
 ```
 
+## RPC Functions
+
+### get_posts_with_details(user_id_param UUID)
+- **Purpose**: Get ALL posts (for home page feed)
+- **Parameters**: `user_id_param` (for liked_by_user status only)
+- **Returns**: ALL posts from ALL users, ordered by created_at DESC
+- **Usage**: Home page, general feed
+
+### get_user_posts_with_details(profile_user_id UUID, current_user_id UUID)
+- **Purpose**: Get posts from specific user (for profile pages)
+- **Parameters**: 
+  - `profile_user_id`: The user whose posts to fetch
+  - `current_user_id`: Current user (for liked_by_user status)
+- **Returns**: Posts ONLY from the specified user
+- **Usage**: Profile pages showing user-specific posts
+
 ## Remember: 
 - **profiles.id = auth.users.id** (same value, 1:1 relationship)
 - All user_id fields in other tables reference **auth.users.id**
-- To join with profiles, use the named foreign key: `profiles!table_column_fkey`
+- **Home page**: Use `get_posts_with_details()` for ALL posts
+- **Profile page**: Use `get_user_posts_with_details()` for specific user posts

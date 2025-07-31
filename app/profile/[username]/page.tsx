@@ -87,10 +87,11 @@ export default function ProfilePage() {
 
       setProfileUser(profileData)
 
-      // Fetch ONLY this user's posts directly instead of filtering all posts
+      // Fetch ONLY this user's posts using the dedicated user posts function
       const { data: userPosts, error: postsError } = await supabase
-        .rpc("get_posts_with_details", {
-          user_id_param: profile.id,
+        .rpc("get_user_posts_with_details", {
+          profile_user_id: profile.id,
+          current_user_id: currentUser?.id || null,
         })
 
       if (postsError) {
