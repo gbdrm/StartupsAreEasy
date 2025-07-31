@@ -87,7 +87,15 @@ export function PostCard({ post, user, comments, onLike, onComment }: PostCardPr
           </div>
         )}
 
-        <p className="text-sm leading-relaxed whitespace-pre-wrap">{post.content}</p>
+        {/* For idea posts, only show additional content if it differs from the auto-generated content */}
+        {post.type === "idea" && post.startup ? (
+          // Only show content if it's different from the auto-generated format
+          post.content !== `💡 **${post.startup.name}**\n\n${post.startup.description}` && (
+            <p className="text-sm leading-relaxed whitespace-pre-wrap">{post.content}</p>
+          )
+        ) : (
+          <p className="text-sm leading-relaxed whitespace-pre-wrap">{post.content}</p>
+        )}
 
         {post.link && (
           <div className="mt-3">

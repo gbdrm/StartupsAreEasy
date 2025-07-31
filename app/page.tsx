@@ -73,8 +73,16 @@ export default function HomePage() {
       
       const { post } = await createEnhancedPost(data, currentUser.id)
 
-      // Add the new post to the top of the list
-      setPosts(prevPosts => [post, ...prevPosts])
+      // Add the new post to the top of the list with a unique key to prevent duplicates
+      // Check if post already exists to prevent duplicates
+      setPosts(prevPosts => {
+        const postExists = prevPosts.some(existingPost => existingPost.id === post.id)
+        if (postExists) {
+          console.log("Post already exists, not adding duplicate")
+          return prevPosts
+        }
+        return [post, ...prevPosts]
+      })
       
       // Reload user startups in case new ones were created
       await loadUserStartups()
