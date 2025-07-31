@@ -1,14 +1,14 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { EnhancedPostForm } from "@/components/enhanced-post-form"
+import { CollapsiblePostForm } from "@/components/collapsible-post-form"
 import { PostCard } from "@/components/post-card"
 import { Header } from "@/components/header"
+import { AuthDialog } from "@/components/auth-dialog"
 import type { Post, Comment, PostType, PostFormData, Startup } from "@/lib/types"
 import { Separator } from "@/components/ui/separator"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Button } from "@/components/ui/button"
-import { Loader2, Plus } from "lucide-react"
+import { Loader2 } from "lucide-react"
 import { getPosts, toggleLike, getComments, createComment } from "@/lib/posts"
 import { createEnhancedPost, getUserStartupsForPosts } from "@/lib/enhanced-posts"
 import { useAuth } from "@/hooks/use-auth"
@@ -20,8 +20,8 @@ export default function HomePage() {
   const [userStartups, setUserStartups] = useState<Startup[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [showPostForm, setShowPostForm] = useState(false)
   const [isCreatingPost, setIsCreatingPost] = useState(false)
+  const [showLoginDialog, setShowLoginDialog] = useState(false)
 
   // Load posts and user startups
   useEffect(() => {
@@ -75,9 +75,6 @@ export default function HomePage() {
       
       // Reload user startups in case new ones were created
       await loadUserStartups()
-      
-      // Hide the form
-      setShowPostForm(false)
     } catch (err) {
       console.error("Error creating post:", err)
       setError("Failed to create post. Please try again.")
@@ -163,29 +160,21 @@ export default function HomePage() {
             </Alert>
           )}
 
-          {/* Create Post Button */}
-          {currentUser && !showPostForm && (
-            <div className="flex justify-center">
-              <Button
-                onClick={() => setShowPostForm(true)}
-                className="flex items-center gap-2"
-                size="lg"
-              >
-                <Plus className="h-4 w-4" />
-                Create Post
-              </Button>
-            </div>
-          )}
+          {/* Collapsible Post Form - Always visible */}
+          <CollapsiblePostForm
+            user={currentUser}
+            onSubmit={handleCreatePost}
+            userStartups={userStartups}
+            isSubmitting={isCreatingPost}
+            onLoginRequired={() => setShowLoginDialog(true)}
+          />
 
-          {/* Enhanced Post Form */}
-          {showPostForm && currentUser && (
-            <EnhancedPostForm
-              onSubmit={handleCreatePost}
-              userStartups={userStartups}
-              isSubmitting={isCreatingPost}
-              onCancel={() => setShowPostForm(false)}
-            />
-          )}
+          {/* Auth Dialog */}
+          <AuthDialog
+            open={showLoginDialog}
+            onOpenChange={setShowLoginDialog}
+            onLogin={handleLogin}
+          />
 
           <Separator />
 

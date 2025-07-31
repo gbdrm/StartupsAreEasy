@@ -14,8 +14,9 @@ interface HeaderProps {
 export function Header({ user, onLogin, onLogout }: HeaderProps) {
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container flex h-16 items-center justify-between">
-        <div className="flex items-center gap-4 ml-4">
+      <div className="container flex h-16 items-center">
+        {/* Logo on the left */}
+        <div className="flex items-center ml-4">
           <Link href="/" className="flex items-center hover:opacity-80 transition-opacity">
             <img
               src="/big_logo.png"
@@ -23,7 +24,10 @@ export function Header({ user, onLogin, onLogout }: HeaderProps) {
               className="h-10 w-auto"
             />
           </Link>
-          
+        </div>
+        
+        {/* Centered navigation links */}
+        <div className="flex-1 flex items-center justify-center gap-6">
           <Link href="/startups" className="text-xl font-semibold hover:text-gray-700 transition-colors">
             Startups
           </Link>
@@ -32,7 +36,11 @@ export function Header({ user, onLogin, onLogout }: HeaderProps) {
             About
           </Link>
         </div>
-        <AuthButton user={user} onLogin={onLogin} onLogout={onLogout} />
+        
+        {/* Auth button on the right */}
+        <div className="mr-4">
+          <AuthButton user={user} onLogin={onLogin} onLogout={onLogout} />
+        </div>
       </div>
     </header>
   )

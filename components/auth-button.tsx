@@ -55,13 +55,13 @@ export function AuthButton({ user, onLogin, onLogout }: AuthButtonProps) {
           <Button
             className={isFakeLogin ? "bg-yellow-500 hover:bg-yellow-600 text-black" : "bg-[#0088cc] hover:bg-[#0077b3]"}
           >
-            {isFakeLogin ? "Login Fake" : "Login with Telegram"}
+            {isFakeLogin ? "Sign in" : "Sign in"}
           </Button>
         </DialogTrigger>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Login with Telegram</DialogTitle>
-            <DialogDescription>Click the button below to authenticate with your Telegram account.</DialogDescription>
+            <DialogTitle>Sign in</DialogTitle>
+            <DialogDescription>Sign in to your account to continue.</DialogDescription>
           </DialogHeader>
           <div className="flex justify-center py-4">
             {isFakeLogin ? (
