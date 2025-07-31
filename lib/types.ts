@@ -39,6 +39,7 @@ export interface Startup {
   target_market?: string
   estimated_timeline?: string
   looking_for?: string[]
+  launch_date?: string
   is_public?: boolean
   created_at: string
   updated_at: string

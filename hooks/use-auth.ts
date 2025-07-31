@@ -1,17 +1,36 @@
 import { useState, useEffect } from "react"
 import { signInWithTelegram, getCurrentUserProfile, signOut } from "@/lib/auth"
+import { supabase } from "@/lib/supabase"
 import type { User } from "@/lib/types"
 import type { TelegramUser } from "@/lib/auth"
 
 export function useAuth() {
     const [currentUser, setCurrentUser] = useState<User | null>(null)
+    const [loading, setLoading] = useState(true)
 
     useEffect(() => {
+        // Get initial user
         async function fetchUser() {
             const user = await getCurrentUserProfile()
             setCurrentUser(user)
+            setLoading(false)
         }
         fetchUser()
+
+        // Listen for auth changes
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(
+            async (event, session) => {
+                if (session?.user) {
+                    const user = await getCurrentUserProfile()
+                    setCurrentUser(user)
+                } else {
+                    setCurrentUser(null)
+                }
+                setLoading(false)
+            }
+        )
+
+        return () => subscription.unsubscribe()
     }, [])
 
     const handleLogin = async (telegramUser: TelegramUser) => {
@@ -36,6 +55,7 @@ export function useAuth() {
 
     return {
         user: currentUser,
+        loading,
         login: handleLogin,
         logout: handleLogout
     }

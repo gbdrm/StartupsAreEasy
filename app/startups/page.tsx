@@ -1,26 +1,25 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import { Header } from "@/components/header"
+import { StartupCard } from "@/components/startup-card"
+import { StartupDetailDialog } from "@/components/startup-detail-dialog"
+import { CollapsibleStartupForm } from "@/components/collapsible-startup-form"
+import { AuthDialog } from "@/components/auth-dialog"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { supabase } from "@/lib/supabase"
-import { useAuth } from "@/hooks/use-auth"
+import { Separator } from "@/components/ui/separator"
 import { Loader2 } from "lucide-react"
-import { useEffect, useState } from "react"
-import Link from "next/link"
+import { useAuth } from "@/hooks/use-auth"
+import { getStartups, createStartup } from "@/lib/startups"
+import type { Startup } from "@/lib/types"
 
-interface Startup {
-  id: string
+interface StartupFormData {
   name: string
-  slug: string
-  description?: string
-  website_url?: string
-  logo_url?: string
-  industry?: string
-  stage?: string
-  founded_date?: string
-  location?: string
-  team_size?: number
-  funding_raised?: number
+  description: string
+  website_url: string
+  industry: string
+  stage: "idea" | "planning" | "building" | "mvp" | "beta" | "launched" | "scaling" | "acquired" | "paused"
+  logo_url: string
 }
 
 export default function StartupsPage() {
@@ -28,61 +27,60 @@ export default function StartupsPage() {
   const [startups, setStartups] = useState<Startup[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [showForm, setShowForm] = useState(false)
-  const [formData, setFormData] = useState({ name: "", description: "", website_url: "" })
-  const [creating, setCreating] = useState(false)
+  const [isCreatingStartup, setIsCreatingStartup] = useState(false)
+  const [showLoginDialog, setShowLoginDialog] = useState(false)
+  const [selectedStartup, setSelectedStartup] = useState<Startup | null>(null)
+  const [showDetailDialog, setShowDetailDialog] = useState(false)
 
   useEffect(() => {
-    // Check for missing API keys
-    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-      setError("Supabase API keys are missing. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in your .env.local file.")
-      setLoading(false)
-      return
-    }
-    const fetchStartups = async () => {
-      setLoading(true)
-      setError(null)
-      const { data, error } = await supabase
-        .from("startups")
-        .select("id, name, slug, description, website_url, logo_url, industry, stage, founded_date, location, team_size, funding_raised")
-        .eq("is_public", true)
-        .order("created_at", { ascending: false })
-      if (error) {
-        setError(error.message || "Failed to load startups")
-        setLoading(false)
-        return
-      }
-      setStartups(data || [])
-      setLoading(false)
-    }
-    fetchStartups()
+    loadStartups()
   }, [])
 
-  const handleCreateStartup = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setCreating(true)
-    setError(null)
+  const loadStartups = async () => {
     try {
-      if (!currentUser) {
-        throw new Error("You must be logged in to create a startup")
-      }
-      
-      const { data, error } = await supabase.from("startups").insert({
-        name: formData.name,
-        description: formData.description,
-        website_url: formData.website_url,
-        user_id: currentUser.id,
-        is_public: true,
-      }).select().single()
-      if (error) throw error
-      setStartups([data, ...startups])
-      setShowForm(false)
-      setFormData({ name: "", description: "", website_url: "" })
-    } catch (err: any) {
-      setError(err.message || "Failed to create startup")
+      setLoading(true)
+      setError(null)
+      const startupsData = await getStartups()
+      setStartups(startupsData)
+    } catch (err) {
+      console.error("Error loading startups:", err)
+      setError("Failed to load startups. Please try again.")
     } finally {
-      setCreating(false)
+      setLoading(false)
     }
+  }
+
+  const handleCreateStartup = async (data: StartupFormData) => {
+    if (!currentUser) return
+
+    try {
+      setIsCreatingStartup(true)
+      setError(null)
+      
+      const startup = await createStartup({
+        userId: currentUser.id,
+        name: data.name,
+        description: data.description || undefined,
+        website_url: data.website_url || undefined,
+        logo_url: data.logo_url || undefined,
+        industry: data.industry || undefined,
+        stage: data.stage,
+        is_public: true,
+      })
+
+      // Add the new startup to the top of the list
+      setStartups(prevStartups => [startup, ...prevStartups])
+    } catch (err) {
+      console.error("Error creating startup:", err)
+      setError("Failed to create startup. Please try again.")
+    } finally {
+      setIsCreatingStartup(false)
+    }
+  }
+
+  const handleStartupClick = (startup: Startup) => {
+    setSelectedStartup(startup)
+    setShowDetailDialog(true)
   }
 
   if (loading) {
@@ -96,82 +94,62 @@ export default function StartupsPage() {
   return (
     <div className="min-h-screen bg-background">
       <Header user={currentUser} onLogin={handleLogin} onLogout={handleLogout} />
-      <main className="container max-w-3xl mx-auto py-8 px-4">
-        {currentUser && (
-          <div className="flex justify-center mb-8">
-            <button
-              className="px-6 py-2 bg-primary text-primary-foreground rounded-lg shadow hover:bg-primary/80 transition"
-              onClick={() => setShowForm((v) => !v)}
-            >
-              {showForm ? "Cancel" : "Create Startup"}
-            </button>
+
+      <main className="container max-w-6xl mx-auto py-8 px-4">
+        <div className="space-y-6">
+          {/* Page Header */}
+          <div className="text-center space-y-2">
+            <h1 className="text-3xl font-bold">Startups</h1>
+            <p className="text-muted-foreground">
+              Discover innovative startups and share your own
+            </p>
           </div>
-        )}
-        {showForm && currentUser && (
-          <form onSubmit={handleCreateStartup} className="mb-8 p-6 border rounded-xl bg-white/90 dark:bg-muted flex flex-col gap-4 shadow-lg max-w-lg mx-auto">
-            <input
-              type="text"
-              placeholder="Startup Name"
-              value={formData.name}
-              onChange={e => setFormData({ ...formData, name: e.target.value })}
-              required
-              className="border rounded px-3 py-2 text-lg"
-            />
-            <textarea
-              placeholder="Description"
-              value={formData.description}
-              onChange={e => setFormData({ ...formData, description: e.target.value })}
-              className="border rounded px-3 py-2 text-base"
-            />
-            <input
-              type="url"
-              placeholder="Website URL"
-              value={formData.website_url}
-              onChange={e => setFormData({ ...formData, website_url: e.target.value })}
-              className="border rounded px-3 py-2 text-base"
-            />
-            <button
-              type="submit"
-              disabled={creating || !formData.name.trim()}
-              className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-base font-semibold"
-            >
-              {creating ? "Creating..." : "Add Startup"}
-            </button>
-          </form>
-        )}
-        {error && (
-          <Alert variant="destructive" className="mb-6">
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
-        <div className="grid gap-8 md:grid-cols-2">
-          {startups.map((startup) => (
-            <div key={startup.id} className="flex flex-col gap-3 border rounded-xl p-6 bg-white/90 dark:bg-muted shadow-lg">
-              <div className="flex items-center gap-4">
-                {startup.logo_url && (
-                  <img src={startup.logo_url} alt={startup.name} className="w-16 h-16 object-contain rounded" />
-                )}
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-xl font-semibold">{startup.name}</h2>
-                    {startup.website_url && (
-                      <a href={startup.website_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-sm">Website</a>
-                    )}
-                  </div>
-                  {startup.description && <p className="text-muted-foreground text-base mt-1">{startup.description}</p>}
-                </div>
-              </div>
-              <div className="flex flex-wrap gap-3 mt-2 text-xs text-muted-foreground">
-                {startup.industry && <span className="bg-muted px-2 py-1 rounded">Industry: {startup.industry}</span>}
-                {startup.stage && <span className="bg-muted px-2 py-1 rounded">Stage: {startup.stage}</span>}
-                {startup.location && <span className="bg-muted px-2 py-1 rounded">Location: {startup.location}</span>}
-                {startup.team_size && <span className="bg-muted px-2 py-1 rounded">Team: {startup.team_size}</span>}
-                {startup.funding_raised && <span className="bg-muted px-2 py-1 rounded">Funding: ${startup.funding_raised.toLocaleString()}</span>}
-              </div>
+
+          {error && (
+            <Alert variant="destructive">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+
+          {/* Collapsible Startup Form - Always visible */}
+          <CollapsibleStartupForm
+            user={currentUser}
+            onSubmit={handleCreateStartup}
+            isSubmitting={isCreatingStartup}
+            onLoginRequired={() => setShowLoginDialog(true)}
+          />
+
+          {/* Auth Dialog */}
+          <AuthDialog
+            open={showLoginDialog}
+            onOpenChange={setShowLoginDialog}
+            onLogin={handleLogin}
+          />
+
+          {/* Startup Detail Dialog */}
+          <StartupDetailDialog
+            startup={selectedStartup}
+            open={showDetailDialog}
+            onOpenChange={setShowDetailDialog}
+          />
+
+          <Separator />
+
+          {/* Startups Grid */}
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {startups.map((startup) => (
+              <StartupCard
+                key={startup.id}
+                startup={startup}
+                onClick={() => handleStartupClick(startup)}
+              />
+            ))}
+          </div>
+
+          {startups.length === 0 && !loading && (
+            <div className="text-center py-12">
+              <p className="text-muted-foreground">No startups yet. Be the first to share yours!</p>
             </div>
-          ))}
-          {!loading && startups.length === 0 && !error && (
-            <div className="text-center text-muted-foreground py-12 col-span-2">No startups found.</div>
           )}
         </div>
       </main>

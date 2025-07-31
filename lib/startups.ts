@@ -2,24 +2,32 @@ import { supabase } from "./supabase"
 import type { Startup, StartupStage, User } from "./types"
 
 export async function getStartups(userId?: string): Promise<Startup[]> {
-    let query = supabase
+    const { data, error } = await supabase
         .from("startups")
         .select(`
-      *,
-      user:user_id (
-        id,
-        name,
-        username,
-        avatar,
-        telegram_id,
-        first_name,
-        last_name
-      )
+      id,
+      name,
+      slug,
+      description,
+      website_url,
+      logo_url,
+      industry,
+      stage,
+      founded_date,
+      location,
+      team_size,
+      funding_raised,
+      target_market,
+      estimated_timeline,
+      looking_for,
+      launch_date,
+      is_public,
+      created_at,
+      updated_at,
+      user_id
     `)
         .eq("is_public", true)
         .order("created_at", { ascending: false })
-
-    const { data, error } = await query
 
     if (error) {
         console.error("Error fetching startups:", error)
@@ -32,18 +40,7 @@ export async function getStartups(userId?: string): Promise<Startup[]> {
 export async function getStartupsByStage(stage: StartupStage): Promise<Startup[]> {
     const { data, error } = await supabase
         .from("startups")
-        .select(`
-      *,
-      user:user_id (
-        id,
-        name,
-        username,
-        avatar,
-        telegram_id,
-        first_name,
-        last_name
-      )
-    `)
+        .select("*")
         .eq("is_public", true)
         .eq("stage", stage)
         .order("created_at", { ascending: false })
@@ -59,18 +56,7 @@ export async function getStartupsByStage(stage: StartupStage): Promise<Startup[]
 export async function getUserStartups(userId: string): Promise<Startup[]> {
     const { data, error } = await supabase
         .from("startups")
-        .select(`
-      *,
-      user:user_id (
-        id,
-        name,
-        username,
-        avatar,
-        telegram_id,
-        first_name,
-        last_name
-      )
-    `)
+        .select("*")
         .eq("user_id", userId)
         .order("created_at", { ascending: false })
 
@@ -87,19 +73,36 @@ export async function createStartup(startup: {
     name: string
     description?: string
     website_url?: string
+    logo_url?: string
     industry?: string
     stage?: StartupStage
+    founded_date?: string
+    location?: string
+    team_size?: number
+    funding_raised?: number
     target_market?: string
     estimated_timeline?: string
     looking_for?: string[]
     is_public?: boolean
 }): Promise<Startup> {
+    // Generate slug from name
+    const slug = startup.name
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-|-$/g, '')
+
     const insertData: any = {
         name: startup.name,
+        slug,
         description: startup.description,
         website_url: startup.website_url,
+        logo_url: startup.logo_url,
         industry: startup.industry,
         stage: startup.stage || "idea",
+        founded_date: startup.founded_date,
+        location: startup.location,
+        team_size: startup.team_size,
+        funding_raised: startup.funding_raised,
         target_market: startup.target_market,
         estimated_timeline: startup.estimated_timeline,
         looking_for: startup.looking_for,
@@ -114,18 +117,7 @@ export async function createStartup(startup: {
     const { data, error } = await supabase
         .from("startups")
         .insert(insertData)
-        .select(`
-      *,
-      user:user_id (
-        id,
-        name,
-        username,
-        avatar,
-        telegram_id,
-        first_name,
-        last_name
-      )
-    `)
+        .select("*")
         .single()
 
     if (error) {
@@ -144,18 +136,7 @@ export async function updateStartup(
         .from("startups")
         .update(updates)
         .eq("id", startupId)
-        .select(`
-      *,
-      user:user_id (
-        id,
-        name,
-        username,
-        avatar,
-        telegram_id,
-        first_name,
-        last_name
-      )
-    `)
+        .select("*")
         .single()
 
     if (error) {
@@ -181,18 +162,7 @@ export async function deleteStartup(startupId: string): Promise<void> {
 export async function getStartupBySlug(slug: string): Promise<Startup | null> {
     const { data, error } = await supabase
         .from("startups")
-        .select(`
-      *,
-      user:user_id (
-        id,
-        name,
-        username,
-        avatar,
-        telegram_id,
-        first_name,
-        last_name
-      )
-    `)
+        .select("*")
         .eq("slug", slug)
         .eq("is_public", true)
         .single()
