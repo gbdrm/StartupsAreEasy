@@ -9,14 +9,15 @@ import type { Post, Comment, PostType, PostFormData, Startup } from "@/lib/types
 import { Separator } from "@/components/ui/separator"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Loader2 } from "lucide-react"
-import { getPosts, toggleLike, getComments, createComment } from "@/lib/posts"
+import { getPosts } from "@/lib/posts"
 import { createEnhancedPost, getUserStartupsForPosts } from "@/lib/enhanced-posts"
 import { useAuth } from "@/hooks/use-auth"
+import { useComments } from "@/hooks/use-comments"
 
 export default function HomePage() {
   const { user: currentUser, login: handleLogin, logout: handleLogout } = useAuth()
   const [posts, setPosts] = useState<Post[]>([])
-  const [comments, setComments] = useState<Comment[]>([])
+  const { comments, loadComments, handleComment, handleLike } = useComments(currentUser, setPosts)
   const [userStartups, setUserStartups] = useState<Startup[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -26,6 +27,10 @@ export default function HomePage() {
   // Load posts and user startups
   useEffect(() => {
     loadPosts()
+  }, []) // Remove currentUser dependency to prevent unnecessary re-fetches
+
+  // Load user startups separately when user changes
+  useEffect(() => {
     if (currentUser) {
       loadUserStartups()
     }
@@ -38,11 +43,9 @@ export default function HomePage() {
       const postsData = await getPosts(currentUser?.id)
       setPosts(postsData)
 
-      // Load comments for all posts in parallel
-      const commentsArrays = await Promise.all(
-        postsData.map((post) => getComments(post.id)),
-      )
-      setComments(commentsArrays.flat())
+      // Load comments using the shared hook
+      const postIds = postsData.map(post => post.id)
+      await loadComments(postIds)
     } catch (err) {
       console.error("Error loading posts:", err)
       setError("Failed to load posts. Please try again.")
@@ -80,63 +83,6 @@ export default function HomePage() {
       setError("Failed to create post. Please try again.")
     } finally {
       setIsCreatingPost(false)
-    }
-  }
-
-  const handleLike = async (postId: string) => {
-    if (!currentUser) return
-
-    try {
-      const isLiked = await toggleLike(postId, currentUser.id)
-
-      // Update local state optimistically
-      setPosts(
-        posts.map((post) => {
-          if (post.id === postId) {
-            return {
-              ...post,
-              liked_by_user: isLiked,
-              likes_count: isLiked ? post.likes_count + 1 : post.likes_count - 1,
-            }
-          }
-          return post
-        }),
-      )
-    } catch (err) {
-      console.error("Error toggling like:", err)
-      setError("Failed to update like. Please try again.")
-    }
-  }
-
-  const handleComment = async (postId: string, content: string) => {
-    if (!currentUser) return
-
-    try {
-      await createComment({
-        postId,
-        userId: currentUser.id,
-        content,
-      })
-
-      // Reload comments for this post
-      const newComments = await getComments(postId)
-      setComments((prev) => [...prev.filter((c) => c.post_id !== postId), ...newComments])
-
-      // Update post comment count
-      setPosts(
-        posts.map((post) => {
-          if (post.id === postId) {
-            return {
-              ...post,
-              comments_count: newComments.length,
-            }
-          }
-          return post
-        }),
-      )
-    } catch (err) {
-      console.error("Error creating comment:", err)
-      setError("Failed to create comment. Please try again.")
     }
   }
 

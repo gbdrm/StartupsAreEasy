@@ -52,7 +52,7 @@ export default function ProfilePage() {
     if (username) {
       loadProfile()
     }
-  }, [username, currentUser])
+  }, [username]) // Remove currentUser dependency to prevent unnecessary re-fetches
 
   const loadProfile = async () => {
     try {
@@ -87,16 +87,84 @@ export default function ProfilePage() {
 
       setProfileUser(profileData)
 
-      // Fetch user's posts
-      const userPosts = await getPosts(currentUser?.id)
-      const filteredPosts = userPosts.filter(post => post.user.id === profile.id)
-      setPosts(filteredPosts)
+      // Fetch ONLY this user's posts directly instead of filtering all posts
+      const { data: userPosts, error: postsError } = await supabase
+        .rpc("get_posts_with_details", {
+          user_id_param: profile.id,
+        })
 
-      // Load comments for posts
-      const commentsArrays = await Promise.all(
-        filteredPosts.map((post) => getComments(post.id))
-      )
-      setComments(commentsArrays.flat())
+      if (postsError) {
+        console.error("Error fetching user posts:", postsError)
+        setPosts([])
+        setComments([])
+        return
+      }
+
+      const formattedPosts = userPosts.map((post: any) => ({
+        id: post.id,
+        user: {
+          id: post.user_id,
+          name: `${post.first_name} ${post.last_name || ""}`.trim(),
+          username: post.username,
+          avatar: post.avatar_url,
+        },
+        type: post.type,
+        content: post.content,
+        link: post.link_url,
+        image: post.image_url,
+        created_at: post.created_at,
+        likes_count: post.likes_count,
+        comments_count: post.comments_count,
+        liked_by_user: currentUser ? post.liked_by_user : false,
+      })) as Post[]
+
+      setPosts(formattedPosts)
+
+      // Batch load comments for all posts in a single query if there are posts
+      if (formattedPosts.length > 0) {
+        const postIds = formattedPosts.map(post => post.id)
+        
+        // Use a simpler join approach - since comments.user_id = profiles.id (both reference auth.users.id)
+        const { data: allComments, error: commentsError } = await supabase
+          .from("comments")
+          .select(`
+            id,
+            content,
+            created_at,
+            user_id,
+            post_id,
+            profiles!user_id (
+              id,
+              username,
+              first_name,
+              last_name,
+              avatar_url
+            )
+          `)
+          .in("post_id", postIds)
+          .order("created_at", { ascending: true })
+
+        if (!commentsError && allComments) {
+          const formattedComments = allComments.map((comment: any) => ({
+            id: comment.id,
+            content: comment.content,
+            created_at: comment.created_at,
+            user_id: comment.user_id,
+            post_id: comment.post_id,
+            user: {
+              id: comment.profiles?.id || comment.user_id,
+              name: comment.profiles ? `${comment.profiles.first_name} ${comment.profiles.last_name || ""}`.trim() : "Unknown User",
+              username: comment.profiles?.username || "unknown",
+              avatar: comment.profiles?.avatar_url,
+            }
+          }))
+          setComments(formattedComments)
+        } else {
+          setComments([])
+        }
+      } else {
+        setComments([])
+      }
 
     } catch (err) {
       console.error("Error loading profile:", err)
@@ -151,18 +219,28 @@ export default function ProfilePage() {
     if (!currentUser) return
 
     try {
-      await createComment({
+      const newComment = await createComment({
         postId,
         userId: currentUser.id,
         content,
       })
 
-      // Reload comments
-      const newComments = await getComments(postId)
-      setComments(prevComments => [
-        ...prevComments.filter(c => c.post_id !== postId),
-        ...newComments,
-      ])
+      // Add the new comment to local state instead of reloading
+      const formattedNewComment = {
+        id: newComment.id,
+        content: newComment.content,
+        created_at: newComment.created_at,
+        user_id: newComment.user_id,
+        post_id: newComment.post_id,
+        user: {
+          id: currentUser.id,
+          name: currentUser.name,
+          username: currentUser.username,
+          avatar: currentUser.avatar,
+        }
+      }
+
+      setComments(prevComments => [...prevComments, formattedNewComment])
 
       // Update comment count
       setPosts(prevPosts =>
