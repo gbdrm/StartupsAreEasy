@@ -67,11 +67,26 @@ StartupsAreEasy is a home for people who love starting things — even when they
    cp .env.example .env.local
    ```
    
-   Fill in your Supabase credentials:
+   Fill in your Supabase credentials and development settings:
    ```env
+   # Supabase configuration
    NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
    NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+   SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+   
+   # Telegram Bot (for authentication)
+   NEXT_PUBLIC_TELEGRAM_BOT_TOKEN=your_telegram_bot_token  # Client-side (Login Widget)
+   
+   # Development testing (for local development)
+   NEXT_PUBLIC_DEFAULT_USER_ID=your_default_user_id
+   NEXT_PUBLIC_DEV_EMAIL=your-dev-email@example.com
+   NEXT_PUBLIC_DEV_PASSWORD=your-secure-dev-password
    ```
+   
+   **For local development:**
+   - Create a test user in your Supabase Auth dashboard
+   - Use those credentials for `NEXT_PUBLIC_DEV_EMAIL` and `NEXT_PUBLIC_DEV_PASSWORD`
+   - This enables proper authentication testing without hardcoded credentials
 
 4. **Set up the database**
    

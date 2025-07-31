@@ -13,40 +13,85 @@ export type TelegramUser = {
 };
 
 export async function signInWithTelegram(telegramUser: TelegramUser): Promise<User> {
-  // Local dev override
+  // Local dev override - use proper Supabase authentication
   if (HAS_FAKE_LOGIN) {
-    const { data: profile, error } = await supabase
-      .from("profiles")
-      .select("id, username, first_name, last_name, avatar_url")
-      .eq("id", process.env.NEXT_PUBLIC_DEFAULT_USER_ID)
-      .single();
-    if (error || !profile) throw new Error("Could not find default profile for local dev");
+    // For local development, sign in with a test email/password
+    // This creates a real Supabase session with proper auth.uid()
+    const testEmail = process.env.NEXT_PUBLIC_DEV_EMAIL;
+    const testPassword = process.env.NEXT_PUBLIC_DEV_PASSWORD;
 
-    // Store fake session data in localStorage for persistence
-    const fakeUserData = {
-      id: profile.id,
-      name: `${profile.first_name ?? ""} ${profile.last_name ?? ""}`.trim(),
-      username: profile.username ?? "",
-      avatar: profile.avatar_url ?? "",
-      first_name: profile.first_name,
-      last_name: profile.last_name,
-    };
-    localStorage.setItem(STORAGE_KEYS.FAKE_USER_SESSION, JSON.stringify(fakeUserData));
-
-    // For fake login, we need to set the Supabase session to make RLS work
-    // Create a fake JWT token for local development
-    try {
-      // Try to get an actual session for the default user
-      // This requires the user to exist in auth.users
-      const { data, error } = await supabase.auth.getUser();
-      if (error || !data.user) {
-        console.warn('No Supabase session found for fake login. RLS policies may not work correctly.');
-      }
-    } catch (err) {
-      console.warn('Could not verify Supabase session for fake login:', err);
+    if (!testEmail || !testPassword) {
+      throw new Error("Local dev credentials not found. Please set NEXT_PUBLIC_DEV_EMAIL and NEXT_PUBLIC_DEV_PASSWORD in .env.local");
     }
 
-    return fakeUserData;
+    // Try to sign in with existing test user
+    let { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+      email: testEmail,
+      password: testPassword,
+    });
+
+    // If user doesn't exist, create them
+    if (authError && authError.message.includes("Invalid login credentials")) {
+      console.log("Creating test user for local development...");
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+        email: testEmail,
+        password: testPassword,
+      });
+
+      if (signUpError || !signUpData.user || !signUpData.session) {
+        throw new Error(`Failed to create test user: ${signUpError?.message}`);
+      }
+
+      // Use the sign up data directly
+      authData = {
+        user: signUpData.user,
+        session: signUpData.session
+      };
+      authError = null;
+    }
+
+    if (authError || !authData?.user) {
+      throw new Error(`Local dev auth failed: ${authError?.message}`);
+    }
+
+    const authUserId = authData.user.id;
+
+    // Get or create profile for the authenticated user
+    let { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("id, username, first_name, last_name, avatar_url")
+      .eq("id", authUserId)
+      .single();
+
+    if (profileError && profileError.code === 'PGRST116') {
+      // Profile doesn't exist, create it
+      const { data: newProfile, error: createError } = await supabase
+        .from("profiles")
+        .insert({
+          id: authUserId,
+          username: "localdev",
+          first_name: "Local",
+          last_name: "Developer",
+        })
+        .select()
+        .single();
+
+      if (createError || !newProfile) {
+        throw new Error(`Failed to create profile: ${createError?.message}`);
+      }
+      profile = newProfile;
+    } else if (profileError || !profile) {
+      throw new Error(`Profile error: ${profileError?.message || 'Profile not found'}`);
+    }
+
+    return {
+      id: profile!.id,
+      name: `${profile!.first_name ?? ""} ${profile!.last_name ?? ""}`.trim(),
+      username: profile!.username ?? "",
+      avatar: profile!.avatar_url ?? "",
+      first_name: profile!.first_name,
+      last_name: profile!.last_name,
+    };
   }
 
   // Call backend to get JWT

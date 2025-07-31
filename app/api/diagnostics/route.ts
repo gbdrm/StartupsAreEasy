@@ -164,8 +164,7 @@ export async function GET(request: NextRequest) {
 
         const optionalEnvVars = [
             'SUPABASE_SERVICE_ROLE_KEY',
-            'NEXT_PUBLIC_TELEGRAM_BOT_TOKEN',
-            'TELEGRAM_BOT_TOKEN'
+            'NEXT_PUBLIC_TELEGRAM_BOT_TOKEN'
         ]
 
         const envStatus = {
