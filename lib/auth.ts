@@ -153,28 +153,7 @@ export async function signInWithTelegram(telegramUser: TelegramUser): Promise<Us
 }
 
 export async function getCurrentUserProfile(): Promise<User | null> {
-  // Check for fake session first (local dev)
-  if (process.env.NEXT_PUBLIC_DEFAULT_USER_ID) {
-    const fakeSession = localStorage.getItem("fake-user-session");
-    if (fakeSession) {
-      try {
-        const userData = JSON.parse(fakeSession);
-        return userData;
-      } catch (error) {
-        console.error("Error parsing fake session:", error);
-        localStorage.removeItem("fake-user-session");
-      }
-    }
-    return null;
-  }
-
-  // Production auth flow
-  // Restore JWT from localStorage if present
-  const access_token = localStorage.getItem("sb-access-token");
-  if (access_token) {
-    await supabase.auth.setSession({ access_token, refresh_token: "" });
-  }
-
+  // Get current user from Supabase auth
   const { data: userData, error: authError } = await supabase.auth.getUser();
   if (authError || !userData?.user) return null;
   const user = userData.user;
@@ -197,13 +176,5 @@ export async function getCurrentUserProfile(): Promise<User | null> {
 }
 
 export async function signOut() {
-  // Clear fake session for local dev
-  if (process.env.NEXT_PUBLIC_DEFAULT_USER_ID) {
-    localStorage.removeItem("fake-user-session");
-    return;
-  }
-
-  // Production logout
-  localStorage.removeItem("sb-access-token");
   await supabase.auth.signOut();
 }

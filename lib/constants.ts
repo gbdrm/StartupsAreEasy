@@ -1,6 +1,6 @@
 // Environment and feature flags
 export const IS_DEVELOPMENT = process.env.NODE_ENV === 'development'
-export const HAS_FAKE_LOGIN = !!process.env.NEXT_PUBLIC_DEFAULT_USER_ID
+export const HAS_FAKE_LOGIN = !!(process.env.NEXT_PUBLIC_DEV_EMAIL && process.env.NEXT_PUBLIC_DEV_PASSWORD)
 
 // UI Constants
 export const AVATAR_SIZES = {

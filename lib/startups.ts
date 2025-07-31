@@ -109,7 +109,7 @@ export async function createStartup(startup: {
         is_public: startup.is_public ?? true,
     }
 
-    // Only add user_id if provided and the column exists
+    // Only add user_id if provided
     if (startup.userId) {
         insertData.user_id = startup.userId
     }
