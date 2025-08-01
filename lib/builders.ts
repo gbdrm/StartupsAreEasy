@@ -6,6 +6,7 @@ export async function getBuilders() {
         const { data: profiles, error } = await supabase
             .from("profiles")
             .select("id, first_name, last_name, username, avatar_url")
+            .neq("username", "admin")  // Exclude admin profile
             .order("created_at", { ascending: false })
 
         if (error) throw error
