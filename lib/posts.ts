@@ -238,3 +238,113 @@ export async function createComment(data: {
     throw error
   }
 }
+
+// Get posts filtered by type
+export async function getPostsByType(postType: PostType, userId?: string) {
+  try {
+    // First try to use the custom function but filter by type
+    const { data, error } = await supabase.rpc("get_posts_with_details", {
+      user_id_param: userId || null,
+    })
+
+    if (error) {
+      // If the function doesn't exist, fall back to basic query
+      if (error.message.includes("function") && error.message.includes("does not exist")) {
+        return await getPostsByTypeBasic(postType, userId)
+      }
+      throw error
+    }
+
+    // Filter by post type
+    const filteredData = data.filter((post: any) => post.type === postType)
+
+    return filteredData.map((post: any) => ({
+      id: post.id,
+      user: {
+        id: post.user_id,
+        name: `${post.first_name} ${post.last_name || ""}`.trim(),
+        username: post.username,
+        avatar: post.avatar_url,
+      },
+      type: post.type,
+      content: post.content,
+      link: post.link_url,
+      image: post.image_url,
+      created_at: post.created_at,
+      likes_count: post.likes_count,
+      comments_count: post.comments_count,
+      liked_by_user: post.liked_by_user,
+      startup: post.startup_name ? {
+        id: post.startup_id,
+        name: post.startup_name,
+        description: post.startup_description,
+        stage: post.startup_stage,
+      } : null,
+    })) as Post[]
+  } catch (error) {
+    console.error("Error fetching posts by type:", error)
+    // Fall back to basic query if RPC fails
+    return await getPostsByTypeBasic(postType, userId)
+  }
+}
+
+// Fallback function for basic posts query filtered by type
+async function getPostsByTypeBasic(postType: PostType, userId?: string) {
+  const { data: posts, error } = await supabase
+    .from("posts")
+    .select(`
+      id,
+      user_id,
+      type,
+      content,
+      link,
+      image,
+      created_at,
+      startup_id,
+      startups:startup_id (
+        id,
+        name,
+        description,
+        stage
+      )
+    `)
+    .eq("type", postType)
+    .order("created_at", { ascending: false })
+
+  if (error) throw error
+
+  // Get user profiles for all posts
+  const userIds = [...new Set(posts.map(post => post.user_id))]
+  const { data: profiles } = await supabase
+    .from("profiles")
+    .select("id, first_name, last_name, username, avatar_url")
+    .in("id", userIds)
+
+  // Transform the data
+  return posts.map(post => {
+    const profile = profiles?.find(p => p.id === post.user_id)
+    return {
+      id: post.id,
+      user: {
+        id: post.user_id,
+        name: profile ? `${profile.first_name} ${profile.last_name || ""}`.trim() : "Unknown User",
+        username: profile?.username || "unknown",
+        avatar: profile?.avatar_url,
+      },
+      type: post.type,
+      content: post.content,
+      link: post.link,
+      image: post.image,
+      created_at: post.created_at,
+      likes_count: 0, // Would need separate query
+      comments_count: 0, // Would need separate query
+      liked_by_user: false, // Would need separate query
+      startup: post.startups ? {
+        id: (post.startups as any).id,
+        name: (post.startups as any).name,
+        description: (post.startups as any).description,
+        stage: (post.startups as any).stage,
+      } : null,
+    } as Post
+  })
+}

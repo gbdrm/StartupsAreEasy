@@ -14,6 +14,7 @@ interface EnhancedPostFormProps {
   userStartups: Startup[]
   isSubmitting?: boolean
   onCancel: () => void
+  restrictToType?: PostType
 }
 
 export interface PostFormData {
@@ -25,8 +26,8 @@ export interface PostFormData {
   existing_startup_id?: string
 }
 
-export function EnhancedPostForm({ onSubmit, userStartups, isSubmitting, onCancel }: EnhancedPostFormProps) {
-  const [postType, setPostType] = useState<PostType>("post")
+export function EnhancedPostForm({ onSubmit, userStartups, isSubmitting, onCancel, restrictToType }: EnhancedPostFormProps) {
+  const [postType, setPostType] = useState<PostType>(restrictToType || "post")
   const [formData, setFormData] = useState<PostFormData>({
     type: "post"
   })
@@ -254,28 +255,45 @@ export function EnhancedPostForm({ onSubmit, userStartups, isSubmitting, onCance
   return (
     <Card className="w-full max-w-2xl mx-auto">
       <CardHeader>
-        <CardTitle>Create a </CardTitle>
-        <div className="flex gap-2">
-          {(["post", "idea", "launch", "progress"] as PostType[]).map(type => (
-            <Button
-              key={type}
-              type="button"
-              variant={postType === type ? "default" : "outline"}
-              size="sm"
-              onClick={() => {
-                setPostType(type)
-                setFormData({ type })
-              }}
-            >
-              {type === "post" && "💬"}
-              {type === "idea" && "💡"}
-              {type === "launch" && "🚀"}
-              {type === "progress" && "📈"}
-              {type.charAt(0).toUpperCase() + type.slice(1)}
-            </Button>
-          ))}
-        </div>
-        <p className="text-sm text-muted-foreground">{getPostTypeDescription()}</p>
+        <CardTitle>Create a {restrictToType ? restrictToType : 'post'}</CardTitle>
+        {!restrictToType && (
+          <>
+            <div className="flex gap-2">
+              {(["post", "idea", "launch", "progress"] as PostType[]).map(type => (
+                <Button
+                  key={type}
+                  type="button"
+                  variant={postType === type ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => {
+                    setPostType(type)
+                    setFormData({ type })
+                  }}
+                >
+                  {type === "post" && "💬"}
+                  {type === "idea" && "💡"}
+                  {type === "launch" && "🚀"}
+                  {type === "progress" && "📈"}
+                  {type.charAt(0).toUpperCase() + type.slice(1)}
+                </Button>
+              ))}
+            </div>
+            <p className="text-sm text-muted-foreground">{getPostTypeDescription()}</p>
+          </>
+        )}
+        {restrictToType && (
+          <div className="flex items-center gap-2">
+            <span className="text-lg">
+              {restrictToType === "post" && "💬"}
+              {restrictToType === "idea" && "💡"}
+              {restrictToType === "launch" && "🚀"}
+              {restrictToType === "progress" && "📈"}
+            </span>
+            <span className="text-sm text-muted-foreground">
+              Share your {restrictToType === "idea" ? "innovative startup idea" : restrictToType} with the community
+            </span>
+          </div>
+        )}
       </CardHeader>
 
       <CardContent>

@@ -4,7 +4,7 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { EnhancedPostForm } from "./enhanced-post-form"
-import type { PostFormData, Startup } from "@/lib/types"
+import type { PostFormData, Startup, PostType } from "@/lib/types"
 
 interface CollapsiblePostFormProps {
   user: any | null
@@ -12,6 +12,7 @@ interface CollapsiblePostFormProps {
   userStartups: Startup[]
   isSubmitting?: boolean
   onLoginRequired: () => void
+  restrictToType?: PostType
 }
 
 export function CollapsiblePostForm({ 
@@ -19,7 +20,8 @@ export function CollapsiblePostForm({
   onSubmit, 
   userStartups, 
   isSubmitting, 
-  onLoginRequired 
+  onLoginRequired,
+  restrictToType
 }: CollapsiblePostFormProps) {
   const [isExpanded, setIsExpanded] = useState(false)
 
@@ -45,6 +47,7 @@ export function CollapsiblePostForm({
         userStartups={userStartups}
         isSubmitting={isSubmitting}
         onCancel={handleCancel}
+        restrictToType={restrictToType}
       />
     )
   }
