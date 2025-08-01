@@ -13,10 +13,17 @@ interface StartupCardProps {
 export function StartupCard({ startup, onClick }: StartupCardProps) {
   const stageInfo = STARTUP_STAGES[startup.stage || 'idea']
 
+  const handleClick = (e: React.MouseEvent) => {
+    console.log('StartupCard handleClick triggered for:', startup.name)
+    e.preventDefault()
+    e.stopPropagation()
+    onClick()
+  }
+
   return (
     <Card 
       className="cursor-pointer transition-all duration-200 hover:shadow-lg hover:scale-[1.02] bg-card"
-      onClick={onClick}
+      onClick={handleClick}
     >
       <CardContent className="p-6">
         <div className="flex items-start gap-4 mb-4">

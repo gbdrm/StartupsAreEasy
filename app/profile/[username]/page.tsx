@@ -400,8 +400,26 @@ export default function ProfilePage() {
                     key={startup.id}
                     startup={startup}
                     onClick={() => {
-                      // Navigate to startup detail page when available
-                      console.log("Navigate to startup:", startup.slug)
+                      console.log('Profile StartupCard clicked:', startup.name, startup.slug)
+                      try {
+                        const url = `/startups/${startup.slug}`
+                        console.log('Navigating to:', url)
+                        
+                        // Try router.push first
+                        router.push(url)
+                        
+                        // If router doesn't work within 1 second, fallback to window.location
+                        setTimeout(() => {
+                          if (window.location.pathname !== url) {
+                            console.warn('Router navigation failed, using window.location fallback')
+                            window.location.href = url
+                          }
+                        }, 1000)
+                      } catch (error) {
+                        console.error('Navigation error:', error)
+                        // Fallback to direct navigation
+                        window.location.href = `/startups/${startup.slug}`
+                      }
                     }}
                   />
                 ))}
