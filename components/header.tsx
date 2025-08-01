@@ -27,7 +27,7 @@ export function Header({ user, onLogin, onLogout }: HeaderProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   const navigationItems = [
-    { href: "/", emoji: "🏠", label: "Feed" },
+    { href: "/", emoji: "🏠", label: "Home" },
     { href: "/startups", emoji: "🚀", label: "Startups" },
     { href: "/builders", emoji: "🧑‍💻", label: "Builders" },
   ]
