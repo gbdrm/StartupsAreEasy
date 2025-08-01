@@ -28,7 +28,6 @@ export function Header({ user, onLogin, onLogout }: HeaderProps) {
 
   const navigationItems = [
     { href: "/", emoji: "🏠", label: "Feed" },
-    { href: "/ideas", emoji: "💡", label: "Ideas" },
     { href: "/startups", emoji: "🚀", label: "Startups" },
     { href: "/builders", emoji: "🧑‍💻", label: "Builders" },
   ]
