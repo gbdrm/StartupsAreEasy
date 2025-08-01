@@ -4,16 +4,19 @@ import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { Header } from "@/components/header"
 import { PostCard } from "@/components/post-card"
+import { StartupCard } from "@/components/startup-card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Separator } from "@/components/ui/separator"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Loader2, ArrowLeft, Calendar, MapPin, Link as LinkIcon } from "lucide-react"
 import { supabase } from "@/lib/supabase"
-import { getPosts, toggleLike, getComments, createComment } from "@/lib/posts"
+import { getPosts, toggleLike, getComments, createComment, getPostsByType } from "@/lib/posts"
+import { getUserStartups } from "@/lib/startups"
 import { signInWithTelegram, signOut, getCurrentUserProfile } from "@/lib/auth"
-import type { User, Post, Comment } from "@/lib/types"
+import type { User, Post, Comment, Startup } from "@/lib/types"
 import type { TelegramUser } from "@/lib/auth"
 
 interface ProfileData extends User {
@@ -34,6 +37,8 @@ export default function ProfilePage() {
   const [currentUser, setCurrentUser] = useState<User | null>(null)
   const [profileUser, setProfileUser] = useState<ProfileData | null>(null)
   const [posts, setPosts] = useState<Post[]>([])
+  const [ideas, setIdeas] = useState<Post[]>([])
+  const [startups, setStartups] = useState<Startup[]>([])
   const [comments, setComments] = useState<Comment[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -87,21 +92,34 @@ export default function ProfilePage() {
 
       setProfileUser(profileData)
 
-      // Fetch ONLY this user's posts using the dedicated user posts function
-      const { data: userPosts, error: postsError } = await supabase
-        .rpc("get_user_posts_with_details", {
+      // Fetch user's posts, ideas, and startups in parallel
+      const [userPostsResult, userIdeasResult, userStartupsResult] = await Promise.all([
+        // Get regular posts (excluding ideas)  
+        supabase.rpc("get_user_posts_with_details", {
           profile_user_id: profile.id,
           current_user_id: currentUser?.id || null,
-        })
+        }),
+        // Get user's ideas (posts with type "idea")
+        getPostsByType("idea", currentUser?.id).then(allIdeas => 
+          allIdeas.filter(idea => idea.user.id === profile.id)
+        ),
+        // Get user's launched startups
+        getUserStartups(profile.id).then(allStartups =>
+          allStartups.filter(startup => startup.stage === "launched" || startup.stage === "scaling")
+        )
+      ])
 
-      if (postsError) {
-        console.error("Error fetching user posts:", postsError)
+      if (userPostsResult.error) {
+        console.error("Error fetching user posts:", userPostsResult.error)
         setPosts([])
+        setIdeas([])
+        setStartups([])
         setComments([])
         return
       }
 
-      const formattedPosts = userPosts.map((post: any) => ({
+      // Format posts (filter out ideas from regular posts)
+      const allUserPosts = userPostsResult.data.map((post: any) => ({
         id: post.id,
         user: {
           id: post.user_id,
@@ -119,11 +137,15 @@ export default function ProfilePage() {
         liked_by_user: currentUser ? post.liked_by_user : false,
       })) as Post[]
 
-      setPosts(formattedPosts)
+      // Separate regular posts from ideas
+      const regularPosts = allUserPosts.filter(post => post.type !== "idea")
+      setPosts(regularPosts)
+      setIdeas(userIdeasResult)
+      setStartups(userStartupsResult)
 
-      // Batch load comments for all posts in a single query if there are posts
-      if (formattedPosts.length > 0) {
-        const postIds = formattedPosts.map(post => post.id)
+      // Batch load comments for all posts and ideas in a single query
+      const allContentIds = [...regularPosts, ...userIdeasResult].map(item => item.id)
+      if (allContentIds.length > 0) {
         
         // Use a simpler join approach - since comments.user_id = profiles.id (both reference auth.users.id)
         const { data: allComments, error: commentsError } = await supabase
@@ -142,7 +164,7 @@ export default function ProfilePage() {
               avatar_url
             )
           `)
-          .in("post_id", postIds)
+          .in("post_id", allContentIds)
           .order("created_at", { ascending: true })
 
         if (!commentsError && allComments) {
@@ -199,6 +221,8 @@ export default function ProfilePage() {
     
     try {
       const isLiked = await toggleLike(postId, currentUser.id)
+      
+      // Update both posts and ideas
       setPosts(prevPosts =>
         prevPosts.map(post => {
           if (post.id === postId) {
@@ -209,6 +233,19 @@ export default function ProfilePage() {
             }
           }
           return post
+        })
+      )
+      
+      setIdeas(prevIdeas =>
+        prevIdeas.map(idea => {
+          if (idea.id === postId) {
+            return {
+              ...idea,
+              liked_by_user: isLiked,
+              likes_count: isLiked ? idea.likes_count + 1 : idea.likes_count - 1,
+            }
+          }
+          return idea
         })
       )
     } catch (error) {
@@ -243,12 +280,20 @@ export default function ProfilePage() {
 
       setComments(prevComments => [...prevComments, formattedNewComment])
 
-      // Update comment count
+      // Update comment count for both posts and ideas
       setPosts(prevPosts =>
         prevPosts.map(post =>
           post.id === postId
             ? { ...post, comments_count: post.comments_count + 1 }
             : post
+        )
+      )
+      
+      setIdeas(prevIdeas =>
+        prevIdeas.map(idea =>
+          idea.id === postId
+            ? { ...idea, comments_count: idea.comments_count + 1 }
+            : idea
         )
       )
     } catch (error) {
@@ -343,29 +388,79 @@ export default function ProfilePage() {
           </CardHeader>
         </Card>
 
-        {/* Posts Section */}
-        <div className="space-y-6">
-          <h2 className="text-xl font-semibold">Posts ({posts.length})</h2>
+        {/* Content Tabs */}
+        <Tabs defaultValue="posts" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="posts">Posts ({posts.length})</TabsTrigger>
+            <TabsTrigger value="ideas">💡 Ideas ({ideas.length})</TabsTrigger>
+            <TabsTrigger value="startups">🚀 Launched ({startups.length})</TabsTrigger>
+          </TabsList>
           
-          {posts.length === 0 ? (
-            <Card>
-              <CardContent className="py-12 text-center">
-                <p className="text-muted-foreground">No posts yet</p>
-              </CardContent>
-            </Card>
-          ) : (
-            posts.map((post) => (
-              <PostCard
-                key={post.id}
-                post={post}
-                user={currentUser}
-                comments={comments.filter(c => c.post_id === post.id)}
-                onLike={handleLike}
-                onComment={handleComment}
-              />
-            ))
-          )}
-        </div>
+          <TabsContent value="posts" className="space-y-6">
+            {posts.length === 0 ? (
+              <Card>
+                <CardContent className="py-12 text-center">
+                  <p className="text-muted-foreground">No posts yet</p>
+                </CardContent>
+              </Card>
+            ) : (
+              posts.map((post) => (
+                <PostCard
+                  key={post.id}
+                  post={post}
+                  user={currentUser}
+                  comments={comments.filter(c => c.post_id === post.id)}
+                  onLike={handleLike}
+                  onComment={handleComment}
+                />
+              ))
+            )}
+          </TabsContent>
+          
+          <TabsContent value="ideas" className="space-y-6">
+            {ideas.length === 0 ? (
+              <Card>
+                <CardContent className="py-12 text-center">
+                  <p className="text-muted-foreground">No ideas yet</p>
+                </CardContent>
+              </Card>
+            ) : (
+              ideas.map((idea) => (
+                <PostCard
+                  key={idea.id}
+                  post={idea}
+                  user={currentUser}
+                  comments={comments.filter(c => c.post_id === idea.id)}
+                  onLike={handleLike}
+                  onComment={handleComment}
+                />
+              ))
+            )}
+          </TabsContent>
+          
+          <TabsContent value="startups" className="space-y-6">
+            {startups.length === 0 ? (
+              <Card>
+                <CardContent className="py-12 text-center">
+                  <p className="text-muted-foreground">No launched startups yet</p>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="grid gap-6 md:grid-cols-2">
+                {startups.map((startup) => (
+                  <StartupCard
+                    key={startup.id}
+                    startup={startup}
+                    onClick={() => {
+                      // Navigate to startup detail page when available
+                      console.log("Navigate to startup:", startup.slug)
+                    }}
+                  />
+                ))}
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
       </main>
     </div>
   )
