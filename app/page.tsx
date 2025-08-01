@@ -15,7 +15,7 @@ import { useAuth } from "@/hooks/use-auth"
 import { useComments } from "@/hooks/use-comments"
 
 export default function HomePage() {
-  const { user: currentUser, login: handleLogin, logout: handleLogout } = useAuth()
+  const { user: currentUser, login: handleLogin, logout: handleLogout, loading: authLoading } = useAuth()
   const [posts, setPosts] = useState<Post[]>([])
   const { comments, loadComments, handleComment, handleLike } = useComments(currentUser, setPosts)
   const [userStartups, setUserStartups] = useState<Startup[]>([])
@@ -24,32 +24,94 @@ export default function HomePage() {
   const [isCreatingPost, setIsCreatingPost] = useState(false)
   const [showLoginDialog, setShowLoginDialog] = useState(false)
 
+  // Diagnostics - log all loading states
+  useEffect(() => {
+    const timestamp = new Date().toISOString()
+    console.log(`[${timestamp}] Loading states:`, {
+      authLoading,
+      postsLoading: loading,
+      currentUser: currentUser ? `${currentUser.name} (${currentUser.id})` : 'null',
+      postsCount: posts.length,
+      commentsCount: comments.length
+    })
+  }, [authLoading, loading, currentUser, posts.length, comments.length])
+
+  // Emergency fallback: if loading states are stuck for more than 15 seconds, force clear them
+  useEffect(() => {
+    const emergencyTimeout = setTimeout(() => {
+      if (authLoading || loading) {
+        console.error(`[${new Date().toISOString()}] EMERGENCY: Loading states stuck for 15+ seconds, forcing clear`)
+        setLoading(false)
+        // Note: we can't directly clear authLoading from here, but the timeout in useAuth should handle it
+        if (posts.length === 0) {
+          setError("Loading timed out. Please refresh the page.")
+        }
+      }
+    }, 15000) // 15 seconds
+
+    return () => clearTimeout(emergencyTimeout)
+  }, [authLoading, loading, posts.length])
+
   // Load posts and user startups
   useEffect(() => {
+    console.log(`[${new Date().toISOString()}] Effect triggered: loadPosts()`)
     loadPosts()
   }, []) // Remove currentUser dependency to prevent unnecessary re-fetches
 
   // Load user startups separately when user changes
   useEffect(() => {
     if (currentUser) {
+      console.log(`[${new Date().toISOString()}] Effect triggered: loadUserStartups() for user:`, currentUser.name)
       loadUserStartups()
     }
   }, [currentUser])
 
   const loadPosts = async () => {
+    const startTime = Date.now()
+    console.log(`[${new Date().toISOString()}] Starting loadPosts()`)
+    
     try {
       setLoading(true)
       setError(null)
-      const postsData = await getPosts(currentUser?.id)
+      
+      console.log(`[${new Date().toISOString()}] Calling getPosts() with userId:`, currentUser?.id || 'null')
+      
+      // Add timeout protection - if getPosts takes longer than 10 seconds, bail out
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Posts loading timeout after 10 seconds')), 10000)
+      )
+      
+      const postsData = await Promise.race([
+        getPosts(currentUser?.id),
+        timeoutPromise
+      ]) as Post[]
+      
+      console.log(`[${new Date().toISOString()}] getPosts() returned ${postsData.length} posts`)
       setPosts(postsData)
 
       // Load comments using the shared hook
       const postIds = postsData.map(post => post.id)
-      await loadComments(postIds)
+      console.log(`[${new Date().toISOString()}] Loading comments for ${postIds.length} posts`)
+      
+      try {
+        await loadComments(postIds)
+        console.log(`[${new Date().toISOString()}] Comments loaded successfully`)
+      } catch (commentError) {
+        console.error(`[${new Date().toISOString()}] Error loading comments (non-fatal):`, commentError)
+        // Don't fail the whole operation if comments fail
+      }
+      
     } catch (err) {
-      console.error("Error loading posts:", err)
-      setError("Failed to load posts. Please try again.")
+      console.error(`[${new Date().toISOString()}] Error loading posts:`, err)
+      
+      if (err instanceof Error && err.message.includes('timeout')) {
+        setError("Loading is taking longer than expected. Please check your connection and try again.")
+      } else {
+        setError("Failed to load posts. Please try again.")
+      }
     } finally {
+      const endTime = Date.now()
+      console.log(`[${new Date().toISOString()}] loadPosts() completed in ${endTime - startTime}ms`)
       setLoading(false)
     }
   }
@@ -94,10 +156,27 @@ export default function HomePage() {
     }
   }
 
-  if (loading) {
+  // Show loading spinner only if both auth is loading AND we don't have any posts yet
+  // This prevents the spinner from showing too long when auth takes time
+  const showLoadingSpinner = (authLoading && !currentUser) || (loading && posts.length === 0)
+
+  // Add diagnostic info in development
+  const isDev = process.env.NODE_ENV === 'development'
+
+  if (showLoadingSpinner) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin" />
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-8 w-8 animate-spin" />
+          {isDev && (
+            <div className="text-xs text-muted-foreground text-center space-y-1">
+              <div>Auth loading: {authLoading ? 'true' : 'false'}</div>
+              <div>Posts loading: {loading ? 'true' : 'false'}</div>
+              <div>Current user: {currentUser ? currentUser.name : 'null'}</div>
+              <div>Posts count: {posts.length}</div>
+            </div>
+          )}
+        </div>
       </div>
     )
   }
