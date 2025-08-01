@@ -103,7 +103,19 @@ export function PostCard({ post, user, comments, onLike, onComment, clickable = 
                 {post.type === "launch" && "🚀"}
                 {post.type === "progress" && "📈"}
               </span>
-              <h3 className="font-semibold">{post.startup.name}</h3>
+              <a
+                href={`/startups/${post.startup.slug}`}
+                className="font-semibold text-foreground hover:text-primary transition-colors flex items-center gap-1 group"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  if (post.startup?.slug) {
+                    router.push(`/startups/${post.startup.slug}`)
+                  }
+                }}
+              >
+                {post.startup.name}
+                <ExternalLink className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+              </a>
               {post.startup.stage && (
                 <span className="text-xs bg-background px-2 py-1 rounded">
                   {post.startup.stage}

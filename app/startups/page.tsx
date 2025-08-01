@@ -96,24 +96,10 @@ export default function StartupsPage() {
   }
 
   const handleStartupClick = (startup: Startup) => {
-    console.log('StartupCard clicked:', startup.name, startup.slug)
     try {
-      const url = `/startups/${startup.slug}`
-      console.log('Navigating to:', url)
-      
-      // Try router.push first
-      router.push(url)
-      
-      // If router doesn't work within 1 second, fallback to window.location
-      setTimeout(() => {
-        if (window.location.pathname !== url) {
-          console.warn('Router navigation failed, using window.location fallback')
-          window.location.href = url
-        }
-      }, 1000)
+      router.push(`/startups/${startup.slug}`)
     } catch (error) {
       console.error('Navigation error:', error)
-      // Fallback to direct navigation
       window.location.href = `/startups/${startup.slug}`
     }
   }

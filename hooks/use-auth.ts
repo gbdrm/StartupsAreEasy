@@ -11,59 +11,44 @@ export function useAuth() {
     useEffect(() => {
         console.log(`[${new Date().toISOString()}] useAuth: Starting auth initialization`)
 
-        // Get initial user with timeout protection
-        async function fetchUser() {
-            const startTime = Date.now()
-            console.log(`[${new Date().toISOString()}] useAuth: Fetching current user profile`)
-
-            try {
-                // Add timeout protection - if getCurrentUserProfile takes longer than 5 seconds, bail out
-                const timeoutPromise = new Promise((_, reject) =>
-                    setTimeout(() => reject(new Error('Auth timeout after 5 seconds')), 5000)
-                )
-
-                const user = await Promise.race([
-                    getCurrentUserProfile(),
-                    timeoutPromise
-                ]) as User | null
-
-                const endTime = Date.now()
-                console.log(`[${new Date().toISOString()}] useAuth: Got user profile in ${endTime - startTime}ms:`, user ? `${user.name} (${user.id})` : 'null')
-                setCurrentUser(user)
-            } catch (error) {
-                console.error(`[${new Date().toISOString()}] useAuth: Error fetching user:`, error)
-                setCurrentUser(null)
-
-                // If it's a timeout, we still want to continue without auth
-                if (error instanceof Error && error.message.includes('timeout')) {
-                    console.log(`[${new Date().toISOString()}] useAuth: Continuing without authentication due to timeout`)
-                }
-            } finally {
-                setLoading(false)
-                console.log(`[${new Date().toISOString()}] useAuth: Auth loading completed`)
-            }
-        }
-        fetchUser()
-
-        // Listen for auth changes
+        // Listen for auth changes (this will also fire initially with current session)
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
             async (event, session) => {
                 console.log(`[${new Date().toISOString()}] useAuth: Auth state changed - event:`, event, 'session:', session ? 'exists' : 'null')
 
                 if (session?.user) {
                     try {
-                        const user = await getCurrentUserProfile()
-                        console.log(`[${new Date().toISOString()}] useAuth: Updated user profile:`, user ? `${user.name} (${user.id})` : 'null')
-                        setCurrentUser(user)
+                        // Only fetch profile if we don't already have user data or if it's a sign-in event
+                        if (!currentUser || event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+                            console.log(`[${new Date().toISOString()}] useAuth: Fetching user profile for event:`, event)
+
+                            // Add timeout protection
+                            const timeoutPromise = new Promise((_, reject) =>
+                                setTimeout(() => reject(new Error('Auth timeout after 2 seconds')), 2000)
+                            )
+
+                            const user = await Promise.race([
+                                getCurrentUserProfile(),
+                                timeoutPromise
+                            ]) as User | null
+
+                            console.log(`[${new Date().toISOString()}] useAuth: Got user profile:`, user ? `${user.name} (${user.id})` : 'null')
+                            setCurrentUser(user)
+                        } else {
+                            console.log(`[${new Date().toISOString()}] useAuth: Skipping profile fetch, already have user data`)
+                        }
                     } catch (error) {
-                        console.error(`[${new Date().toISOString()}] useAuth: Error updating user profile:`, error)
+                        console.error(`[${new Date().toISOString()}] useAuth: Error fetching user profile:`, error)
                         setCurrentUser(null)
                     }
                 } else {
                     console.log(`[${new Date().toISOString()}] useAuth: No session, clearing user`)
                     setCurrentUser(null)
                 }
+
+                // Always ensure loading is false after auth state changes
                 setLoading(false)
+                console.log(`[${new Date().toISOString()}] useAuth: Auth loading completed`)
             }
         )
 

@@ -153,28 +153,51 @@ export async function signInWithTelegram(telegramUser: TelegramUser): Promise<Us
 }
 
 export async function getCurrentUserProfile(): Promise<User | null> {
-  // Get current user from Supabase auth
-  const { data: userData, error: authError } = await supabase.auth.getUser();
-  if (authError || !userData?.user) return null;
-  const user = userData.user;
+  try {
+    // Get current user from Supabase auth
+    const { data: userData, error: authError } = await supabase.auth.getUser();
 
-  const { data: profile, error: profileError } = await supabase
-    .from("profiles")
-    .select("id, username, first_name, last_name, avatar_url")
-    .eq("id", user.id)
-    .single();
-  if (profileError || !profile) return null;
+    if (authError) {
+      console.log(`getCurrentUserProfile: Auth error:`, authError.message)
+      return null
+    }
 
-  return {
-    id: user.id,
-    name: `${profile.first_name ?? ""} ${profile.last_name ?? ""}`.trim(),
-    username: profile.username ?? "",
-    avatar: profile.avatar_url ?? "",
-    first_name: profile.first_name,
-    last_name: profile.last_name,
-  };
-}
+    if (!userData?.user) {
+      return null // No need to log this, it's normal when not authenticated
+    }
 
-export async function signOut() {
+    const user = userData.user;
+
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("id, username, first_name, last_name, avatar_url")
+      .eq("id", user.id)
+      .single();
+
+    if (profileError) {
+      console.log(`getCurrentUserProfile: Profile error:`, profileError.message)
+      return null
+    }
+
+    if (!profile) {
+      console.log(`getCurrentUserProfile: No profile found for user:`, user.id)
+      return null
+    }
+
+    const userProfile = {
+      id: user.id,
+      name: `${profile.first_name ?? ""} ${profile.last_name ?? ""}`.trim(),
+      username: profile.username ?? "",
+      avatar: profile.avatar_url ?? "",
+      first_name: profile.first_name,
+      last_name: profile.last_name,
+    }
+
+    return userProfile
+  } catch (error) {
+    console.error(`getCurrentUserProfile: Unexpected error:`, error)
+    return null
+  }
+} export async function signOut() {
   await supabase.auth.signOut();
 }

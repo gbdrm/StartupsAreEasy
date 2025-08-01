@@ -14,7 +14,6 @@ export function StartupCard({ startup, onClick }: StartupCardProps) {
   const stageInfo = STARTUP_STAGES[startup.stage || 'idea']
 
   const handleClick = (e: React.MouseEvent) => {
-    console.log('StartupCard handleClick triggered for:', startup.name)
     e.preventDefault()
     e.stopPropagation()
     onClick()
