@@ -3,6 +3,7 @@
 import type React from "react"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
@@ -19,12 +20,14 @@ interface PostCardProps {
   comments: Comment[]
   onLike: (postId: string) => void
   onComment: (postId: string, content: string) => void
+  clickable?: boolean // New prop to make post clickable
 }
 
-export function PostCard({ post, user, comments, onLike, onComment }: PostCardProps) {
+export function PostCard({ post, user, comments, onLike, onComment, clickable = true }: PostCardProps) {
   const [commentContent, setCommentContent] = useState("")
   const [isCommenting, setIsCommenting] = useState(false)
   const [showComments, setShowComments] = useState(false)
+  const router = useRouter()
 
   const handleComment = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -36,10 +39,32 @@ export function PostCard({ post, user, comments, onLike, onComment }: PostCardPr
     setIsCommenting(false)
   }
 
+  const handleCardClick = (e: React.MouseEvent) => {
+    // Don't navigate if clicking on interactive elements
+    const target = e.target as HTMLElement
+    if (
+      target.closest('button') ||
+      target.closest('a') ||
+      target.closest('input') ||
+      target.tagName === 'BUTTON' ||
+      target.tagName === 'A' ||
+      target.tagName === 'INPUT'
+    ) {
+      return
+    }
+
+    if (clickable) {
+      router.push(`/posts/${post.id}`)
+    }
+  }
+
   const postType = POST_TYPES[post.type]
 
   return (
-    <Card>
+    <Card 
+      className={clickable ? "cursor-pointer transition-all duration-200 hover:shadow-md" : ""}
+      onClick={handleCardClick}
+    >
       <CardHeader className="pb-3">
         <div className="flex items-start gap-3">
           <UserLink user={post.user} showAvatar avatarSize="lg" />
@@ -55,9 +80,13 @@ export function PostCard({ post, user, comments, onLike, onComment }: PostCardPr
                   <span className="text-xs font-medium text-muted-foreground">{postType.label}</span>
                 </div>
                 <span className="text-muted-foreground text-xs">·</span>
-                <p className="text-muted-foreground text-xs">
+                <a 
+                  href={`/posts/${post.id}`}
+                  className="text-muted-foreground text-xs hover:text-foreground transition-colors"
+                  onClick={(e) => e.stopPropagation()}
+                >
                   {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
-                </p>
+                </a>
               </div>
             </div>
           </div>

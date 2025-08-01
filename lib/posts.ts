@@ -240,6 +240,124 @@ export async function createComment(data: {
 }
 
 // Get posts filtered by type
+export async function getPostById(postId: string, userId?: string): Promise<Post | null> {
+  try {
+    // Try to use the custom function first
+    const { data, error } = await supabase.rpc("get_posts_with_details", {
+      user_id_param: userId || null,
+    })
+
+    if (error) {
+      // If the function doesn't exist, fall back to basic query
+      if (error.message.includes("function") && error.message.includes("does not exist")) {
+        return await getPostByIdBasic(postId, userId)
+      }
+      throw error
+    }
+
+    // Find the specific post by ID
+    const postData = data.find((post: any) => post.id === postId)
+
+    if (!postData) {
+      return null
+    }
+
+    return {
+      id: postData.id,
+      user: {
+        id: postData.user_id,
+        name: `${postData.first_name} ${postData.last_name || ""}`.trim(),
+        username: postData.username,
+        avatar: postData.avatar_url,
+      },
+      type: postData.type,
+      content: postData.content,
+      link: postData.link_url,
+      image: postData.image_url,
+      created_at: postData.created_at,
+      likes_count: postData.likes_count,
+      comments_count: postData.comments_count,
+      liked_by_user: postData.liked_by_user,
+      startup: postData.startup_name ? {
+        id: postData.startup_id,
+        name: postData.startup_name,
+        description: postData.startup_description,
+        stage: postData.startup_stage,
+      } : null,
+    } as Post
+  } catch (error) {
+    console.error("Error fetching post by ID:", error)
+    // Fall back to basic query if RPC fails
+    return await getPostByIdBasic(postId, userId)
+  }
+}
+
+// Fallback function for basic post by ID query
+async function getPostByIdBasic(postId: string, userId?: string): Promise<Post | null> {
+  // First get the post with startup info
+  const { data: post, error } = await supabase
+    .from("posts")
+    .select(`
+      id,
+      user_id,
+      type,
+      content,
+      link,
+      image,
+      created_at,
+      startup:startups(id, name, description, stage)
+    `)
+    .eq("id", postId)
+    .single()
+
+  if (error) {
+    if (error.code === "PGRST116") {
+      return null // Not found
+    }
+    throw error
+  }
+
+  // Get user profile
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .select("id, username, first_name, last_name, avatar_url")
+    .eq("id", post.user_id)
+    .single()
+
+  if (profileError) throw profileError
+
+  // Get like and comment counts
+  const [likesResult, commentsResult, userLikeResult] = await Promise.all([
+    supabase.from("likes").select("*", { count: "exact", head: true }).eq("post_id", post.id),
+    supabase.from("comments").select("*", { count: "exact", head: true }).eq("post_id", post.id),
+    userId ? supabase.from("likes").select("id").eq("post_id", post.id).eq("user_id", userId).maybeSingle() : Promise.resolve({ data: null })
+  ])
+
+  return {
+    id: post.id,
+    user: {
+      id: profile.id,
+      name: `${profile.first_name} ${profile.last_name || ""}`.trim(),
+      username: profile.username,
+      avatar: profile.avatar_url,
+    },
+    type: post.type,
+    content: post.content,
+    link: post.link,
+    image: post.image,
+    startup: post.startup ? {
+      id: (post.startup as any).id,
+      name: (post.startup as any).name,
+      description: (post.startup as any).description,
+      stage: (post.startup as any).stage,
+    } : null,
+    created_at: post.created_at,
+    likes_count: likesResult.count || 0,
+    comments_count: commentsResult.count || 0,
+    liked_by_user: !!userLikeResult?.data,
+  } as Post
+}
+
 export async function getPostsByType(postType: PostType, userId?: string) {
   try {
     // First try to use the custom function but filter by type
