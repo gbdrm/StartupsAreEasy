@@ -85,11 +85,24 @@ export async function createStartup(startup: {
     looking_for?: string[]
     is_public?: boolean
 }): Promise<Startup> {
-    // Generate slug from name
-    const slug = startup.name
+    // Generate base slug from name
+    const baseSlug = startup.name
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/^-|-$/g, '')
+
+    // If baseSlug is empty, use a fallback
+    if (!baseSlug) {
+        throw new Error("Startup name must contain at least one alphanumeric character")
+    }
+
+    // Generate initial slug from name
+    let slug = baseSlug
+
+    console.log(`Generated initial slug: "${slug}"`)
+
+    // Simple approach: just try to insert, and if it fails due to duplicate slug, add timestamp
+    // This is simpler and less likely to hang than checking availability first
 
     const insertData: any = {
         name: startup.name,
@@ -114,6 +127,8 @@ export async function createStartup(startup: {
         insertData.user_id = startup.userId
     }
 
+    console.log(`Attempting to create startup with slug: "${slug}"`)
+
     const { data, error } = await supabase
         .from("startups")
         .insert(insertData)
@@ -122,9 +137,42 @@ export async function createStartup(startup: {
 
     if (error) {
         console.error("Error creating startup:", error)
+
+        // If we get a duplicate slug error, try with timestamp suffix
+        if (error.code === '23505' && error.message?.includes('startups_slug_key')) {
+            console.warn("Duplicate slug detected, retrying with timestamp suffix...")
+
+            // Generate a unique slug with timestamp and random suffix
+            const uniqueSlug = `${baseSlug}-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`
+            console.log(`Retrying with unique slug: "${uniqueSlug}"`)
+
+            const retryData = { ...insertData, slug: uniqueSlug }
+
+            try {
+                const { data: retryResult, error: retryError } = await supabase
+                    .from("startups")
+                    .insert(retryData)
+                    .select("*")
+                    .single()
+
+                if (retryError) {
+                    console.error("Error creating startup on retry:", retryError)
+                    throw retryError
+                }
+
+                console.log("Startup created successfully on retry")
+                return retryResult
+            } catch (retryErr) {
+                console.error("Retry also failed:", retryErr)
+                throw retryErr
+            }
+        }
+
+        // For other errors, throw them
         throw error
     }
 
+    console.log("Startup created successfully")
     return data
 }
 

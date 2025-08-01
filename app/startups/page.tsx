@@ -20,6 +20,8 @@ interface StartupFormData {
   industry: string
   stage: "idea" | "planning" | "building" | "mvp" | "beta" | "launched" | "scaling" | "acquired" | "paused"
   logo_url: string
+  location: string
+  founded_date: string
 }
 
 export default function StartupsPage() {
@@ -50,8 +52,8 @@ export default function StartupsPage() {
     }
   }
 
-  const handleCreateStartup = async (data: StartupFormData) => {
-    if (!currentUser) return
+  const handleCreateStartup = async (data: StartupFormData): Promise<boolean> => {
+    if (!currentUser) return false
 
     try {
       setIsCreatingStartup(true)
@@ -64,15 +66,28 @@ export default function StartupsPage() {
         website_url: data.website_url || undefined,
         logo_url: data.logo_url || undefined,
         industry: data.industry || undefined,
+        location: data.location || undefined,
+        founded_date: data.founded_date || undefined,
         stage: data.stage,
         is_public: true,
       })
 
       // Add the new startup to the top of the list
       setStartups(prevStartups => [startup, ...prevStartups])
-    } catch (err) {
-      console.error("Error creating startup:", err)
-      setError("Failed to create startup. Please try again.")
+      return true  // Success
+    } catch (err: any) {
+      // Don't log the error again since it's already logged in the createStartup function
+      // Just handle the user-facing error messages
+      
+      // Handle specific database constraint errors
+      if (err?.code === '23505' && err?.message?.includes('startups_slug_key')) {
+        setError("A startup with this name already exists. Please choose a different name.")
+      } else if (err?.message) {
+        setError(`Failed to create startup: ${err.message}`)
+      } else {
+        setError("Failed to create startup. Please try again.")
+      }
+      return false  // Failure
     } finally {
       setIsCreatingStartup(false)
     }

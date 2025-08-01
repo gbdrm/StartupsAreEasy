@@ -13,11 +13,13 @@ interface StartupFormData {
   industry: string
   stage: "idea" | "planning" | "building" | "mvp" | "beta" | "launched" | "scaling" | "acquired" | "paused"
   logo_url: string
+  location: string
+  founded_date: string
 }
 
 interface CollapsibleStartupFormProps {
   user: User | null
-  onSubmit: (data: StartupFormData) => Promise<void>
+  onSubmit: (data: StartupFormData) => Promise<boolean>  // Return boolean to indicate success
   isSubmitting: boolean
   onLoginRequired: () => void
 }
@@ -30,9 +32,12 @@ export function CollapsibleStartupForm({
 }: CollapsibleStartupFormProps) {
   const [isExpanded, setIsExpanded] = useState(false)
 
-  const handleSubmit = async (data: StartupFormData) => {
-    await onSubmit(data)
-    setIsExpanded(false)
+  const handleFormSubmit = async (data: StartupFormData): Promise<boolean> => {
+    const success = await onSubmit(data)
+    if (success) {
+      setIsExpanded(false)  // Only close the form on success
+    }
+    return success
   }
 
   const handleClick = () => {
@@ -57,7 +62,7 @@ export function CollapsibleStartupForm({
         </div>
         <StartupForm
           user={user}
-          onSubmit={handleSubmit}
+          onSubmit={handleFormSubmit}
           isSubmitting={isSubmitting}
           onLoginRequired={onLoginRequired}
         />

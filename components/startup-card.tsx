@@ -60,9 +60,21 @@ export function StartupCard({ startup, onClick }: StartupCardProps) {
 
         <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
           {startup.industry && (
-            <div className="flex items-center gap-1 bg-muted px-2 py-1 rounded">
-              <span>{startup.industry}</span>
-            </div>
+            <>
+              {startup.industry.includes(',') ? (
+                // Show as separate tag badges if comma-separated
+                startup.industry.split(',').map((tag, index) => (
+                  <Badge key={index} variant="outline" className="text-xs">
+                    {tag.trim()}
+                  </Badge>
+                ))
+              ) : (
+                // Show as single industry tag
+                <div className="flex items-center gap-1 bg-muted px-2 py-1 rounded">
+                  <span>{startup.industry}</span>
+                </div>
+              )}
+            </>
           )}
           {startup.location && (
             <div className="flex items-center gap-1 bg-muted px-2 py-1 rounded">
