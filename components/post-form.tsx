@@ -28,6 +28,7 @@ export function PostForm({ user, onSubmit }: PostFormProps) {
   const [link, setLink] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isExpanded, setIsExpanded] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -35,18 +36,24 @@ export function PostForm({ user, onSubmit }: PostFormProps) {
     if (!content.trim() || !user) return
 
     setIsSubmitting(true)
+    setError(null)
 
-    await onSubmit({
-      type,
-      content: content.trim(),
-      link: link.trim() || undefined,
-    })
+    try {
+      await onSubmit({
+        type,
+        content: content.trim(),
+        link: link.trim() || undefined,
+      })
 
-    // Reset form
-    setContent("")
-    setLink("")
-    setIsSubmitting(false)
-    setIsExpanded(false)
+      // Reset form
+      setContent("")
+      setLink("")
+      setIsExpanded(false)
+    } catch (err) {
+      setError("Failed to submit. Please try again.")
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   useEffect(() => {
@@ -133,6 +140,8 @@ export function PostForm({ user, onSubmit }: PostFormProps) {
               />
             </div>
           </div>
+
+          {error && <p className="text-sm text-destructive">{error}</p>}
 
           <Button type="submit" className="w-full" disabled={!content.trim() || isSubmitting}>
             {isSubmitting ? "Posting..." : "Post"}
