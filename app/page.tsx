@@ -83,6 +83,8 @@ export default function HomePage() {
 
   // Show loading only when actually needed
   const showLoading = authLoading || (postsLoading && posts.length === 0)
+  
+  console.log(`[${new Date().toISOString()}] HomePage: Loading states - authLoading: ${authLoading}, postsLoading: ${postsLoading}, posts.length: ${posts.length}, showLoading: ${showLoading}`)
 
   if (showLoading) {
     return (

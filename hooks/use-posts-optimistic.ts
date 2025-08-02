@@ -8,7 +8,10 @@ export function usePostsWithOptimisticUpdates(userId?: string) {
     const hasLoaded = useRef(false)
 
     const loadPosts = useCallback(async () => {
-        if (loading || hasLoaded.current) return
+        if (loading || hasLoaded.current) {
+            console.log(`[${new Date().toISOString()}] usePostsWithOptimisticUpdates: Skipping load - loading: ${loading}, hasLoaded: ${hasLoaded.current}`)
+            return
+        }
 
         console.log(`[${new Date().toISOString()}] usePostsWithOptimisticUpdates: Loading posts...`)
 
@@ -25,9 +28,10 @@ export function usePostsWithOptimisticUpdates(userId?: string) {
             hasLoaded.current = false // Allow retry
             throw error
         } finally {
+            console.log(`[${new Date().toISOString()}] usePostsWithOptimisticUpdates: Setting loading to false`)
             setLoading(false)
         }
-    }, [userId, loading])
+    }, [userId]) // Remove 'loading' from dependencies to prevent infinite loop
 
     const refreshPosts = useCallback(() => {
         hasLoaded.current = false

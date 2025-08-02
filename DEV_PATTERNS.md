@@ -286,6 +286,39 @@ Before committing new code:
 - [ ] Component doesn't cause infinite loops
 - [ ] Authentication is properly checked
 - [ ] Types are defined and used correctly
+- [ ] React hook dependencies don't include state setters
+- [ ] `useCallback` dependencies are minimal and stable
+
+## Common Infinite Loop Issues
+
+### React Hook Dependencies
+```typescript
+// ❌ WRONG - Including loading state in dependency array
+const loadData = useCallback(async () => {
+    setLoading(true) // This triggers the useCallback to recreate
+    // ... 
+    setLoading(false)
+}, [loading]) // Including 'loading' creates infinite loop
+
+// ✅ CORRECT - Exclude state setters from dependencies  
+const loadData = useCallback(async () => {
+    setLoading(true)
+    // ...
+    setLoading(false) 
+}, [userId]) // Only include stable external dependencies
+```
+
+### Loading State Management
+```typescript
+// ❌ WRONG - Race conditions in loading state
+const showLoading = authLoading || postsLoading // Can get stuck
+
+// ✅ CORRECT - More specific loading conditions
+const showLoading = authLoading || (postsLoading && posts.length === 0)
+
+// ✅ BETTER - Add debugging for production issues
+console.log('Loading states:', { authLoading, postsLoading, postsCount: posts.length })
+```
 
 ## Common PostgREST Query Examples
 

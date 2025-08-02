@@ -24,11 +24,13 @@ function setGlobalUser(user: User | null) {
 }
 
 function setGlobalLoading(loading: boolean) {
+    console.log(`[${new Date().toISOString()}] useSimpleAuth: Setting global loading to ${loading}`)
     globalLoading = loading
     notifySubscribers()
 }
 
 function resetAuth() {
+    console.log(`[${new Date().toISOString()}] useSimpleAuth: Resetting auth state`)
     globalUser = null
     globalLoading = false
     notifySubscribers()
@@ -83,6 +85,7 @@ export function useSimpleAuth() {
                 console.error(`[${new Date().toISOString()}] useSimpleAuth: Error getting session:`, error)
                 setGlobalUser(null)
             } finally {
+                console.log(`[${new Date().toISOString()}] useSimpleAuth: Setting loading to false`)
                 setGlobalLoading(false)
             }
         }
