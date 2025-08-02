@@ -4,7 +4,7 @@ import { useEffect } from "react"
 
 declare global {
   interface Window {
-    TelegramLoginWidget: {
+    TelegramLoginWidget?: {
       dataOnauth: (user: any) => void
     }
   }
@@ -53,6 +53,7 @@ export function TelegramLogin({ botName, onAuth }: TelegramLoginProps) {
       if (container && script.parentNode) {
         container.removeChild(script)
       }
+      delete (window as any).TelegramLoginWidget
     }
   }, [botName, onAuth])
 
