@@ -43,6 +43,16 @@
   - `hooks/use-page-visibility.ts` ✅ - Track tab visibility
 - **Result:** Sessions maintained across tab switches, graceful fallbacks
 
+### 6. **Stuck Loading State in Production (NEW)**
+**Status:** ✅ **FIXED**
+- **Problem:** `authLoading` never set to `false`, causing infinite spinner
+- **Root Cause:** Race condition between `initAuth()` and `SIGNED_IN` event
+- **Solution:** 
+  - Ensure `setGlobalLoading(false)` called in ALL auth event handlers
+  - Added 10-second failsafe timeout to prevent stuck states
+  - Enhanced logging to track auth state transitions
+- **Result:** Homepage loads properly in production, no more infinite spinners
+
 ## 🔍 **Code Quality Assessment**
 
 ### **API Layer (`lib/api-direct.ts`)**

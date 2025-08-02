@@ -85,7 +85,7 @@ const handleLike = async (postId: string, currentLiked: boolean, currentCount: n
 
 ### Session Management & Auto-Refresh
 
-Handle session timeouts gracefully:
+Handle session timeouts gracefully and prevent stuck loading states:
 
 ```typescript
 export async function getCurrentUserToken(): Promise<string | null> {
@@ -109,6 +109,27 @@ export async function getCurrentUserToken(): Promise<string | null> {
     
     return session.access_token
 }
+
+// Auth state management with failsafe
+supabase.auth.onAuthStateChange(async (event, session) => {
+    if (event === 'SIGNED_IN' && session?.user) {
+        try {
+            const profile = await getCurrentUserProfile()
+            setGlobalUser(profile)
+        } finally {
+            // Always set loading to false after auth events
+            setGlobalLoading(false)
+        }
+    }
+})
+
+// Failsafe timeout to prevent stuck loading states
+const failsafeTimeout = setTimeout(() => {
+    if (globalLoading) {
+        console.warn('Failsafe: forcing loading to false')
+        setGlobalLoading(false)
+    }
+}, 10000)
 ```
 
 ### JWT Token Authentication for RLS

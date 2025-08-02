@@ -92,6 +92,14 @@ export function useSimpleAuth() {
 
         initAuth()
 
+        // Failsafe: Ensure loading is set to false after maximum timeout
+        const failsafeTimeout = setTimeout(() => {
+            if (globalLoading) {
+                console.warn(`[${new Date().toISOString()}] useSimpleAuth: Failsafe timeout - forcing loading to false`)
+                setGlobalLoading(false)
+            }
+        }, 10000) // 10 second maximum
+
         // Listen for auth changes (only once globally)
         if (!authSubscription) {
             const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -109,15 +117,27 @@ export function useSimpleAuth() {
                         } catch (error) {
                             console.error(`[${new Date().toISOString()}] useSimpleAuth: Error getting profile:`, error)
                             setGlobalUser(null)
+                        } finally {
+                            // Ensure loading is set to false after SIGNED_IN event
+                            console.log(`[${new Date().toISOString()}] useSimpleAuth: SIGNED_IN complete, setting loading to false`)
+                            setGlobalLoading(false)
                         }
+                    } else if (event === 'TOKEN_REFRESHED') {
+                        // Don't change loading state for token refresh
+                        console.log(`[${new Date().toISOString()}] useSimpleAuth: Token refreshed`)
+                    } else {
+                        // For any other event, ensure loading is false
+                        console.log(`[${new Date().toISOString()}] useSimpleAuth: Other auth event (${event}), ensuring loading is false`)
+                        setGlobalLoading(false)
                     }
-                    // Ignore TOKEN_REFRESHED and other events
                 }
             )
             authSubscription = subscription
         }
 
         return () => {
+            // Clear failsafe timeout
+            clearTimeout(failsafeTimeout)
             // Don't unsubscribe on individual component unmount
             // Only when the entire app unmounts
         }
