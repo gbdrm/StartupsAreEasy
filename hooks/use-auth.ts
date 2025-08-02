@@ -18,24 +18,16 @@ export function useAuth() {
 
                 if (session?.user) {
                     try {
-                        // Only fetch profile if we don't already have user data or if it's a sign-in event
-                        if (!currentUser || event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+                        // Only fetch profile for actual sign-in events, not tab recovery
+                        if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN') {
                             console.log(`[${new Date().toISOString()}] useAuth: Fetching user profile for event:`, event)
 
-                            // Add timeout protection
-                            const timeoutPromise = new Promise((_, reject) =>
-                                setTimeout(() => reject(new Error('Auth timeout after 2 seconds')), 2000)
-                            )
-
-                            const user = await Promise.race([
-                                getCurrentUserProfile(),
-                                timeoutPromise
-                            ]) as User | null
+                            const user = await getCurrentUserProfile()
 
                             console.log(`[${new Date().toISOString()}] useAuth: Got user profile:`, user ? `${user.name} (${user.id})` : 'null')
                             setCurrentUser(user)
                         } else {
-                            console.log(`[${new Date().toISOString()}] useAuth: Skipping profile fetch, already have user data`)
+                            console.log(`[${new Date().toISOString()}] useAuth: Skipping profile fetch for event:`, event)
                         }
                     } catch (error) {
                         console.error(`[${new Date().toISOString()}] useAuth: Error fetching user profile:`, error)

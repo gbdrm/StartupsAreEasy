@@ -19,6 +19,10 @@ export interface User {
   telegram_id?: number
   first_name?: string
   last_name?: string
+  bio?: string
+  location?: string
+  website?: string
+  joined_at?: string
 }
 
 export interface Startup {

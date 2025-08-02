@@ -1,6 +1,56 @@
 import { supabase } from "./supabase"
 import type { Post, Comment, PostType } from "./types"
 
+// Simple REST API version for posts to avoid auth conflicts
+export async function getPostsSimple(userId?: string): Promise<Post[]> {
+  try {
+    console.log(`[${new Date().toISOString()}] getPostsSimple: Starting direct REST API call...`)
+
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+
+    // Get posts with basic info
+    const postsUrl = `${supabaseUrl}/rest/v1/posts?order=created_at.desc&select=id,user_id,type,content,link,image,created_at,startup_id`
+
+    const response = await fetch(postsUrl, {
+      headers: {
+        'apikey': supabaseKey,
+        'Authorization': `Bearer ${supabaseKey}`,
+        'Content-Type': 'application/json'
+      }
+    })
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${await response.text()}`)
+    }
+
+    const posts = await response.json()
+    console.log(`[${new Date().toISOString()}] getPostsSimple: Loaded ${posts.length} posts`)
+
+    // For now, return simplified posts without complex joins
+    return posts.map((post: any) => ({
+      id: post.id,
+      user: {
+        id: post.user_id,
+        name: "User", // Simplified - we can enhance this later
+        username: "user",
+        avatar: null,
+      },
+      type: post.type,
+      content: post.content,
+      link: post.link,
+      image: post.image,
+      created_at: post.created_at,
+      likes_count: 0, // Simplified - we can enhance this later
+      comments_count: 0, // Simplified - we can enhance this later
+      liked_by_user: false,
+    })) as Post[]
+  } catch (error) {
+    console.error("Error fetching posts (simple):", error)
+    throw error
+  }
+}
+
 export async function getPosts(userId?: string) {
   try {
     // First try to use the custom function

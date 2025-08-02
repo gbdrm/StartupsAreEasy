@@ -1,8 +1,8 @@
 import { notFound } from "next/navigation"
 import { supabase } from "@/lib/supabase"
 import { PostClientWrapper } from "@/components/post-client-wrapper"
-import { getPostById } from "@/lib/posts"
-import { getComments } from "@/lib/posts"
+import { getPostByIdDirect } from "@/lib/api-direct"
+import { getCommentsDirect } from "@/lib/api-direct"
 
 interface PostPageProps {
   params: Promise<{
@@ -19,14 +19,14 @@ export default async function PostPage({ params }: PostPageProps) {
   
   try {
     // Get the post
-    const post = await getPostById(id, user?.id)
+    const post = await getPostByIdDirect(id)
     
     if (!post) {
       notFound()
     }
 
     // Get comments for this post
-    const comments = await getComments(id)
+    const comments = await getCommentsDirect(id)
 
     return (
       <PostClientWrapper
@@ -44,7 +44,7 @@ export async function generateMetadata({ params }: PostPageProps) {
   try {
     // Await params for Next.js 15 compatibility
     const { id } = await params
-    const post = await getPostById(id)
+    const post = await getPostByIdDirect(id)
     
     if (!post) {
       return {

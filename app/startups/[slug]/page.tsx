@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation"
 import { supabase } from "@/lib/supabase"
 import { StartupClientWrapper } from "@/components/startup-client-wrapper"
-import { getStartupBySlug } from "@/lib/startups"
+import { getStartupBySlugDirect } from "@/lib/api-direct"
 import { getPosts } from "@/lib/posts"
 
 interface StartupPageProps {
@@ -22,7 +22,7 @@ export default async function StartupPage({ params }: StartupPageProps) {
   try {
     // Get the startup
     console.log('Fetching startup for slug:', slug)
-    const startup = await getStartupBySlug(slug)
+    const startup = await getStartupBySlugDirect(slug)
     
     if (!startup) {
       console.log('Startup not found for slug:', slug)
@@ -53,7 +53,7 @@ export async function generateMetadata({ params }: StartupPageProps) {
   try {
     // Await params for Next.js 15 compatibility
     const { slug } = await params
-    const startup = await getStartupBySlug(slug)
+    const startup = await getStartupBySlugDirect(slug)
     
     if (!startup) {
       return {

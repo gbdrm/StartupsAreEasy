@@ -2,39 +2,53 @@ import { supabase } from "./supabase"
 import type { Startup, StartupStage, User } from "./types"
 
 export async function getStartups(userId?: string): Promise<Startup[]> {
-    const { data, error } = await supabase
-        .from("startups")
-        .select(`
-      id,
-      name,
-      slug,
-      description,
-      website_url,
-      logo_url,
-      industry,
-      stage,
-      founded_date,
-      location,
-      team_size,
-      funding_raised,
-      target_market,
-      estimated_timeline,
-      looking_for,
-      launch_date,
-      is_public,
-      created_at,
-      updated_at,
-      user_id
-    `)
-        .eq("is_public", true)
-        .order("created_at", { ascending: false })
+    console.log(`[${new Date().toISOString()}] getStartups: Starting database query...`)
 
-    if (error) {
-        console.error("Error fetching startups:", error)
-        throw error
+    try {
+        // Use direct REST API approach to bypass auth client conflicts
+        console.log(`[${new Date().toISOString()}] getStartups: Using direct REST API approach...`)
+
+        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+        const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+
+        const url = `${supabaseUrl}/rest/v1/startups?is_public=eq.true&order=created_at.desc&select=id,name,slug,description,website_url,logo_url,industry,stage,founded_date,location,team_size,funding_raised,target_market,estimated_timeline,looking_for,launch_date,is_public,created_at,updated_at,user_id`
+
+        console.log(`[${new Date().toISOString()}] getStartups: Making direct HTTP request...`)
+
+        const response = await fetch(url, {
+            headers: {
+                'apikey': supabaseKey,
+                'Authorization': `Bearer ${supabaseKey}`,
+                'Content-Type': 'application/json',
+                'Prefer': 'return=representation'
+            }
+        })
+
+        console.log(`[${new Date().toISOString()}] getStartups: HTTP response status:`, response.status)
+
+        if (!response.ok) {
+            const errorText = await response.text()
+            console.error(`[${new Date().toISOString()}] getStartups: HTTP error:`, errorText)
+            throw new Error(`HTTP ${response.status}: ${errorText}`)
+        }
+
+        const data = await response.json()
+        console.log(`[${new Date().toISOString()}] getStartups: Successfully loaded ${data.length} startups`)
+
+        return data || []
+
+        console.log(`[${new Date().toISOString()}] getStartups: Database query completed`, { data: data?.length, error })
+
+        if (error) {
+            console.error("Error fetching startups:", error)
+            throw error
+        }
+
+        return data || []
+    } catch (err) {
+        console.error(`[${new Date().toISOString()}] getStartups: Exception caught:`, err)
+        throw err
     }
-
-    return data || []
 }
 
 export async function getStartupsByStage(stage: StartupStage): Promise<Startup[]> {

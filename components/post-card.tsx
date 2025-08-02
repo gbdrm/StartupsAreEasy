@@ -175,7 +175,7 @@ export function PostCard({ post, user, comments, onLike, onComment, clickable = 
               className="flex items-center gap-1 px-2 py-1 h-auto"
             >
               <MessageCircle className="h-4 w-4" />
-              <span className="text-sm">{post.comments_count}</span>
+              <span className="text-sm">{comments.length}</span>
             </Button>
           </div>
 

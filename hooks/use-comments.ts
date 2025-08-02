@@ -1,143 +1,64 @@
-import { useState } from "react"
-import { supabase } from "@/lib/supabase"
-import { createComment, toggleLike } from "@/lib/posts"
+import { useState, useCallback } from "react"
+import { getBulkCommentsDirect, createCommentDirect } from "@/lib/api-direct"
 import type { User, Post, Comment } from "@/lib/types"
 
-export function useComments(currentUser: User | null, setPosts: React.Dispatch<React.SetStateAction<Post[]>>) {
+export function useComments(currentUser: User | null, refreshPosts: () => void) {
     const [comments, setComments] = useState<Comment[]>([])
 
-    const loadComments = async (postIds: string[]) => {
+    const loadComments = useCallback(async (postIds: string[]) => {
         if (postIds.length === 0) {
             setComments([])
             return
         }
 
         try {
-            // First get comments - simple query without foreign key joins
-            const { data: allComments, error: commentsError } = await supabase
-                .from("comments")
-                .select("id, content, created_at, user_id, post_id")
-                .in("post_id", postIds)
-                .order("created_at", { ascending: true })
-
-            if (commentsError) {
-                console.error("Error loading comments:", commentsError)
-                setComments([])
-                return
-            }
-
-            if (!allComments || allComments.length === 0) {
-                setComments([])
-                return
-            }
-
-            // Get unique user IDs from comments
-            const userIds = [...new Set(allComments.map(comment => comment.user_id))]
-
-            // Fetch user profiles separately
-            const { data: profiles, error: profilesError } = await supabase
-                .from("profiles")
-                .select("id, username, first_name, last_name, avatar_url")
-                .in("id", userIds)
-
-            if (profilesError) {
-                console.error("Error loading profiles:", profilesError)
-                setComments([])
-                return
-            }
-
-            // Create a map for quick profile lookup
-            const profileMap = new Map(profiles?.map(profile => [profile.id, profile]) || [])
-
-            const formattedComments = allComments.map((comment: any) => {
-                const profile = profileMap.get(comment.user_id)
-                return {
-                    id: comment.id,
-                    content: comment.content,
-                    created_at: comment.created_at,
-                    user_id: comment.user_id,
-                    post_id: comment.post_id,
-                    user: {
-                        id: comment.user_id,
-                        name: profile ? `${profile.first_name} ${profile.last_name || ""}`.trim() : "Unknown User",
-                        username: profile?.username || "unknown",
-                        avatar: profile?.avatar_url,
-                    }
-                }
-            })
-            setComments(formattedComments)
+            // Use bulk API to load all comments in one request
+            const allComments = await getBulkCommentsDirect(postIds)
+            setComments(allComments)
         } catch (error) {
             console.error("Error loading comments:", error)
             setComments([])
         }
-    }
+    }, []) // Empty dependency array since it doesn't depend on any props/state
 
-    const handleComment = async (postId: string, content: string) => {
+    const handleComment = useCallback(async (postId: string, content: string) => {
         if (!currentUser) return
 
         try {
-            const newComment = await createComment({
-                postId,
-                userId: currentUser.id,
-                content,
+            const newComment = await createCommentDirect({
+                post_id: postId,
+                user_id: currentUser.id,
+                content
             })
 
-            // Add the new comment to local state instead of reloading
-            const formattedNewComment = {
-                id: newComment.id,
-                content: newComment.content,
-                created_at: newComment.created_at,
-                user_id: newComment.user_id,
-                post_id: newComment.post_id,
-                user: {
-                    id: currentUser.id,
-                    name: currentUser.name,
-                    username: currentUser.username,
-                    avatar: currentUser.avatar,
-                }
-            }
+            // Add the new comment to local state
+            setComments(prev => [...prev, newComment])
 
-            setComments(prevComments => [...prevComments, formattedNewComment])
+            // Refresh posts to update comment counts
+            refreshPosts()
 
-            // Update comment count
-            setPosts(prevPosts =>
-                prevPosts.map(post =>
-                    post.id === postId
-                        ? { ...post, comments_count: post.comments_count + 1 }
-                        : post
-                )
-            )
+            return true
         } catch (error) {
             console.error("Error creating comment:", error)
+            return false
         }
-    }
+    }, [currentUser, refreshPosts])
 
-    const handleLike = async (postId: string) => {
+    const handleLike = useCallback(async (postId: string) => {
         if (!currentUser) return
 
         try {
-            const isLiked = await toggleLike(postId, currentUser.id)
-            setPosts(prevPosts =>
-                prevPosts.map(post => {
-                    if (post.id === postId) {
-                        return {
-                            ...post,
-                            liked_by_user: isLiked,
-                            likes_count: isLiked ? post.likes_count + 1 : post.likes_count - 1,
-                        }
-                    }
-                    return post
-                })
-            )
+            // For now, just log that like functionality is not yet implemented
+            console.log("Like functionality not yet implemented with direct API")
         } catch (error) {
             console.error("Error toggling like:", error)
         }
-    }
+    }, [currentUser])
 
     return {
         comments,
         loadComments,
         handleComment,
-        handleLike
+        handleLike,
     }
 }

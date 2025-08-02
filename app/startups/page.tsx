@@ -10,8 +10,8 @@ import { AuthDialog } from "@/components/auth-dialog"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Separator } from "@/components/ui/separator"
 import { Loader2 } from "lucide-react"
-import { useAuth } from "@/hooks/use-auth"
-import { getStartups, createStartup } from "@/lib/startups"
+import { useSimpleAuth } from "@/hooks/use-simple-auth"
+import { getStartupsDirect, createStartupDirect } from "@/lib/api-direct"
 import type { Startup } from "@/lib/types"
 
 interface StartupFormData {
@@ -26,7 +26,7 @@ interface StartupFormData {
 }
 
 export default function StartupsPage() {
-  const { user: currentUser, login: handleLogin, logout: handleLogout } = useAuth()
+  const { user, login, logout } = useSimpleAuth()
   const router = useRouter()
   const [startups, setStartups] = useState<Startup[]>([])
   const [loading, setLoading] = useState(true)
@@ -42,87 +42,87 @@ export default function StartupsPage() {
 
   const loadStartups = async () => {
     try {
+      console.log(`[${new Date().toISOString()}] StartupsPage: Starting to load startups...`)
       setLoading(true)
       setError(null)
-      const startupsData = await getStartups()
+      
+      // Add timeout to prevent hanging
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Request timeout after 10 seconds')), 10000)
+      )
+      
+      const startupsPromise = getStartupsDirect()
+      
+      const startupsData = await Promise.race([startupsPromise, timeoutPromise]) as Startup[]
+      console.log(`[${new Date().toISOString()}] StartupsPage: Loaded ${startupsData.length} startups`)
       setStartups(startupsData)
     } catch (err) {
       console.error("Error loading startups:", err)
-      setError("Failed to load startups. Please try again.")
+      setError(`Failed to load startups: ${err instanceof Error ? err.message : 'Unknown error'}`)
     } finally {
+      console.log(`[${new Date().toISOString()}] StartupsPage: Finished loading startups`)
       setLoading(false)
     }
   }
 
   const handleCreateStartup = async (data: StartupFormData): Promise<boolean> => {
-    if (!currentUser) return false
+    if (!user) return false
 
     try {
       setIsCreatingStartup(true)
       setError(null)
       
-      const startup = await createStartup({
-        userId: currentUser.id,
-        name: data.name,
-        description: data.description || undefined,
-        website_url: data.website_url || undefined,
-        logo_url: data.logo_url || undefined,
-        industry: data.industry || undefined,
-        location: data.location || undefined,
-        founded_date: data.founded_date || undefined,
-        stage: data.stage,
-        is_public: true,
+      const startup = await createStartupDirect({
+        ...data,
+        userId: user.id
       })
 
-      // Add the new startup to the top of the list
-      setStartups(prevStartups => [startup, ...prevStartups])
-      return true  // Success
-    } catch (err: any) {
-      // Don't log the error again since it's already logged in the createStartup function
-      // Just handle the user-facing error messages
-      
-      // Handle specific database constraint errors
-      if (err?.code === '23505' && err?.message?.includes('startups_slug_key')) {
-        setError("A startup with this name already exists. Please choose a different name.")
-      } else if (err?.message) {
-        setError(`Failed to create startup: ${err.message}`)
-      } else {
-        setError("Failed to create startup. Please try again.")
-      }
-      return false  // Failure
+      setStartups(prev => [startup, ...prev])
+      return true // Return success
+    } catch (err) {
+      console.error("Error creating startup:", err)
+      setError("Failed to create startup. Please try again.")
+      return false
     } finally {
       setIsCreatingStartup(false)
     }
   }
 
   const handleStartupClick = (startup: Startup) => {
-    try {
-      router.push(`/startups/${startup.slug}`)
-    } catch (error) {
-      console.error('Navigation error:', error)
-      window.location.href = `/startups/${startup.slug}`
-    }
+    router.push(`/startups/${startup.slug}`)
   }
 
-  if (loading) {
+  const handleStartupDetail = (startup: Startup) => {
+    setSelectedStartup(startup)
+    setShowDetailDialog(true)
+  }
+
+  if (loading && startups.length === 0) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin" />
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-8 w-8 animate-spin" />
+          <p className="text-sm text-muted-foreground">Loading startups...</p>
+        </div>
       </div>
     )
   }
 
   return (
     <div className="min-h-screen bg-background">
-      <Header user={currentUser} onLogin={handleLogin} onLogout={handleLogout} />
+      <Header user={user} onLogin={login} onLogout={logout} />
 
       <main className="container max-w-6xl mx-auto py-8 px-4">
         <div className="space-y-6">
-          {/* Page Header */}
-          <div className="text-center space-y-2">
-            <h1 className="text-3xl font-bold">Startups</h1>
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">
+              Startups
+              {loading && (
+                <Loader2 className="inline-block ml-2 h-5 w-5 animate-spin" />
+              )}
+            </h1>
             <p className="text-muted-foreground">
-              Discover innovative startups and share your own
+              Discover amazing startups and share your own
             </p>
           </div>
 
@@ -132,32 +132,16 @@ export default function StartupsPage() {
             </Alert>
           )}
 
-          {/* Collapsible Startup Form - Always visible */}
           <CollapsibleStartupForm
-            user={currentUser}
+            user={user}
             onSubmit={handleCreateStartup}
             isSubmitting={isCreatingStartup}
             onLoginRequired={() => setShowLoginDialog(true)}
           />
 
-          {/* Auth Dialog */}
-          <AuthDialog
-            open={showLoginDialog}
-            onOpenChange={setShowLoginDialog}
-            onLogin={handleLogin}
-          />
-
-          {/* Startup Detail Dialog */}
-          <StartupDetailDialog
-            startup={selectedStartup}
-            open={showDetailDialog}
-            onOpenChange={setShowDetailDialog}
-          />
-
           <Separator />
 
-          {/* Startups Grid */}
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {startups.map((startup) => (
               <StartupCard
                 key={startup.id}
@@ -169,9 +153,23 @@ export default function StartupsPage() {
 
           {startups.length === 0 && !loading && (
             <div className="text-center py-12">
-              <p className="text-muted-foreground">No startups yet. Be the first to share yours!</p>
+              <p className="text-muted-foreground">
+                No startups yet. Be the first to share yours!
+              </p>
             </div>
           )}
+
+          <AuthDialog
+            open={showLoginDialog}
+            onOpenChange={setShowLoginDialog}
+            onLogin={login}
+          />
+
+          <StartupDetailDialog
+            startup={selectedStartup}
+            open={showDetailDialog}
+            onOpenChange={setShowDetailDialog}
+          />
         </div>
       </main>
     </div>
