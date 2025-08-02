@@ -25,35 +25,47 @@ export async function getPostsDirect(userId?: string): Promise<Post[]> {
     try {
         console.log(`[${new Date().toISOString()}] getPostsDirect: Starting...`)
 
-        // Join posts with profiles to get user information
-        const url = `${supabaseUrl}/rest/v1/posts?order=created_at.desc&select=id,user_id,type,content,link,image,created_at,startup_id,profiles!user_id(id,first_name,last_name,username,avatar_url)`
+        // Use the get_posts_with_details function to get all posts with like counts
+        const url = `${supabaseUrl}/rest/v1/rpc/get_posts_with_details`
+        const requestBody = {
+            user_id_param: userId || null
+        }
 
-        const response = await fetch(url, { headers })
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                ...headers,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(requestBody)
+        })
 
         if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${await response.text()}`)
+            const errorText = await response.text()
+            console.error(`[${new Date().toISOString()}] getPostsDirect: Error ${response.status}:`, errorText)
+            throw new Error(`HTTP ${response.status}: ${errorText}`)
         }
 
         const posts = await response.json()
         console.log(`[${new Date().toISOString()}] getPostsDirect: Loaded ${posts.length} posts`)
 
-        // Return posts with proper user information
+        // Transform the response to match our Post type
         return posts.map((post: any) => ({
             id: post.id,
             user: {
                 id: post.user_id,
-                name: post.profiles ? `${post.profiles.first_name || ''} ${post.profiles.last_name || ''}`.trim() || 'User' : 'User',
-                username: post.profiles?.username || 'user',
-                avatar: post.profiles?.avatar_url || '',
+                name: post.first_name && post.last_name ? `${post.first_name} ${post.last_name}`.trim() : post.username || 'User',
+                username: post.username || 'user',
+                avatar: post.avatar_url || '',
             },
             type: post.type,
             content: post.content,
-            link: post.link,
-            image: post.image,
+            link: post.link_url,
+            image: post.image_url,
             created_at: post.created_at,
-            likes_count: 0, // Simplified for now
-            comments_count: 0,
-            liked_by_user: false,
+            likes_count: post.likes_count || 0,
+            comments_count: post.comments_count || 0,
+            liked_by_user: post.liked_by_user || false,
         })) as Post[]
     } catch (error) {
         console.error("Error fetching posts:", error)
@@ -166,9 +178,14 @@ export async function createStartupDirect(startup: {
         }
 
         const url = `${supabaseUrl}/rest/v1/startups`
+        const requestHeaders = {
+            ...getAuthHeaders(token),
+            'Prefer': 'return=representation'  // Tell Supabase to return the created data
+        }
+
         const response = await fetch(url, {
             method: 'POST',
-            headers: getAuthHeaders(token),
+            headers: requestHeaders,
             body: JSON.stringify(insertData)
         })
 
@@ -182,7 +199,7 @@ export async function createStartupDirect(startup: {
                 const retryData = { ...insertData, slug: uniqueSlug }
                 const retryResponse = await fetch(url, {
                     method: 'POST',
-                    headers: getAuthHeaders(token),
+                    headers: requestHeaders,
                     body: JSON.stringify(retryData)
                 })
 
@@ -190,7 +207,20 @@ export async function createStartupDirect(startup: {
                     throw new Error(`HTTP ${retryResponse.status}: ${await retryResponse.text()}`)
                 }
 
-                const result = await retryResponse.json()
+                // Handle empty response for retry
+                const retryResponseText = await retryResponse.text()
+                if (!retryResponseText || retryResponseText.trim() === '') {
+                    console.log(`[${new Date().toISOString()}] createStartupDirect: Empty response but 201 status - startup created with unique slug`)
+                    return {
+                        ...insertData,
+                        id: `temp-${Date.now()}`,
+                        slug: uniqueSlug,
+                        created_at: new Date().toISOString(),
+                        updated_at: new Date().toISOString(),
+                    } as Startup
+                }
+
+                const result = JSON.parse(retryResponseText)
                 console.log(`[${new Date().toISOString()}] createStartupDirect: Startup created with unique slug`)
                 return result[0] || result
             }
@@ -198,7 +228,19 @@ export async function createStartupDirect(startup: {
             throw new Error(`HTTP ${response.status}: ${errorText}`)
         }
 
-        const result = await response.json()
+        // Handle empty response for main request
+        const responseText = await response.text()
+        if (!responseText || responseText.trim() === '') {
+            console.log(`[${new Date().toISOString()}] createStartupDirect: Empty response but 201 status - startup created successfully`)
+            return {
+                ...insertData,
+                id: `temp-${Date.now()}`,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+            } as Startup
+        }
+
+        const result = JSON.parse(responseText)
         console.log(`[${new Date().toISOString()}] createStartupDirect: Startup created successfully`)
         return result[0] || result
     } catch (error) {
@@ -217,21 +259,69 @@ export async function createPostDirect(data: {
     startup_id?: string
 }, token?: string): Promise<Post> {
     try {
-        console.log(`[${new Date().toISOString()}] createPostDirect: Creating post...`)
+        console.log(`[${new Date().toISOString()}] createPostDirect: Creating post with data:`, data)
+        console.log(`[${new Date().toISOString()}] createPostDirect: Using token:`, token ? 'YES (length: ' + token.length + ')' : 'NO')
 
         const url = `${supabaseUrl}/rest/v1/posts`
+        const requestHeaders = {
+            ...getAuthHeaders(token),
+            'Prefer': 'return=representation'  // Tell Supabase to return the created data
+        }
+        console.log(`[${new Date().toISOString()}] createPostDirect: Request headers:`, requestHeaders)
+
         const response = await fetch(url, {
             method: 'POST',
-            headers: getAuthHeaders(token),
+            headers: requestHeaders,
             body: JSON.stringify(data)
         })
 
+        console.log(`[${new Date().toISOString()}] createPostDirect: Response status:`, response.status)
+        console.log(`[${new Date().toISOString()}] createPostDirect: Response headers:`, Object.fromEntries(response.headers.entries()))
+
         if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${await response.text()}`)
+            const errorText = await response.text()
+            console.error(`[${new Date().toISOString()}] createPostDirect: Error response:`, errorText)
+            throw new Error(`HTTP ${response.status}: ${errorText}`)
         }
 
-        const result = await response.json()
-        console.log(`[${new Date().toISOString()}] createPostDirect: Post created successfully`)
+        // Check if response has content before parsing JSON
+        const responseText = await response.text()
+        console.log(`[${new Date().toISOString()}] createPostDirect: Raw response:`, responseText)
+        console.log(`[${new Date().toISOString()}] createPostDirect: Response length:`, responseText.length)
+
+        if (!responseText || responseText.trim() === '') {
+            console.log(`[${new Date().toISOString()}] createPostDirect: Empty response but 201 status - post was created successfully`)
+            // Post was created successfully but no data returned
+            // Return a minimal post object with the data we sent
+            return {
+                id: `temp-${Date.now()}`, // Temporary ID since we don't have the real one
+                user: {
+                    id: data.user_id,
+                    name: "User",
+                    username: "user",
+                    avatar: "",
+                },
+                type: data.type,
+                content: data.content,
+                link: data.link,
+                image: data.image,
+                created_at: new Date().toISOString(),
+                likes_count: 0,
+                comments_count: 0,
+                liked_by_user: false,
+            } as Post
+        }
+
+        let result
+        try {
+            result = JSON.parse(responseText)
+        } catch (parseError) {
+            console.error(`[${new Date().toISOString()}] createPostDirect: JSON parse error:`, parseError)
+            console.error(`[${new Date().toISOString()}] createPostDirect: Response was:`, responseText)
+            throw new Error(`Invalid JSON response: ${responseText}`)
+        }
+
+        console.log(`[${new Date().toISOString()}] createPostDirect: Post created successfully`, result)
 
         // Return simplified post structure
         const post = result[0] || result
@@ -504,20 +594,63 @@ export async function createCommentDirect(data: {
 }, token?: string): Promise<Comment> {
     try {
         console.log(`[${new Date().toISOString()}] createCommentDirect: Creating comment...`)
+        console.log(`[${new Date().toISOString()}] createCommentDirect: Using token:`, token ? 'YES (length: ' + token.length + ')' : 'NO')
 
         const url = `${supabaseUrl}/rest/v1/comments`
+        const requestHeaders = {
+            ...getAuthHeaders(token),
+            'Prefer': 'return=representation'  // Tell Supabase to return the created data
+        }
+        console.log(`[${new Date().toISOString()}] createCommentDirect: Request headers:`, requestHeaders)
+
         const response = await fetch(url, {
             method: 'POST',
-            headers: getAuthHeaders(token),
+            headers: requestHeaders,
             body: JSON.stringify(data)
         })
 
+        console.log(`[${new Date().toISOString()}] createCommentDirect: Response status:`, response.status)
+        console.log(`[${new Date().toISOString()}] createCommentDirect: Response headers:`, Object.fromEntries(response.headers.entries()))
+
         if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${await response.text()}`)
+            const errorText = await response.text()
+            console.error(`[${new Date().toISOString()}] createCommentDirect: Error response:`, errorText)
+            throw new Error(`HTTP ${response.status}: ${errorText}`)
         }
 
-        const result = await response.json()
-        console.log(`[${new Date().toISOString()}] createCommentDirect: Comment created successfully`)
+        // Check if response has content before parsing JSON
+        const responseText = await response.text()
+        console.log(`[${new Date().toISOString()}] createCommentDirect: Raw response:`, responseText)
+        console.log(`[${new Date().toISOString()}] createCommentDirect: Response length:`, responseText.length)
+
+        if (!responseText || responseText.trim() === '') {
+            console.log(`[${new Date().toISOString()}] createCommentDirect: Empty response but 201 status - comment was created successfully`)
+            // Comment was created successfully but no data returned
+            // Return a minimal comment object with the data we sent
+            return {
+                id: `temp-${Date.now()}`, // Temporary ID since we don't have the real one
+                post_id: data.post_id,
+                user: {
+                    id: data.user_id,
+                    name: "User",
+                    username: "user",
+                    avatar: "",
+                },
+                content: data.content,
+                created_at: new Date().toISOString(),
+            } as Comment
+        }
+
+        let result
+        try {
+            result = JSON.parse(responseText)
+        } catch (parseError) {
+            console.error(`[${new Date().toISOString()}] createCommentDirect: JSON parse error:`, parseError)
+            console.error(`[${new Date().toISOString()}] createCommentDirect: Response was:`, responseText)
+            throw new Error(`Invalid JSON response: ${responseText}`)
+        }
+
+        console.log(`[${new Date().toISOString()}] createCommentDirect: Comment created successfully`, result)
 
         const comment = result[0] || result
         return {
@@ -672,19 +805,36 @@ export async function toggleLikeDirect(postId: string, userId: string, token?: s
         } else {
             // Like: create a new like
             console.log('👍 Adding like...')
+            console.log('🔍 Debug - userId:', userId, 'postId:', postId)
+            console.log('🔍 Debug - token present:', !!token)
+            console.log('🔍 Debug - token length:', token?.length || 0)
+
             const createUrl = `${supabaseUrl}/rest/v1/likes`
+            const likeHeaders = getAuthHeaders(token)
+            console.log('🔍 Debug - request headers:', likeHeaders)
+
             const createResponse = await fetch(createUrl, {
                 method: 'POST',
-                headers: getAuthHeaders(token),
+                headers: likeHeaders,
                 body: JSON.stringify({
                     user_id: userId,
                     post_id: postId
                 })
             })
 
+            console.log('🔍 Debug - response status:', createResponse.status)
+            console.log('🔍 Debug - response headers:', Object.fromEntries(createResponse.headers.entries()))
+
             if (!createResponse.ok) {
-                console.error('❌ Error creating like:', createResponse.status, await createResponse.text())
-                throw new Error(`HTTP ${createResponse.status}: ${await createResponse.text()}`)
+                const errorText = await createResponse.text()
+                console.error('❌ Error creating like:', createResponse.status, errorText)
+                console.error('❌ Full error details:', {
+                    status: createResponse.status,
+                    statusText: createResponse.statusText,
+                    headers: Object.fromEntries(createResponse.headers.entries()),
+                    body: errorText
+                })
+                throw new Error(`HTTP ${createResponse.status}: ${errorText}`)
             }
             console.log('✅ Like added successfully')
         }

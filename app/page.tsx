@@ -9,21 +9,42 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Separator } from "@/components/ui/separator"         
 import { Loader2 } from "lucide-react"
 import { useSimpleAuth } from "@/hooks/use-simple-auth"
-import { useDataLoader } from "@/hooks/use-data-loader"
+import { usePostsWithOptimisticUpdates } from "@/hooks/use-posts-optimistic"
 import { useComments } from "@/hooks/use-comments"
 import { createPostFromFormDirect } from "@/lib/api-direct"
 import type { PostFormData, Comment as PostComment } from "@/lib/types"
 
 export default function HomePage() {
-  // Much simpler state management
+  // Much simpler state management with optimistic updates
   const { user, loading: authLoading, login, logout } = useSimpleAuth()
-  const { posts, userStartups, loading: postsLoading, refreshPosts } = useDataLoader()
-  const { comments, loadComments, handleComment, handleLike } = useComments(user, refreshPosts)
+  const { 
+    posts, 
+    loading: postsLoading, 
+    loadPosts,
+    refreshPosts, 
+    updatePostLikeOptimistically,
+    updatePostCommentsOptimistically,
+    addPostOptimistically
+  } = usePostsWithOptimisticUpdates(user?.id)
+  
+  const { comments, loadComments, handleComment, handleLike } = useComments(
+    user, 
+    refreshPosts,
+    updatePostLikeOptimistically,
+    updatePostCommentsOptimistically
+  )
   
   // Only local UI state needed
   const [isCreatingPost, setIsCreatingPost] = useState(false)
   const [showLoginDialog, setShowLoginDialog] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // Load posts when component mounts
+  useEffect(() => {
+    if (!postsLoading && posts.length === 0) {
+      loadPosts()
+    }
+  }, [loadPosts, posts.length, postsLoading])
 
   // Load comments when posts change
   useEffect(() => {
@@ -49,6 +70,14 @@ export default function HomePage() {
       setError("Failed to create post. Please try again.")
     } finally {
       setIsCreatingPost(false)
+    }
+  }
+
+  // Wrapper function to match PostCard interface
+  const handleLikeWrapper = (postId: string) => {
+    const post = posts.find(p => p.id === postId)
+    if (post) {
+      handleLike(postId, post.liked_by_user || false, post.likes_count || 0)
     }
   }
 
@@ -83,7 +112,7 @@ export default function HomePage() {
           <CollapsiblePostForm
             user={user}
             onSubmit={handleCreatePost}
-            userStartups={userStartups}
+            userStartups={[]} // Simplified for now
             isSubmitting={isCreatingPost}
             onLoginRequired={() => setShowLoginDialog(true)}
           />
@@ -103,7 +132,7 @@ export default function HomePage() {
                 post={post}
                 user={user}
                 comments={comments.filter((comment: PostComment) => comment.post_id === post.id)}
-                onLike={handleLike}
+                onLike={handleLikeWrapper}
                 onComment={handleComment}
               />
             ))}

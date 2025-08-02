@@ -121,20 +121,81 @@ SELECT * FROM posts WHERE id IN ('id1', 'id2', 'id3');
 ```typescript
 export async function apiFunction(): Promise<DataType[]> {
     try {
+        console.log(`[${new Date().toISOString()}] apiFunction: Starting...`)
+        
         // API call
         const response = await fetch(url, options)
         
         if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`)
+            const errorText = await response.text()
+            console.error(`[${new Date().toISOString()}] apiFunction: Error ${response.status}:`, errorText)
+            throw new Error(`HTTP ${response.status}: ${errorText}`)
         }
         
         const data = await response.json()
+        console.log(`[${new Date().toISOString()}] apiFunction: Loaded ${data.length} items`)
         return data || []
     } catch (error) {
         console.error("Error in apiFunction:", error)
-        // Log details for debugging
-        console.error("Request details:", { url, options })
         throw error // Re-throw to let caller handle
+    }
+}
+```
+
+### POST Request Pattern (Create Operations)
+
+```typescript
+export async function createDataDirect(data: CreateDataType, token?: string): Promise<DataType> {
+    try {
+        console.log(`[${new Date().toISOString()}] createDataDirect: Creating...`)
+        console.log(`[${new Date().toISOString()}] createDataDirect: Using token:`, token ? 'YES (length: ' + token.length + ')' : 'NO')
+
+        const url = `${supabaseUrl}/rest/v1/table_name`
+        const requestHeaders = {
+            ...getAuthHeaders(token),
+            'Prefer': 'return=representation'  // Tell Supabase to return the created data
+        }
+
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: requestHeaders,
+            body: JSON.stringify(data)
+        })
+
+        console.log(`[${new Date().toISOString()}] createDataDirect: Response status:`, response.status)
+
+        if (!response.ok) {
+            const errorText = await response.text()
+            console.error(`[${new Date().toISOString()}] createDataDirect: Error response:`, errorText)
+            throw new Error(`HTTP ${response.status}: ${errorText}`)
+        }
+
+        // Handle empty response from Supabase
+        const responseText = await response.text()
+        console.log(`[${new Date().toISOString()}] createDataDirect: Response length:`, responseText.length)
+
+        if (!responseText || responseText.trim() === '') {
+            console.log(`[${new Date().toISOString()}] createDataDirect: Empty response but 201 status - record created successfully`)
+            return {
+                id: `temp-${Date.now()}`,
+                ...data,
+                created_at: new Date().toISOString(),
+            } as DataType
+        }
+
+        let result
+        try {
+            result = JSON.parse(responseText)
+        } catch (parseError) {
+            console.error(`[${new Date().toISOString()}] createDataDirect: JSON parse error:`, parseError)
+            throw new Error(`Invalid JSON response: ${responseText}`)
+        }
+
+        console.log(`[${new Date().toISOString()}] createDataDirect: Created successfully`, result)
+        return result[0] || result
+    } catch (error) {
+        console.error("Error creating data:", error)
+        throw error
     }
 }
 ```

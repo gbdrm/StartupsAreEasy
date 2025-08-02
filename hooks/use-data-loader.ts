@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { getPostsDirect } from '@/lib/api-direct'
 import { useSimpleAuth } from '@/hooks/use-simple-auth'
 import type { Post, Startup } from '@/lib/types'
@@ -12,22 +12,7 @@ export function useDataLoader() {
     const [postsLoading, setPostsLoading] = useState(false)
     const hasLoaded = useRef(false)
 
-    // Load posts once when component mounts
-    useEffect(() => {
-        if (posts.length === 0 && !postsLoading && !hasLoaded.current) {
-            loadPosts()
-        }
-    }, [])
-
-    // Load user startups when user changes  
-    useEffect(() => {
-        if (user && userStartups.length === 0) {
-            // For simplicity, just set empty array for now
-            setUserStartups([])
-        }
-    }, [user])
-
-    const loadPosts = async () => {
+    const loadPosts = useCallback(async () => {
         if (postsLoading || hasLoaded.current) return
 
         console.log(`[${new Date().toISOString()}] useDataLoader: Loading posts...`)
@@ -47,13 +32,28 @@ export function useDataLoader() {
         } finally {
             setPostsLoading(false)
         }
-    }
+    }, [user?.id, postsLoading])
 
-    const refreshPosts = () => {
+    // Load posts once when component mounts
+    useEffect(() => {
+        if (posts.length === 0 && !postsLoading && !hasLoaded.current) {
+            loadPosts()
+        }
+    }, [posts.length, postsLoading, loadPosts])
+
+    // Load user startups when user changes  
+    useEffect(() => {
+        if (user && userStartups.length === 0) {
+            // For simplicity, just set empty array for now
+            setUserStartups([])
+        }
+    }, [user, userStartups.length])
+
+    const refreshPosts = useCallback(() => {
         hasLoaded.current = false
         setPosts([]) // Clear posts to force reload
         loadPosts()
-    }
+    }, [loadPosts])
 
     return {
         posts,

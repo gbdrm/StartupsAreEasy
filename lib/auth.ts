@@ -204,17 +204,22 @@ export async function getCurrentUserToken(): Promise<string | null> {
   try {
     console.log('🔑 getCurrentUserToken: Getting session...')
 
-    // Add timeout to prevent hanging
-    const sessionPromise = supabase.auth.getSession()
-    const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('Session timeout')), 5000)
-    )
-
-    const { data: { session }, error } = await Promise.race([sessionPromise, timeoutPromise]) as any
+    // Try to get the session with a shorter timeout and auto-refresh
+    const { data: { session }, error } = await supabase.auth.getSession()
 
     if (error) {
       console.error('❌ Error getting session:', error)
-      return null
+      // Try to refresh the session
+      console.log('🔄 Attempting to refresh session...')
+      const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession()
+
+      if (refreshError || !refreshData.session) {
+        console.error('❌ Session refresh failed:', refreshError)
+        return null
+      }
+
+      console.log('✅ Session refreshed successfully')
+      return refreshData.session.access_token
     }
 
     console.log('🔑 Session found:', !!session, 'has access_token:', !!session?.access_token)
@@ -224,8 +229,26 @@ export async function getCurrentUserToken(): Promise<string | null> {
       return null
     }
 
-    const token = session?.access_token || null
-    console.log('🔑 Returning token:', token ? 'YES (length: ' + token?.length + ')' : 'NO')
+    // Check if token is close to expiring (within 5 minutes)
+    const now = Math.floor(Date.now() / 1000)
+    const tokenExp = session.expires_at || 0
+    const timeUntilExpiry = tokenExp - now
+
+    if (timeUntilExpiry < 300) { // 5 minutes
+      console.log('🔄 Token expires soon, refreshing...')
+      const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession()
+
+      if (refreshError || !refreshData.session) {
+        console.warn('⚠️ Token refresh failed, using existing token:', refreshError)
+        return session.access_token
+      }
+
+      console.log('✅ Token refreshed proactively')
+      return refreshData.session.access_token
+    }
+
+    const token = session.access_token
+    console.log('🔑 Returning token:', token ? 'YES (length: ' + token.length + ')' : 'NO')
     return token
   } catch (error) {
     console.error("❌ Error getting user token:", error)

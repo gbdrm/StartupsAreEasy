@@ -1,4 +1,4 @@
-﻿// Centralized logging utility for better control over debug output
+// Centralized logging utility for better control over debug output
 // Logs only show in development unless explicitly enabled
 
 type LogLevel = 'debug' | 'info' | 'warn' | 'error'
@@ -30,7 +30,7 @@ function shouldLog(level: LogLevel): boolean {
 function formatMessage(level: LogLevel, message: string, context?: any): string {
     const timestamp = config.timestamp ? `[${new Date().toISOString()}]` : ''
     const levelTag = `[${level.toUpperCase()}]`
-    return `  `
+    return `${timestamp} ${levelTag} ${message}`
 }
 
 export const logger = {
@@ -55,12 +55,6 @@ export const logger = {
     error: (message: string, error?: any, context?: any) => {
         if (shouldLog('error')) {
             console.error(formatMessage('error', message), error || '', context || '')
-        }
-    },
-
-    log: (message: string, context?: any) => {
-        if (shouldLog('info')) {
-            console.log(formatMessage('info', message), context || '')
         }
     },
 
