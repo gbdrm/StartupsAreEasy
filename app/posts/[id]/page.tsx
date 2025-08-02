@@ -1,5 +1,4 @@
 import { notFound } from "next/navigation"
-import { supabase } from "@/lib/supabase"
 import { PostClientWrapper } from "@/components/post-client-wrapper"
 import { getPostByIdDirect } from "@/lib/api-direct"
 import { getCommentsDirect } from "@/lib/api-direct"
@@ -13,10 +12,7 @@ interface PostPageProps {
 export default async function PostPage({ params }: PostPageProps) {
   // Await params for Next.js 15 compatibility
   const { id } = await params
-  
-  // Get current user
-  const { data: { user } } = await supabase.auth.getUser()
-  
+
   try {
     // Get the post
     const post = await getPostByIdDirect(id)
