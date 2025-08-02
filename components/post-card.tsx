@@ -60,6 +60,16 @@ export function PostCard({ post, user, comments, onLike, onComment, clickable = 
 
   const postType = POST_TYPES[post.type]
 
+  // Safely parse the post link to extract the hostname
+  let linkHostname: string | null = null
+  if (post.link) {
+    try {
+      linkHostname = new URL(post.link).hostname
+    } catch {
+      linkHostname = null
+    }
+  }
+
   return (
     <Card 
       className={clickable ? "cursor-pointer transition-all duration-200 hover:shadow-md" : ""}
@@ -147,7 +157,7 @@ export function PostCard({ post, user, comments, onLike, onComment, clickable = 
               className="flex items-center gap-2 w-full p-3 text-sm text-blue-600 hover:text-blue-800 hover:bg-blue-50 dark:hover:bg-blue-950/50 border border-blue-200 dark:border-blue-800 rounded-lg transition-colors"
             >
               <ExternalLink className="h-4 w-4 flex-shrink-0" />
-              <span className="truncate">{new URL(post.link).hostname}</span>
+              <span className="truncate">{linkHostname ?? post.link}</span>
             </a>
           </div>
         )}
