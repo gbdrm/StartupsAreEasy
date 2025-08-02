@@ -151,7 +151,7 @@ export async function createStartupDirect(startup: {
             logo_url: startup.logo_url,
             industry: startup.industry,
             stage: startup.stage || "idea",
-            founded_date: startup.founded_date,
+            founded_date: startup.founded_date && startup.founded_date.trim() !== '' ? startup.founded_date : null,
             location: startup.location,
             team_size: startup.team_size,
             funding_raised: startup.funding_raised,
@@ -632,6 +632,85 @@ export async function getStartupsByUserDirect(userId: string): Promise<Startup[]
         return data || []
     } catch (error) {
         console.error("Error fetching startups by user:", error)
+        throw error
+    }
+}
+
+// Like/Unlike API
+export async function toggleLikeDirect(postId: string, userId: string, token?: string): Promise<{ liked: boolean, likesCount: number }> {
+    console.log('🎯 toggleLikeDirect called:', { postId, userId, hasToken: !!token })
+
+    try {
+        // First check if user already liked this post
+        console.log('🔍 Checking if user already liked this post...')
+        const checkUrl = `${supabaseUrl}/rest/v1/likes?user_id=eq.${userId}&post_id=eq.${postId}`
+        const checkResponse = await fetch(checkUrl, { headers: getAuthHeaders(token) })
+
+        if (!checkResponse.ok) {
+            console.error('❌ Error checking existing likes:', checkResponse.status, await checkResponse.text())
+            throw new Error(`HTTP ${checkResponse.status}: ${await checkResponse.text()}`)
+        }
+
+        const existingLikes = await checkResponse.json()
+        const isLiked = existingLikes.length > 0
+        console.log('🔍 Current like status:', isLiked ? 'LIKED' : 'NOT LIKED', 'existing likes:', existingLikes.length)
+
+        if (isLiked) {
+            // Unlike: delete the like
+            console.log('👎 Removing like...')
+            const deleteUrl = `${supabaseUrl}/rest/v1/likes?user_id=eq.${userId}&post_id=eq.${postId}`
+            const deleteResponse = await fetch(deleteUrl, {
+                method: 'DELETE',
+                headers: getAuthHeaders(token)
+            })
+
+            if (!deleteResponse.ok) {
+                console.error('❌ Error deleting like:', deleteResponse.status, await deleteResponse.text())
+                throw new Error(`HTTP ${deleteResponse.status}: ${await deleteResponse.text()}`)
+            }
+            console.log('✅ Like removed successfully')
+        } else {
+            // Like: create a new like
+            console.log('👍 Adding like...')
+            const createUrl = `${supabaseUrl}/rest/v1/likes`
+            const createResponse = await fetch(createUrl, {
+                method: 'POST',
+                headers: getAuthHeaders(token),
+                body: JSON.stringify({
+                    user_id: userId,
+                    post_id: postId
+                })
+            })
+
+            if (!createResponse.ok) {
+                console.error('❌ Error creating like:', createResponse.status, await createResponse.text())
+                throw new Error(`HTTP ${createResponse.status}: ${await createResponse.text()}`)
+            }
+            console.log('✅ Like added successfully')
+        }
+
+        // Get updated likes count
+        console.log('📊 Getting updated like count...')
+        const countUrl = `${supabaseUrl}/rest/v1/likes?post_id=eq.${postId}&select=id`
+        const countResponse = await fetch(countUrl, { headers: getAuthHeaders(token) })
+
+        if (!countResponse.ok) {
+            console.error('❌ Error getting like count:', countResponse.status, await countResponse.text())
+            throw new Error(`HTTP ${countResponse.status}: ${await countResponse.text()}`)
+        }
+
+        const likes = await countResponse.json()
+        const likesCount = likes.length
+        console.log('📊 Final like count:', likesCount)
+
+        const result = {
+            liked: !isLiked,
+            likesCount
+        }
+        console.log('✅ toggleLikeDirect returning:', result)
+        return result
+    } catch (error) {
+        console.error("💥 Error toggling like:", error)
         throw error
     }
 }

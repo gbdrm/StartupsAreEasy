@@ -160,7 +160,15 @@ export function PostCard({ post, user, comments, onLike, onComment, clickable = 
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => user && onLike(post.id)}
+              onClick={() => {
+                console.log('💖 Like button clicked for post:', post.id, 'user exists:', !!user)
+                if (user) {
+                  console.log('💖 Calling onLike function...')
+                  onLike(post.id)
+                } else {
+                  console.log('❌ No user, cannot like')
+                }
+              }}
               disabled={!user}
               className={`flex items-center gap-1 px-2 py-1 h-auto ${post.liked_by_user ? "text-red-500 hover:text-red-600" : ""}`}
             >

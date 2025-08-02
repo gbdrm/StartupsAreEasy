@@ -12,6 +12,7 @@ import { Separator } from "@/components/ui/separator"
 import { Loader2 } from "lucide-react"
 import { useSimpleAuth } from "@/hooks/use-simple-auth"
 import { getStartupsDirect, createStartupDirect } from "@/lib/api-direct"
+import { getCurrentUserToken } from "@/lib/auth"
 import type { Startup } from "@/lib/types"
 
 interface StartupFormData {
@@ -72,10 +73,11 @@ export default function StartupsPage() {
       setIsCreatingStartup(true)
       setError(null)
       
+      const token = await getCurrentUserToken()
       const startup = await createStartupDirect({
         ...data,
         userId: user.id
-      })
+      }, token || undefined)
 
       setStartups(prev => [startup, ...prev])
       return true // Return success

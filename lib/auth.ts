@@ -198,6 +198,41 @@ export async function getCurrentUserProfile(): Promise<User | null> {
     console.error(`getCurrentUserProfile: Unexpected error:`, error)
     return null
   }
-} export async function signOut() {
+}
+
+export async function getCurrentUserToken(): Promise<string | null> {
+  try {
+    console.log('🔑 getCurrentUserToken: Getting session...')
+
+    // Add timeout to prevent hanging
+    const sessionPromise = supabase.auth.getSession()
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Session timeout')), 5000)
+    )
+
+    const { data: { session }, error } = await Promise.race([sessionPromise, timeoutPromise]) as any
+
+    if (error) {
+      console.error('❌ Error getting session:', error)
+      return null
+    }
+
+    console.log('🔑 Session found:', !!session, 'has access_token:', !!session?.access_token)
+
+    if (!session) {
+      console.log('❌ No session found - user might not be authenticated')
+      return null
+    }
+
+    const token = session?.access_token || null
+    console.log('🔑 Returning token:', token ? 'YES (length: ' + token?.length + ')' : 'NO')
+    return token
+  } catch (error) {
+    console.error("❌ Error getting user token:", error)
+    return null
+  }
+}
+
+export async function signOut() {
   await supabase.auth.signOut();
 }
