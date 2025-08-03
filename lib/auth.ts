@@ -113,12 +113,32 @@ export async function signInWithTelegram(telegramUser: TelegramUser): Promise<Us
     expectedEmail: `telegram-${telegramUser.id}@telegram.local`
   })
 
+  // First, let's check the Telegram function health to ensure it's working
+  try {
+    const healthRes = await fetch(API_ENDPOINTS.TELEGRAM_LOGIN, {
+      method: "GET"
+    });
+    if (healthRes.ok) {
+      const healthData = await healthRes.json();
+      console.log('🔵 Telegram function health check:', healthData);
+    }
+  } catch (healthError) {
+    console.warn('🔵 Could not check Telegram function health:', healthError);
+  }
+
   // Call backend to get JWT
   const res = await fetch(API_ENDPOINTS.TELEGRAM_LOGIN, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(telegramUser),
   });
+
+  console.log('🔵 Telegram function response:', {
+    status: res.status,
+    statusText: res.statusText,
+    headers: Object.fromEntries(res.headers.entries())
+  })
+
   if (!res.ok) {
     const errorText = await res.text();
     console.error('Telegram login failed:', res.status, errorText);
@@ -126,7 +146,28 @@ export async function signInWithTelegram(telegramUser: TelegramUser): Promise<Us
   }
   const { access_token, refresh_token } = await res.json();
 
-  console.log('🔵 Got tokens from Telegram function, setting session...')
+  console.log('🔵 Got tokens from Telegram function:', {
+    access_token_length: access_token?.length,
+    refresh_token_length: refresh_token?.length,
+    access_token_preview: access_token?.substring(0, 50) + '...'
+  })
+
+  // Decode the JWT to see what user it's for (just the payload, not verification)
+  try {
+    const payloadBase64 = access_token.split('.')[1]
+    const payload = JSON.parse(atob(payloadBase64))
+    console.log('🔵 JWT payload contains:', {
+      sub: payload.sub,
+      email: payload.email,
+      telegram_id: payload.user_metadata?.telegram_id,
+      username: payload.user_metadata?.username,
+      provider: payload.app_metadata?.provider
+    })
+  } catch (decodeError) {
+    console.error('🔵 Could not decode JWT payload:', decodeError)
+  }
+
+  console.log('🔵 Setting session...')
 
   // Store JWT in localStorage and set session
   localStorage.setItem("sb-access-token", access_token);
@@ -140,7 +181,12 @@ export async function signInWithTelegram(telegramUser: TelegramUser): Promise<Us
     throw new Error("Failed to set session");
   }
 
-  console.log('🔵 Session set successfully, getting user data...')
+  console.log('🔵 Session set successfully, session data:', {
+    user_id: sessionData?.user?.id,
+    user_email: sessionData?.user?.email,
+    expires_at: sessionData?.session?.expires_at
+  })
+  console.log('🔵 Getting user data...')
 
   // Get user from JWT
   const { data: userData, error: userError } = await supabase.auth.getUser();
@@ -434,11 +480,28 @@ export async function debugTelegramUser(telegramId: number) {
     timestamp: new Date().toISOString()
   })
 
-  // This would need to be called from a secure environment with service role key
-  // For now, it's just a diagnostic helper
+  // Check what the Telegram function health endpoint says
+  try {
+    const healthRes = await fetch(API_ENDPOINTS.TELEGRAM_LOGIN, { method: "GET" });
+    if (healthRes.ok) {
+      const healthData = await healthRes.json();
+      console.log('🔍 Telegram function health:', healthData);
+    }
+  } catch (error) {
+    console.error('🔍 Could not check Telegram function health:', error);
+  }
+
   return {
     telegramId,
     expectedEmail,
-    note: 'This function helps identify expected vs actual email lookup issues'
+    telegramEndpoint: API_ENDPOINTS.TELEGRAM_LOGIN,
+    note: 'Check the console logs above for Telegram function health data'
   }
+}
+
+// Add this to window for debugging in browser console
+if (typeof window !== 'undefined') {
+  (window as any).debugTelegramUser = debugTelegramUser;
+  (window as any).debugAuthConfig = debugAuthConfig;
+  (window as any).emergencyAuthReset = emergencyAuthReset;
 }
