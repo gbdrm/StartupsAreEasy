@@ -91,95 +91,13 @@ export async function createStartup(startup: {
     looking_for?: string[]
     is_public?: boolean
 }): Promise<Startup> {
-    // Generate base slug from name
-    const baseSlug = startup.name
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/^-|-$/g, '')
+    // Use the unified createStartupDirect function from api-direct.ts
+    // This ensures consistent error handling and duplicate slug logic
+    const { createStartupDirect } = await import("./api-direct")
+    const { getCurrentUserToken } = await import("./auth")
 
-    // If baseSlug is empty, use a fallback
-    if (!baseSlug) {
-        throw new Error("Startup name must contain at least one alphanumeric character")
-    }
-
-    // Generate initial slug from name
-    let slug = baseSlug
-
-    logger.debug(`Generated initial slug: "${slug}"`)
-
-    // Simple approach: just try to insert, and if it fails due to duplicate slug, add timestamp
-    // This is simpler and less likely to hang than checking availability first
-
-    const insertData: any = {
-        name: startup.name,
-        slug,
-        description: startup.description,
-        website_url: startup.website_url,
-        logo_url: startup.logo_url,
-        industry: startup.industry,
-        stage: startup.stage || "idea",
-        founded_date: startup.founded_date,
-        location: startup.location,
-        team_size: startup.team_size,
-        funding_raised: startup.funding_raised,
-        target_market: startup.target_market,
-        estimated_timeline: startup.estimated_timeline,
-        looking_for: startup.looking_for,
-        is_public: startup.is_public ?? true,
-    }
-
-    // Only add user_id if provided
-    if (startup.userId) {
-        insertData.user_id = startup.userId
-    }
-
-    logger.debug(`Attempting to create startup with slug: "${slug}"`)
-
-    const { data, error } = await supabase
-        .from("startups")
-        .insert(insertData)
-        .select("*")
-        .single()
-
-    if (error) {
-        logger.error("Error creating startup:", error)
-
-        // If we get a duplicate slug error, try with timestamp suffix
-        if (error.code === '23505' && error.message?.includes('startups_slug_key')) {
-            logger.warn("Duplicate slug detected, retrying with timestamp suffix...")
-
-            // Generate a unique slug with timestamp and random suffix
-            const uniqueSlug = `${baseSlug}-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`
-            logger.debug(`Retrying with unique slug: "${uniqueSlug}"`)
-
-            const retryData = { ...insertData, slug: uniqueSlug }
-
-            try {
-                const { data: retryResult, error: retryError } = await supabase
-                    .from("startups")
-                    .insert(retryData)
-                    .select("*")
-                    .single()
-
-                if (retryError) {
-                    logger.error("Error creating startup on retry:", retryError)
-                    throw retryError
-                }
-
-                logger.info("Startup created successfully on retry")
-                return retryResult
-            } catch (retryErr) {
-                logger.error("Retry also failed:", retryErr)
-                throw retryErr
-            }
-        }
-
-        // For other errors, throw them
-        throw error
-    }
-
-    logger.info("Startup created successfully")
-    return data
+    const token = await getCurrentUserToken()
+    return createStartupDirect(startup, token || undefined)
 }
 
 export async function updateStartup(

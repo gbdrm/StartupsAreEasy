@@ -2,6 +2,8 @@
 // These functions use fetch() directly instead of the Supabase JS client
 
 import type { Post, Comment, User, Startup, StartupStage } from "./types"
+import { logger } from "./logger"
+import { getCurrentUserToken } from "./auth"
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -145,7 +147,35 @@ export async function getStartupsDirect(): Promise<Startup[]> {
     }
 }
 
-// Create Startup API
+// Check if startup name is available
+export async function checkStartupNameAvailable(name: string): Promise<boolean> {
+    try {
+        const slug = name
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/^-|-$/g, '')
+
+        if (!slug) {
+            return false
+        }
+
+        const url = `${supabaseUrl}/rest/v1/startups?select=id&name=eq.${encodeURIComponent(name)}`
+        const response = await fetch(url, { headers })
+
+        if (!response.ok) {
+            logger.warn("Error checking startup name availability", { status: response.status })
+            return true // Assume available if we can't check
+        }
+
+        const data = await response.json()
+        return data.length === 0
+    } catch (error) {
+        logger.error("Error checking startup name availability:", error)
+        return true // Assume available if we can't check
+    }
+}
+
+// Create Startup API - Unified with proper error handling
 export async function createStartupDirect(startup: {
     userId?: string
     name: string
@@ -164,7 +194,13 @@ export async function createStartupDirect(startup: {
     is_public?: boolean
 }, token?: string): Promise<Startup> {
     try {
-        console.log(`[${new Date().toISOString()}] createStartupDirect: Creating startup...`)
+        logger.info("Creating startup", { name: startup.name, userId: startup.userId })
+
+        // Check if name is available first
+        const isAvailable = await checkStartupNameAvailable(startup.name)
+        if (!isAvailable) {
+            throw new Error("A startup with this name already exists. Please choose a different name.")
+        }
 
         // Generate base slug from name
         const baseSlug = startup.name
@@ -201,7 +237,7 @@ export async function createStartupDirect(startup: {
         const url = `${supabaseUrl}/rest/v1/startups`
         const requestHeaders = {
             ...getAuthHeaders(token),
-            'Prefer': 'return=representation'  // Tell Supabase to return the created data
+            'Prefer': 'return=representation'
         }
 
         const response = await fetch(url, {
@@ -212,47 +248,25 @@ export async function createStartupDirect(startup: {
 
         if (!response.ok) {
             const errorText = await response.text()
-            // If duplicate slug error, try with timestamp suffix
-            if (response.status === 409 || errorText.includes('startups_slug_key')) {
-                console.warn("Duplicate slug detected, retrying with timestamp suffix...")
-                const uniqueSlug = `${baseSlug}-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`
+            logger.error("Error creating startup:", { status: response.status, error: errorText })
 
-                const retryData = { ...insertData, slug: uniqueSlug }
-                const retryResponse = await fetch(url, {
-                    method: 'POST',
-                    headers: requestHeaders,
-                    body: JSON.stringify(retryData)
-                })
-
-                if (!retryResponse.ok) {
-                    throw new Error(`HTTP ${retryResponse.status}: ${await retryResponse.text()}`)
-                }
-
-                // Handle empty response for retry
-                const retryResponseText = await retryResponse.text()
-                if (!retryResponseText || retryResponseText.trim() === '') {
-                    console.log(`[${new Date().toISOString()}] createStartupDirect: Empty response but 201 status - startup created with unique slug`)
-                    return {
-                        ...insertData,
-                        id: `temp-${Date.now()}`,
-                        slug: uniqueSlug,
-                        created_at: new Date().toISOString(),
-                        updated_at: new Date().toISOString(),
-                    } as Startup
-                }
-
-                const result = JSON.parse(retryResponseText)
-                console.log(`[${new Date().toISOString()}] createStartupDirect: Startup created with unique slug`)
-                return result[0] || result
+            // Handle specific error types with user-friendly messages
+            if (errorText.includes('Authentication token required') || errorText.includes('JWT')) {
+                throw new Error("You must be logged in to create startups. Please sign in and try again.")
+            } else if (errorText.includes('violates row-level security')) {
+                throw new Error("You don't have permission to create this startup. Please make sure you're logged in.")
+            } else if (response.status === 409) {
+                // This shouldn't happen since we checked availability, but handle just in case
+                throw new Error("A startup with this name already exists. Please choose a different name.")
+            } else {
+                throw new Error(`Failed to create startup: ${errorText}`)
             }
-
-            throw new Error(`HTTP ${response.status}: ${errorText}`)
         }
 
-        // Handle empty response for main request
+        // Handle empty response
         const responseText = await response.text()
         if (!responseText || responseText.trim() === '') {
-            console.log(`[${new Date().toISOString()}] createStartupDirect: Empty response but 201 status - startup created successfully`)
+            logger.info("Startup created successfully (empty response)")
             return {
                 ...insertData,
                 id: `temp-${Date.now()}`,
@@ -262,10 +276,37 @@ export async function createStartupDirect(startup: {
         }
 
         const result = JSON.parse(responseText)
-        console.log(`[${new Date().toISOString()}] createStartupDirect: Startup created successfully`)
+        logger.info("Startup created successfully")
         return result[0] || result
     } catch (error) {
-        console.error("Error creating startup:", error)
+        logger.error("Error creating startup:", error)
+        throw error
+    }
+}
+
+// Update Startup Stage API
+export async function updateStartupStageDirect(startupId: string, stage: StartupStage, token?: string): Promise<void> {
+    try {
+        const authHeaders = token ? { 'Authorization': `Bearer ${token}` } : {}
+
+        const response = await fetch(`${supabaseUrl}/rest/v1/startups?id=eq.${startupId}`, {
+            method: 'PATCH',
+            headers: {
+                ...headers,
+                ...authHeaders,
+                'Content-Type': 'application/json',
+                'Prefer': 'return=minimal'
+            },
+            body: JSON.stringify({ stage })
+        })
+
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${await response.text()}`)
+        }
+
+        logger.debug("Startup stage updated", { startupId, stage })
+    } catch (error) {
+        logger.error("Error updating startup stage:", error)
         throw error
     }
 }
@@ -379,21 +420,54 @@ export async function createPostFromFormDirect(formData: {
     existing_startup_id?: string
 }, userId: string, token?: string): Promise<void> {
     try {
-        console.log(`[${new Date().toISOString()}] createPostFromFormDirect: Creating post...`)
+        logger.api(`createPostFromFormDirect: Creating ${formData.type} post`, "POST", { type: formData.type })
 
-        // For simplified version, just create a basic post
+        // Get user token if not provided (required for RLS)
+        const userToken = token || await getCurrentUserToken()
+        if (!userToken) {
+            throw new Error("Authentication token required for creating posts")
+        }
+
+        let startupId = formData.existing_startup_id
+        let postContent = formData.content || ""
+
+        // For idea posts, create a startup record first
+        if (formData.type === "idea" && formData.startup_name && formData.startup_description) {
+            const startupData = {
+                userId: userId, // Make sure userId is passed correctly
+                name: formData.startup_name,
+                description: formData.startup_description,
+                stage: "idea" as const
+            }
+
+            const createdStartup = await createStartupDirect(startupData, userToken)
+            startupId = createdStartup.id
+
+            // For idea posts, don't duplicate the startup info in content
+            // The PostCard will display the startup details in the info section
+            // Only use custom content if provided, otherwise leave empty
+            postContent = formData.content || ""
+
+            logger.debug("Created startup for idea post", { startupId, name: formData.startup_name })
+        }        // For launch posts using existing startup, update startup stage
+        if (formData.type === "launch" && formData.existing_startup_id) {
+            await updateStartupStageDirect(formData.existing_startup_id, "launched", userToken)
+            logger.debug("Updated startup stage to launched", { startupId: formData.existing_startup_id })
+        }
+
+        // Create the post
         const postData = {
             user_id: userId,
             type: formData.type,
-            content: formData.content || "",
+            content: postContent,
             link: formData.link,
-            startup_id: formData.existing_startup_id
+            startup_id: startupId
         }
 
-        await createPostDirect(postData, token)
-        console.log(`[${new Date().toISOString()}] createPostFromFormDirect: Post created successfully`)
+        await createPostDirect(postData, userToken)
+        logger.info("Post created successfully", { type: formData.type, hasStartup: !!startupId })
     } catch (error) {
-        console.error("Error creating post from form:", error)
+        logger.error("Error creating post from form:", error)
         throw error
     }
 }
@@ -730,7 +804,7 @@ export async function getUserProfileDirect(username: string): Promise<User | nul
 // Get posts by user ID
 export async function getPostsByUserDirect(userId: string): Promise<Post[]> {
     try {
-        console.log(`[${new Date().toISOString()}] getPostsByUserDirect: Starting for user ${userId}...`)
+        logger.api("getPostsByUserDirect: Starting", "GET", { userId })
 
         // Join with profiles to get user information
         const url = `${supabaseUrl}/rest/v1/posts?user_id=eq.${userId}&order=created_at.desc&select=id,user_id,type,content,link,image,created_at,startup_id,profiles!user_id(id,first_name,last_name,username,avatar_url)`
@@ -742,7 +816,25 @@ export async function getPostsByUserDirect(userId: string): Promise<Post[]> {
         }
 
         const posts = await response.json()
-        console.log(`[${new Date().toISOString()}] getPostsByUserDirect: Loaded ${posts.length} posts`)
+        logger.debug("Loaded user posts", { count: posts.length })
+
+        // Get unique startup IDs to fetch startup details (same as in getPostsDirect)
+        const startupIds = [...new Set(posts.map((post: any) => post.startup_id).filter(Boolean))]
+        let startupsMap = new Map()
+
+        if (startupIds.length > 0) {
+            logger.debug("Fetching startup details for user posts", { count: startupIds.length })
+            const startupsUrl = `${supabaseUrl}/rest/v1/startups?id=in.(${startupIds.join(',')})&select=id,name,description,slug,stage,industry,target_market`
+            const startupsResponse = await fetch(startupsUrl, { headers })
+
+            if (startupsResponse.ok) {
+                const startups = await startupsResponse.json()
+                startupsMap = new Map(startups.map((s: any) => [s.id, s]))
+                logger.debug("Loaded startup details for user posts", { count: startups.length })
+            } else {
+                logger.warn("Failed to fetch startups for user posts", { status: startupsResponse.status })
+            }
+        }
 
         return posts.map((post: any) => ({
             id: post.id,
@@ -760,9 +852,10 @@ export async function getPostsByUserDirect(userId: string): Promise<Post[]> {
             likes_count: 0,
             comments_count: 0,
             liked_by_user: false,
+            startup: post.startup_id ? startupsMap.get(post.startup_id) || null : null,
         })) as Post[]
     } catch (error) {
-        console.error("Error fetching posts by user:", error)
+        logger.error("Error fetching posts by user:", error)
         throw error
     }
 }

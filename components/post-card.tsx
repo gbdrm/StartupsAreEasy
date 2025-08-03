@@ -107,7 +107,7 @@ export function PostCard({ post, comments, onLike, onComment, clickable = true }
       <CardContent className="pt-0">
         {/* Show startup info for idea/launch/progress posts */}
         {post.startup && (post.type === "idea" || post.type === "launch" || post.type === "progress") && (
-          <div className="mb-3 p-3 bg-muted rounded-lg">
+          <div className="mb-3 p-4 bg-muted rounded-lg border">
             <div className="flex items-center gap-2 mb-2">
               <span className="text-lg">
                 {post.type === "idea" && "💡"}
@@ -128,25 +128,41 @@ export function PostCard({ post, comments, onLike, onComment, clickable = true }
                 <ExternalLink className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
               </a>
               {post.startup.stage && (
-                <span className="text-xs bg-background px-2 py-1 rounded">
+                <span className="text-xs bg-background px-2 py-1 rounded font-medium">
                   {post.startup.stage}
                 </span>
               )}
             </div>
             {post.startup.description && (
-              <p className="text-sm text-muted-foreground">{post.startup.description}</p>
+              <div className="mt-2">
+                <p className="text-sm text-muted-foreground leading-relaxed">{post.startup.description}</p>
+              </div>
+            )}
+            {/* Show additional startup details for ideas */}
+            {post.type === "idea" && (
+              <div className="mt-3 pt-3 border-t border-border/50">
+                <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+                  {post.startup.industry && (
+                    <div>
+                      <span className="font-medium">Industry:</span> {post.startup.industry}
+                    </div>
+                  )}
+                  {post.startup.target_market && (
+                    <div>
+                      <span className="font-medium">Target:</span> {post.startup.target_market}
+                    </div>
+                  )}
+                </div>
+              </div>
             )}
           </div>
         )}
 
-        {/* For idea posts, only show additional content if it differs from the auto-generated content */}
-        {post.type === "idea" && post.startup ? (
-          // Only show content if it's different from the auto-generated format
-          post.content !== `💡 **${post.startup.name}**\n\n${post.startup.description}` && (
+        {/* Display post content */}
+        {post.content && (
+          <div className="prose prose-sm max-w-none">
             <p className="text-sm leading-relaxed whitespace-pre-wrap">{post.content}</p>
-          )
-        ) : (
-          <p className="text-sm leading-relaxed whitespace-pre-wrap">{post.content}</p>
+          </div>
         )}
 
         {post.link && (

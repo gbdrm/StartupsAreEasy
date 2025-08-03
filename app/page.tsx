@@ -12,7 +12,9 @@ import { useAuth } from "@/components/auth-context"
 import { usePostsWithOptimisticUpdates } from "@/hooks/use-posts-optimistic"
 import { useComments } from "@/hooks/use-comments"
 import { createPostFromFormDirect } from "@/lib/api-direct"
-import type { PostFormData, Comment as PostComment } from "@/lib/types"
+import { getUserStartups } from "@/lib/startups"
+import { logger } from "@/lib/logger"
+import type { PostFormData, Comment as PostComment, Startup } from "@/lib/types"
 
 export default function HomePage() {
   const { user, loading: authLoading } = useAuth()
@@ -36,13 +38,14 @@ export default function HomePage() {
   const [isCreatingPost, setIsCreatingPost] = useState(false)
   const [showLoginDialog, setShowLoginDialog] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [userStartups, setUserStartups] = useState<Startup[]>([])
   const hasReloadedForUser = useRef(false)
 
   useEffect(() => {
-    console.log(`[${new Date().toISOString()}] HomePage: useEffect triggered - authLoading: ${authLoading}, postsLoading: ${postsLoading}, posts.length: ${posts.length}`)
+    logger.debug("HomePage: useEffect triggered", { authLoading, postsLoading, postsLength: posts.length })
     // Load posts initially regardless of auth state
     if (!postsLoading && posts.length === 0) {
-      console.log(`[${new Date().toISOString()}] HomePage: Calling loadPosts() for initial load`)
+      logger.debug("HomePage: Calling loadPosts() for initial load")
       loadPosts()
     }
   }, [loadPosts, posts.length, postsLoading])
@@ -50,7 +53,7 @@ export default function HomePage() {
   // Reload posts when user authentication completes to get proper liked_by_user status
   useEffect(() => {
     if (!authLoading && user && posts.length > 0 && !hasReloadedForUser.current) {
-      console.log(`[${new Date().toISOString()}] HomePage: User authenticated, reloading posts to get like status`)
+      logger.debug("HomePage: User authenticated, reloading posts to get like status")
       hasReloadedForUser.current = true
       refreshPosts()
     }
@@ -67,6 +70,25 @@ export default function HomePage() {
     }
   }, [posts, loadComments])
 
+  const loadUserStartups = async () => {
+    if (!user) return
+    try {
+      const startups = await getUserStartups(user.id)
+      setUserStartups(startups)
+    } catch (err) {
+      logger.error("Error loading user startups:", err)
+    }
+  }
+
+  // Load user startups when user is available
+  useEffect(() => {
+    if (user) {
+      loadUserStartups()
+    } else {
+      setUserStartups([])
+    }
+  }, [user])
+
   const handleCreatePost = async (data: PostFormData) => {
     if (!user) return
     try {
@@ -74,9 +96,16 @@ export default function HomePage() {
       setError(null)
       await createPostFromFormDirect(data, user.id)
       refreshPosts()
+      // Reload user startups if an idea was posted (creates a new startup)
+      if (data.type === "idea") {
+        await loadUserStartups()
+      }
     } catch (err) {
-      console.error("Error creating post:", err)
-      setError("Failed to create post. Please try again.")
+      logger.error("Error creating post:", err)
+      
+      // The API now handles all error categorization, so just pass through the message
+      const errorMessage = err instanceof Error ? err.message : String(err)
+      setError(errorMessage)
     } finally {
       setIsCreatingPost(false)
     }
@@ -90,7 +119,7 @@ export default function HomePage() {
   }
 
   const showLoading = authLoading || (postsLoading && posts.length === 0)
-  console.log(`[${new Date().toISOString()}] HomePage: Loading states - authLoading: ${authLoading}, postsLoading: ${postsLoading}, posts.length: ${posts.length}, showLoading: ${showLoading}`)
+  logger.debug("HomePage: Loading states", { authLoading, postsLoading, postsLength: posts.length, showLoading })
 
   if (showLoading) {
     return (
@@ -117,9 +146,11 @@ export default function HomePage() {
           )}
           <CollapsiblePostForm
             onSubmit={handleCreatePost}
-            userStartups={[]}
+            userStartups={userStartups}
             isSubmitting={isCreatingPost}
             onLoginRequired={() => setShowLoginDialog(true)}
+            error={error}
+            onErrorClear={() => setError(null)}
           />
           <AuthDialog
             open={showLoginDialog}

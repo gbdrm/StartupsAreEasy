@@ -10,8 +10,10 @@ import { Separator } from "@/components/ui/separator"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Loader2 } from "lucide-react"
 import { getPostsByTypeDirect, createPostFromFormDirect } from "@/lib/api-direct"
+import { getUserStartups } from "@/lib/startups"
 import { useSimpleAuth } from "@/hooks/use-simple-auth"
 import { useComments } from "@/hooks/use-comments"
+import { logger } from "@/lib/logger"
 
 export default function IdeasPage() {
   const { user: currentUser, login: handleLogin, logout: handleLogout, loading: authLoading } = useSimpleAuth()
@@ -117,10 +119,10 @@ export default function IdeasPage() {
   const loadUserStartups = async () => {
     if (!currentUser) return
     try {
-      // For simplicity, just set empty array for now
-      setUserStartups([])
+      const startups = await getUserStartups(currentUser.id)
+      setUserStartups(startups)
     } catch (err) {
-      console.error("Error loading user startups for ideas page:", err)
+      logger.error("Error loading user startups for ideas page:", err)
     }
   }
 
@@ -145,7 +147,7 @@ export default function IdeasPage() {
       // Reload user startups in case new ones were created
       await loadUserStartups()
     } catch (err) {
-      console.error("Error creating idea post:", err)
+      logger.error("Error creating idea post:", err)
       setError("Failed to create idea. Please try again.")
     } finally {
       setIsCreatingPost(false)

@@ -40,6 +40,46 @@ const responseText = await response.text()
 if (!responseText.trim()) {
     return { id: `temp-${Date.now()}`, ...data } // Handle empty 201 responses
 }
+
+// ✅ Correct - Centralized error handling with user-friendly messages
+if (!response.ok) {
+    const errorText = await response.text()
+    if (errorText.includes('Authentication token required')) {
+        throw new Error("You must be logged in to perform this action. Please sign in and try again.")
+    }
+    // Other specific error handling...
+    throw new Error(`Operation failed: ${errorText}`)
+}
+
+// ❌ Wrong - Messy error detection patterns scattered across pages
+if (errorMessage.includes('startups_slug_key') || 
+    errorMessage.includes('duplicate key value') ||
+    errorMessage.includes('already exists')) {
+    // This should be handled in the API function instead
+}
+```
+
+### Duplicate Detection Pattern
+```typescript
+// ✅ Correct - Check availability first
+export async function checkStartupNameAvailable(name: string): Promise<boolean> {
+    const url = `${supabaseUrl}/rest/v1/startups?select=id&name=eq.${encodeURIComponent(name)}`
+    const response = await fetch(url, { headers })
+    const data = await response.json()
+    return data.length === 0
+}
+
+// Use before creating
+const isAvailable = await checkStartupNameAvailable(startup.name)
+if (!isAvailable) {
+    throw new Error("A startup with this name already exists. Please choose a different name.")
+}
+
+// ❌ Wrong - Catching constraint violations with complex string matching
+const isDuplicateSlug = response.status === 409 || 
+    errorText.includes('startups_slug_key') || 
+    errorText.includes('duplicate key value') ||
+    errorText.includes('violates unique constraint')
 ```
 
 ### Authentication
@@ -101,6 +141,9 @@ When migrating components from legacy patterns:
 6. **Component Prop Drilling**: Components like `Header`, `AuthDialog`, `CollapsiblePostForm`, and `PostCard` manage auth internally via `auth-context` - don't pass auth props
 7. **Hook Function Signatures**: `useComments()` expects callback function as second parameter, not setState directly
 8. **Production Logging**: NEVER use `console.log()` - always use `logger` from `lib/logger.ts` for production-safe logging
+9. **Error Handling**: Centralize error handling in API functions - don't duplicate error detection patterns across pages
+10. **Availability Checks**: Use dedicated availability check functions instead of catching duplicate errors
+11. **Documentation Over-Engineering**: Avoid creating extensive documentation files for temporary fixes - focus on code quality
 
 ## Component Migration Patterns
 
@@ -130,6 +173,31 @@ const { comments, handleLike } = useComments(user, () => setPosts([...posts]))
 
 // ✅ Correct - Wrap with proper signature
 <PostCard onLike={(postId) => handleLike(postId, post.liked_by_user, post.likes_count)} />
+```
+
+### Error Handling Patterns
+```typescript
+// ✅ Correct - Let API handle error categorization
+try {
+    await createStartupDirect(data, token)
+} catch (err) {
+    const errorMessage = err instanceof Error ? err.message : String(err)
+    setError(errorMessage) // API already provides user-friendly message
+}
+
+// ❌ Wrong - Duplicate error categorization in UI components
+try {
+    await createStartupDirect(data, token)
+} catch (err) {
+    const errorMessage = err instanceof Error ? err.message : String(err)
+    if (errorMessage.includes('startups_slug_key') || 
+        errorMessage.includes('duplicate key value')) {
+        setError("A startup with this name already exists...")
+    } else if (errorMessage.includes('Authentication token required')) {
+        setError("You must be logged in...")
+    }
+    // This logic should be in the API function instead
+}
 ```
 
 ## Database Patterns

@@ -83,7 +83,10 @@ export default function StartupsPage() {
       return true // Return success
     } catch (err) {
       console.error("Error creating startup:", err)
-      setError("Failed to create startup. Please try again.")
+      
+      // The API now handles all error categorization, so just pass through the message
+      const errorMessage = err instanceof Error ? err.message : String(err)
+      setError(errorMessage)
       return false
     } finally {
       setIsCreatingStartup(false)

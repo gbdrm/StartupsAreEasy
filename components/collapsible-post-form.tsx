@@ -13,6 +13,8 @@ interface CollapsiblePostFormProps {
   isSubmitting?: boolean
   onLoginRequired: () => void
   restrictToType?: PostType
+  error?: string | null
+  onErrorClear?: () => void
 }
 
 export function CollapsiblePostForm({ 
@@ -20,7 +22,9 @@ export function CollapsiblePostForm({
   userStartups, 
   isSubmitting, 
   onLoginRequired,
-  restrictToType
+  restrictToType,
+  error,
+  onErrorClear
 }: CollapsiblePostFormProps) {
   const { user } = useAuth()
   const [isExpanded, setIsExpanded] = useState(false)
@@ -31,23 +35,39 @@ export function CollapsiblePostForm({
       return
     }
     setIsExpanded(true)
+    // Clear any previous errors when opening the form
+    if (onErrorClear) {
+      onErrorClear()
+    }
   }
 
   const handleCancel = () => {
     setIsExpanded(false)
+    // Clear errors when canceling
+    if (onErrorClear) {
+      onErrorClear()
+    }
+  }
+
+  const handleSubmit = async (data: PostFormData) => {
+    try {
+      await onSubmit(data)
+      setIsExpanded(false) // Only close on success
+    } catch (error) {
+      // Don't close the form on error - let the parent handle error display
+      console.error("Form submission error:", error)
+    }
   }
 
   if (isExpanded && user) {
     return (
       <EnhancedPostForm
-        onSubmit={async (data) => {
-          await onSubmit(data)
-          setIsExpanded(false)
-        }}
+        onSubmit={handleSubmit}
         userStartups={userStartups}
         isSubmitting={isSubmitting}
         onCancel={handleCancel}
         restrictToType={restrictToType}
+        error={error}
       />
     )
   }

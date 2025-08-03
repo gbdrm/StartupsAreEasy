@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import type { PostType, Startup } from "@/lib/types"
 
 interface EnhancedPostFormProps {
@@ -15,6 +16,7 @@ interface EnhancedPostFormProps {
   isSubmitting?: boolean
   onCancel: () => void
   restrictToType?: PostType
+  error?: string | null
 }
 
 export interface PostFormData {
@@ -26,7 +28,7 @@ export interface PostFormData {
   existing_startup_id?: string
 }
 
-export function EnhancedPostForm({ onSubmit, userStartups, isSubmitting, onCancel, restrictToType }: EnhancedPostFormProps) {
+export function EnhancedPostForm({ onSubmit, userStartups, isSubmitting, onCancel, restrictToType, error }: EnhancedPostFormProps) {
   const [postType, setPostType] = useState<PostType>(restrictToType || "post")
   const [formData, setFormData] = useState<PostFormData>({
     type: "post"
@@ -298,6 +300,12 @@ export function EnhancedPostForm({ onSubmit, userStartups, isSubmitting, onCance
 
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
+          {error && (
+            <Alert variant="destructive">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+          
           {renderFormFields()}
 
           <div className="flex gap-2 pt-4">
