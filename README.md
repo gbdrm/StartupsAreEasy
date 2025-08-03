@@ -75,10 +75,9 @@ StartupsAreEasy is a home for people who love starting things — even when they
    SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
    
    # Telegram Bot (for authentication)
-   NEXT_PUBLIC_TELEGRAM_BOT_TOKEN=your_telegram_bot_token  # Client-side (Login Widget)
+   NEXT_PUBLIC_TELEGRAM_BOT_TOKEN=your_telegram_bot_token
    
    # Development testing (for local development)
-   NEXT_PUBLIC_DEFAULT_USER_ID=your_default_user_id
    NEXT_PUBLIC_DEV_EMAIL=your-dev-email@example.com
    NEXT_PUBLIC_DEV_PASSWORD=your-secure-dev-password
    ```
@@ -165,10 +164,11 @@ Individual tests are available in the `tests/` folder.
 ## 📚 Documentation
 
 All documentation is organized in the [`docs/`](./docs/) folder:
-- [Setup Guide](./docs/SETUP.md)
-- [Architecture Overview](./docs/ARCHITECTURE.md)  
-- [Development Patterns](./docs/DEV_PATTERNS.md)
-- [Troubleshooting](./docs/TROUBLESHOOTING.md)
+- [Setup Guide](./docs/SETUP.md) - Get started with development
+- [Architecture Overview](./docs/ARCHITECTURE.md) - System design and decisions  
+- [Database Reference](./docs/DATABASE.md) - Schema, relationships, and patterns
+- [Development Patterns](./docs/DEV_PATTERNS.md) - Code templates and best practices
+- [Troubleshooting](./docs/TROUBLESHOOTING.md) - Common issues and solutions
 
 ## 🎯 Core Philosophy
 
