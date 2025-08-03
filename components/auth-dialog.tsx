@@ -12,8 +12,7 @@ import {
 import { TelegramLogin } from "./telegram-login"
 import { useAuth } from "@/components/auth-context"
 import type { TelegramUser } from "@/lib/auth"
-
-const isFakeLogin = typeof process !== 'undefined' && !!process.env.NEXT_PUBLIC_DEFAULT_USER_ID;
+import { HAS_FAKE_LOGIN } from "@/lib/constants"
 
 interface AuthDialogProps {
   open: boolean
@@ -36,7 +35,7 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
           <DialogDescription>Sign in to your account to continue.</DialogDescription>
         </DialogHeader>
         <div className="flex justify-center py-4">
-          {isFakeLogin ? (
+          {HAS_FAKE_LOGIN ? (
             <button
               className="bg-yellow-500 hover:bg-yellow-600 text-black font-semibold px-4 py-2 rounded"
               onClick={() => {

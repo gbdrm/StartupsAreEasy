@@ -22,7 +22,7 @@ import { useAuth } from "@/components/auth-context"
 import { TelegramLogin } from "./telegram-login"
 import { useState } from "react"
 import Link from "next/link"
-const isFakeLogin = typeof process !== 'undefined' && !!process.env.NEXT_PUBLIC_DEFAULT_USER_ID;
+import { HAS_FAKE_LOGIN } from "@/lib/constants"
 
 interface TelegramUser {
   id: number
@@ -48,9 +48,9 @@ export function AuthButton() {
       <Dialog open={showLoginDialog} onOpenChange={setShowLoginDialog}>
         <DialogTrigger asChild>
           <Button
-            className={isFakeLogin ? "bg-yellow-500 hover:bg-yellow-600 text-black" : "bg-[#0088cc] hover:bg-[#0077b3]"}
+            className={HAS_FAKE_LOGIN ? "bg-yellow-500 hover:bg-yellow-600 text-black" : "bg-[#0088cc] hover:bg-[#0077b3]"}
           >
-            {isFakeLogin ? "Sign in" : "Sign in"}
+            {HAS_FAKE_LOGIN ? "Sign in" : "Sign in"}
           </Button>
         </DialogTrigger>
         <DialogContent className="sm:max-w-md">
@@ -59,7 +59,7 @@ export function AuthButton() {
             <DialogDescription>Sign in to your account to continue.</DialogDescription>
           </DialogHeader>
           <div className="flex justify-center py-4">
-            {isFakeLogin ? (
+            {HAS_FAKE_LOGIN ? (
               <button
                 className="bg-yellow-500 hover:bg-yellow-600 text-black font-semibold px-4 py-2 rounded"
                 onClick={() => {

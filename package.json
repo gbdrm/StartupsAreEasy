@@ -6,7 +6,9 @@
     "build": "next build",
     "dev": "next dev",
     "lint": "next lint",
-    "start": "next start"
+    "start": "next start",
+    "test": "node tests/test-suite.js",
+    "test:watch": "node tests/test-suite.js && echo 'Tests complete. Press Ctrl+C to stop.' && timeout /t 30 > nul && npm run test:watch"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",

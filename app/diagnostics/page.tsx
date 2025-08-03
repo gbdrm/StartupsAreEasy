@@ -268,7 +268,6 @@ export default function DiagnosticsPage() {
       const envChecks = {
         SUPABASE_URL: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
         SUPABASE_ANON_KEY: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-        DEFAULT_USER_ID: !!process.env.NEXT_PUBLIC_DEFAULT_USER_ID,
         TELEGRAM_BOT_TOKEN: !!process.env.NEXT_PUBLIC_TELEGRAM_BOT_TOKEN,
         TELEGRAM_FUNCTION_URL: !!process.env.NEXT_PUBLIC_TELEGRAM_FUNCTION_URL
       }
@@ -283,33 +282,6 @@ export default function DiagnosticsPage() {
           : `Missing (optional): ${missingEnvVars.join(', ')}`,
         details: envChecks
       })
-
-      // Test 11: Check if default user exists in profiles (Client-side)
-      if (process.env.NEXT_PUBLIC_DEFAULT_USER_ID) {
-        try {
-          const { data, error } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', process.env.NEXT_PUBLIC_DEFAULT_USER_ID)
-            .single()
-          
-          if (error) throw error
-          
-          results.push({
-            name: '[Client] Default User Profile',
-            status: 'success',
-            message: 'Default user profile exists',
-            details: data
-          })
-        } catch (err: any) {
-          results.push({
-            name: '[Client] Default User Profile',
-            status: 'warning',
-            message: 'Default user profile not found - may need to create it',
-            details: err
-          })
-        }
-      }
 
       // Test 12: Test Telegram login endpoint (Client-side)
       try {

@@ -38,7 +38,10 @@ export default function HomePage() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    console.log(`[${new Date().toISOString()}] HomePage: useEffect triggered - authLoading: ${authLoading}, postsLoading: ${postsLoading}, posts.length: ${posts.length}`)
+    // Load posts regardless of auth state for testing
     if (!postsLoading && posts.length === 0) {
+      console.log(`[${new Date().toISOString()}] HomePage: Calling loadPosts()`)
       loadPosts()
     }
   }, [loadPosts, posts.length, postsLoading])

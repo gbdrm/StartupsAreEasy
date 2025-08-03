@@ -120,17 +120,55 @@ StartupsAreEasy is a home for people who love starting things — even when they
 │   ├── post-card.tsx     # Post display component
 │   ├── post-form.tsx     # Post creation form
 │   └── user-link.tsx     # User profile links
+## 📁 Project Structure
+
+```
+├── app/                    # Next.js App Router pages
+│   ├── about/             # About page
+│   ├── profile/[userId]/  # Dynamic user profiles
+│   ├── startups/          # Startups directory
+│   └── page.tsx           # Home page
+├── components/            # Reusable UI components
+│   ├── ui/               # shadcn/ui components
+│   ├── auth-button.tsx   # Authentication button
+│   ├── header.tsx        # Main navigation
+│   ├── post-card.tsx     # Post display component
+│   └── post-form.tsx     # Post creation form
 ├── hooks/                # Custom React hooks
-│   └── use-auth.ts       # Authentication hook
 ├── lib/                  # Utility functions and configs
 │   ├── auth.ts           # Authentication logic
 │   ├── posts.ts          # Post CRUD operations
 │   ├── supabase.ts       # Supabase client
 │   ├── types.ts          # TypeScript interfaces
 │   └── utils.ts          # Utility functions
+├── docs/                 # 📚 Documentation
+│   ├── ARCHITECTURE.md   # System architecture
+│   ├── SETUP.md          # Setup instructions
+│   └── README.md         # Documentation index
+├── tests/                # 🧪 Test files
+│   ├── test-suite.js     # Main test suite
+│   └── README.md         # Testing guide
 ├── scripts/              # Database setup scripts
+├── supabase/            # Supabase functions
 └── styles/               # Global styles
 ```
+
+## 🧪 Testing
+
+Run the comprehensive test suite:
+```bash
+npm test
+```
+
+Individual tests are available in the `tests/` folder.
+
+## 📚 Documentation
+
+All documentation is organized in the [`docs/`](./docs/) folder:
+- [Setup Guide](./docs/SETUP.md)
+- [Architecture Overview](./docs/ARCHITECTURE.md)  
+- [Development Patterns](./docs/DEV_PATTERNS.md)
+- [Troubleshooting](./docs/TROUBLESHOOTING.md)
 
 ## 🎯 Core Philosophy
 

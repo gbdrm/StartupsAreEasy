@@ -23,13 +23,15 @@ function getAuthHeaders(token?: string) {
 // Posts API
 export async function getPostsDirect(userId?: string): Promise<Post[]> {
     try {
-        console.log(`[${new Date().toISOString()}] getPostsDirect: Starting...`)
+        console.log(`[${new Date().toISOString()}] getPostsDirect: Starting for user:`, userId || 'anonymous')
 
         // Use the get_posts_with_details function to get all posts with like counts
         const url = `${supabaseUrl}/rest/v1/rpc/get_posts_with_details`
         const requestBody = {
             user_id_param: userId || null
         }
+
+        console.log(`[${new Date().toISOString()}] getPostsDirect: Request body:`, requestBody)
 
         const response = await fetch(url, {
             method: 'POST',
@@ -49,6 +51,24 @@ export async function getPostsDirect(userId?: string): Promise<Post[]> {
         const posts = await response.json()
         console.log(`[${new Date().toISOString()}] getPostsDirect: Loaded ${posts.length} posts`)
 
+        // Get unique startup IDs to fetch startup details
+        const startupIds = [...new Set(posts.map((post: any) => post.startup_id).filter(Boolean))]
+        let startupsMap = new Map()
+
+        if (startupIds.length > 0) {
+            console.log(`[${new Date().toISOString()}] getPostsDirect: Fetching ${startupIds.length} startups`)
+            const startupsUrl = `${supabaseUrl}/rest/v1/startups?id=in.(${startupIds.join(',')})&select=id,name,description,slug,stage`
+            const startupsResponse = await fetch(startupsUrl, { headers })
+
+            if (startupsResponse.ok) {
+                const startups = await startupsResponse.json()
+                startupsMap = new Map(startups.map((s: any) => [s.id, s]))
+                console.log(`[${new Date().toISOString()}] getPostsDirect: Loaded ${startups.length} startup details`)
+            } else {
+                console.warn(`[${new Date().toISOString()}] getPostsDirect: Failed to fetch startups:`, startupsResponse.status)
+            }
+        }
+
         // Transform the response to match our Post type
         return posts.map((post: any) => ({
             id: post.id,
@@ -66,6 +86,7 @@ export async function getPostsDirect(userId?: string): Promise<Post[]> {
             likes_count: post.likes_count || 0,
             comments_count: post.comments_count || 0,
             liked_by_user: post.liked_by_user || false,
+            startup: post.startup_id ? startupsMap.get(post.startup_id) || null : null,
         })) as Post[]
     } catch (error) {
         console.error("Error fetching posts:", error)
