@@ -31,6 +31,13 @@ function setGlobalLoading(loading: boolean) {
 
 function resetAuth() {
     console.log(`[${new Date().toISOString()}] useSimpleAuth: Resetting auth state`)
+
+    // Clear any localStorage items
+    if (typeof window !== 'undefined') {
+        localStorage.removeItem('sb-access-token')
+        localStorage.removeItem('fake-user-session')
+    }
+
     globalUser = null
     globalLoading = false
     notifySubscribers()
@@ -71,11 +78,13 @@ export function useSimpleAuth() {
         // Get initial session
         const initAuth = async () => {
             try {
+                console.log(`[${new Date().toISOString()}] useSimpleAuth: Getting initial session...`)
                 const { data: { session } } = await supabase.auth.getSession()
 
                 if (session?.user) {
-                    console.log(`[${new Date().toISOString()}] useSimpleAuth: Found existing session`)
+                    console.log(`[${new Date().toISOString()}] useSimpleAuth: Found existing session for user:`, session.user.id)
                     const profile = await getCurrentUserProfile()
+                    console.log(`[${new Date().toISOString()}] useSimpleAuth: Got profile:`, profile ? `${profile.first_name} ${profile.last_name} (@${profile.username})` : 'null')
                     setGlobalUser(profile)
                 } else {
                     console.log(`[${new Date().toISOString()}] useSimpleAuth: No existing session`)
@@ -110,9 +119,10 @@ export function useSimpleAuth() {
                         console.log(`[${new Date().toISOString()}] useSimpleAuth: User signed out`)
                         resetAuth()
                     } else if (event === 'SIGNED_IN' && session?.user) {
-                        console.log(`[${new Date().toISOString()}] useSimpleAuth: User signed in`)
+                        console.log(`[${new Date().toISOString()}] useSimpleAuth: User signed in as:`, session.user.id, session.user.email)
                         try {
                             const profile = await getCurrentUserProfile()
+                            console.log(`[${new Date().toISOString()}] useSimpleAuth: Got profile after sign in:`, profile ? `${profile.first_name} ${profile.last_name} (@${profile.username})` : 'null')
                             setGlobalUser(profile)
                         } catch (error) {
                             console.error(`[${new Date().toISOString()}] useSimpleAuth: Error getting profile:`, error)

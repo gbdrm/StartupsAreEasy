@@ -163,10 +163,12 @@ export async function getCurrentUserProfile(): Promise<User | null> {
     }
 
     if (!userData?.user) {
+      console.log(`getCurrentUserProfile: No authenticated user found`)
       return null // No need to log this, it's normal when not authenticated
     }
 
     const user = userData.user;
+    console.log(`getCurrentUserProfile: Found authenticated user:`, user.id, user.email)
 
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
@@ -183,6 +185,8 @@ export async function getCurrentUserProfile(): Promise<User | null> {
       console.log(`getCurrentUserProfile: No profile found for user:`, user.id)
       return null
     }
+
+    console.log(`getCurrentUserProfile: Found profile:`, profile.first_name, profile.last_name, `(@${profile.username})`)
 
     const userProfile = {
       id: user.id,
@@ -257,5 +261,20 @@ export async function getCurrentUserToken(): Promise<string | null> {
 }
 
 export async function signOut() {
-  await supabase.auth.signOut();
+  try {
+    // Clear localStorage items
+    localStorage.removeItem(STORAGE_KEYS.SUPABASE_ACCESS_TOKEN)
+    localStorage.removeItem(STORAGE_KEYS.FAKE_USER_SESSION)
+
+    // Sign out from Supabase
+    await supabase.auth.signOut()
+
+    console.log('✅ Successfully signed out and cleared all local storage')
+  } catch (error) {
+    console.error('❌ Error during signOut:', error)
+    // Even if there's an error, clear local storage
+    localStorage.removeItem(STORAGE_KEYS.SUPABASE_ACCESS_TOKEN)
+    localStorage.removeItem(STORAGE_KEYS.FAKE_USER_SESSION)
+    throw error
+  }
 }
