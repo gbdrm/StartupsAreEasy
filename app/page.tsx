@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Header } from "@/components/header"
 import { PostCard } from "@/components/post-card"
 import { CollapsiblePostForm } from "@/components/collapsible-post-form"
@@ -36,15 +36,29 @@ export default function HomePage() {
   const [isCreatingPost, setIsCreatingPost] = useState(false)
   const [showLoginDialog, setShowLoginDialog] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const hasReloadedForUser = useRef(false)
 
   useEffect(() => {
     console.log(`[${new Date().toISOString()}] HomePage: useEffect triggered - authLoading: ${authLoading}, postsLoading: ${postsLoading}, posts.length: ${posts.length}`)
-    // Load posts regardless of auth state for testing
+    // Load posts initially regardless of auth state
     if (!postsLoading && posts.length === 0) {
-      console.log(`[${new Date().toISOString()}] HomePage: Calling loadPosts()`)
+      console.log(`[${new Date().toISOString()}] HomePage: Calling loadPosts() for initial load`)
       loadPosts()
     }
   }, [loadPosts, posts.length, postsLoading])
+
+  // Reload posts when user authentication completes to get proper liked_by_user status
+  useEffect(() => {
+    if (!authLoading && user && posts.length > 0 && !hasReloadedForUser.current) {
+      console.log(`[${new Date().toISOString()}] HomePage: User authenticated, reloading posts to get like status`)
+      hasReloadedForUser.current = true
+      refreshPosts()
+    }
+    // Reset flag when user changes
+    if (!user) {
+      hasReloadedForUser.current = false
+    }
+  }, [authLoading, user, refreshPosts])
 
   useEffect(() => {
     if (posts.length > 0) {

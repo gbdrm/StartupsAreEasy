@@ -8,21 +8,28 @@ export function usePostsWithOptimisticUpdates(userId?: string) {
     const hasLoaded = useRef(false)
 
     const loadPosts = useCallback(async () => {
-        if (loading || hasLoaded.current) {
-            console.log(`[${new Date().toISOString()}] usePostsWithOptimisticUpdates: Skipping load - loading: ${loading}, hasLoaded: ${hasLoaded.current}`)
+        if (loading) {
+            console.log(`[${new Date().toISOString()}] usePostsWithOptimisticUpdates: Skipping load - already loading`)
             return
         }
 
-        console.log(`[${new Date().toISOString()}] usePostsWithOptimisticUpdates: Loading posts...`)
+        console.log(`[${new Date().toISOString()}] usePostsWithOptimisticUpdates: Loading posts for user: ${userId || 'anonymous'}`)
 
         try {
             setLoading(true)
-            hasLoaded.current = true
 
             const postsData = await getPostsDirect(userId)
             setPosts(postsData)
 
-            console.log(`[${new Date().toISOString()}] usePostsWithOptimisticUpdates: Loaded ${postsData.length} posts`)
+            console.log(`[${new Date().toISOString()}] usePostsWithOptimisticUpdates: Loaded ${postsData.length} posts, user: ${userId || 'anonymous'}`)
+
+            // Log like status for debugging
+            const likedPosts = postsData.filter(p => p.liked_by_user)
+            if (likedPosts.length > 0) {
+                console.log(`[${new Date().toISOString()}] usePostsWithOptimisticUpdates: Found ${likedPosts.length} liked posts:`, likedPosts.map(p => p.id))
+            }
+
+            hasLoaded.current = true
         } catch (error) {
             console.error(`[${new Date().toISOString()}] usePostsWithOptimisticUpdates: Error loading posts:`, error)
             hasLoaded.current = false // Allow retry
@@ -31,7 +38,7 @@ export function usePostsWithOptimisticUpdates(userId?: string) {
             console.log(`[${new Date().toISOString()}] usePostsWithOptimisticUpdates: Setting loading to false`)
             setLoading(false)
         }
-    }, [userId]) // Remove 'loading' from dependencies to prevent infinite loop
+    }, [userId]) // Remove loading from dependencies to prevent infinite loop
 
     const refreshPosts = useCallback(() => {
         hasLoaded.current = false
