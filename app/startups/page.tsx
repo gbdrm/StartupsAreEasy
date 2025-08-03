@@ -13,6 +13,7 @@ import { Loader2 } from "lucide-react"
 import { useSimpleAuth } from "@/hooks/use-simple-auth"
 import { getStartupsDirect, createStartupDirect } from "@/lib/api-direct"
 import { getCurrentUserToken } from "@/lib/auth"
+import { logger } from "@/lib/logger"
 import type { Startup } from "@/lib/types"
 
 interface StartupFormData {
@@ -43,7 +44,7 @@ export default function StartupsPage() {
 
   const loadStartups = async () => {
     try {
-      console.log(`[${new Date().toISOString()}] StartupsPage: Starting to load startups...`)
+      logger.debug("StartupsPage: Starting to load startups...")
       setLoading(true)
       setError(null)
       
@@ -55,13 +56,13 @@ export default function StartupsPage() {
       const startupsPromise = getStartupsDirect()
       
       const startupsData = await Promise.race([startupsPromise, timeoutPromise]) as Startup[]
-      console.log(`[${new Date().toISOString()}] StartupsPage: Loaded ${startupsData.length} startups`)
+      logger.debug("StartupsPage: Loaded startups", { count: startupsData.length })
       setStartups(startupsData)
     } catch (err) {
-      console.error("Error loading startups:", err)
+      logger.error("Error loading startups:", err)
       setError(`Failed to load startups: ${err instanceof Error ? err.message : 'Unknown error'}`)
     } finally {
-      console.log(`[${new Date().toISOString()}] StartupsPage: Finished loading startups`)
+      logger.debug("StartupsPage: Finished loading startups")
       setLoading(false)
     }
   }
@@ -82,7 +83,7 @@ export default function StartupsPage() {
       setStartups(prev => [startup, ...prev])
       return true // Return success
     } catch (err) {
-      console.error("Error creating startup:", err)
+      logger.error("Error creating startup:", err)
       
       // The API now handles all error categorization, so just pass through the message
       const errorMessage = err instanceof Error ? err.message : String(err)

@@ -1,6 +1,5 @@
 "use client"
 
-import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Header } from "@/components/header" 
 import { PostPageClient } from "@/components/post-page-client"
@@ -13,7 +12,7 @@ interface PostClientWrapperProps {
 }
 
 export function PostClientWrapper({ post, initialComments }: PostClientWrapperProps) {
-  const { user, login, logout } = useSimpleAuth()
+  const { user } = useSimpleAuth()
   const router = useRouter()
 
   const handleBackClick = () => {

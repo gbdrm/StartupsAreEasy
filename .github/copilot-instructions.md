@@ -9,6 +9,25 @@ This is a Next.js 15 social platform with a unique **direct REST API architectur
 - **Bulk Operations**: Always prefer single API calls over loops (e.g., `getBulkCommentsDirect()`)
 - **JWT Authentication**: All authenticated operations require token from `getCurrentUserToken()`
 
+### Page Architecture Patterns
+The app uses different rendering strategies depending on the page:
+
+**Client-Only Pages** (Most Common):
+- `app/page.tsx` (Homepage) - Full client component with `useEffect` data fetching
+- `app/profile/[username]/page.tsx` - Full client component with auth-dependent data loading
+- Pattern: `"use client"` at top, all data fetching in `useEffect`, auth handled by global state
+
+**Server + Client Hybrid** (Specific Use Cases):
+- `app/posts/[id]/page.tsx` - Server component for initial data + client wrapper for interactions
+- Pattern: Server fetches public data, client handles auth-dependent features
+- Note: Server components cannot access user auth context, so like status requires client-side updates
+
+**Auth Consistency Rules**:
+- All auth state changes trigger `window.location.reload()` for data consistency
+- Never use complex `useEffect` patterns to sync auth state - rely on page reloads
+- Client-only pages are preferred for auth-dependent features
+- Server components are only used for public data that benefits from SSR/SEO
+
 ## Essential Patterns
 
 ### Logging (Use `lib/logger.ts` - NEVER console.log)
@@ -82,10 +101,16 @@ const isDuplicateSlug = response.status === 409 ||
     errorText.includes('violates unique constraint')
 ```
 
-### Authentication
-- Use `useSimpleAuth()` hook (NOT `useAuth()` - that's legacy)
-- Development has fake login: `HAS_FAKE_LOGIN` when `NEXT_PUBLIC_DEV_EMAIL/PASSWORD` set
-- Production uses Telegram authentication via `/supabase/functions/telegram.ts`
+### Authentication Architecture
+- **Global State**: Use `useSimpleAuth()` hook (NOT `useAuth()` - that's legacy) 
+- **Page Reloads**: Auth state changes trigger `window.location.reload()` for consistency
+- **No Complex Syncing**: Avoid `useEffect` patterns to sync auth - let page reloads handle it
+- **Client-Only Auth**: Server components cannot access auth context - use client components for auth-dependent features
+- **Development**: Fake login available when `NEXT_PUBLIC_DEV_EMAIL/PASSWORD` environment variables are set
+- **Production**: Telegram authentication via `/supabase/functions/telegram.ts`
+- **RLS Tokens**: All authenticated operations require `getCurrentUserToken()` for Row Level Security
+- **Timeout Handling**: Auth operations have 10-second timeouts to prevent hanging on stale sessions
+- **Emergency Reset**: Use `emergencyAuthReset()` function when auth state gets stuck after long inactivity
 
 ### React Hooks
 ```typescript
@@ -143,7 +168,9 @@ When migrating components from legacy patterns:
 8. **Production Logging**: NEVER use `console.log()` - always use `logger` from `lib/logger.ts` for production-safe logging
 9. **Error Handling**: Centralize error handling in API functions - don't duplicate error detection patterns across pages
 10. **Availability Checks**: Use dedicated availability check functions instead of catching duplicate errors
-11. **Documentation Over-Engineering**: Avoid creating extensive documentation files for temporary fixes - focus on code quality
+11. **Complex Auth Syncing**: Avoid `useEffect` patterns to sync auth state - rely on `window.location.reload()` for auth consistency
+12. **Server Component Auth**: Server components cannot access user auth context - handle auth-dependent features on client side
+13. **Auth Timeout Issues**: If app gets stuck on "Getting session...", user sessions may be stale after long inactivity - use `emergencyAuthReset()` for stuck states
 
 ## Component Migration Patterns
 

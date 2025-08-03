@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react"
 import { PostCard } from "@/components/post-card"
-import { toggleLike, createComment } from "@/lib/posts"
+import { toggleLikeDirect, createCommentDirect } from "@/lib/api-direct"
+import { getCurrentUserToken } from "@/lib/auth"
 import type { Post, Comment, User } from "@/lib/types"
 
 interface PostPageClientProps {
@@ -29,13 +30,21 @@ export function PostPageClient({ post, user, initialComments }: PostPageClientPr
     }
 
     try {
-      await toggleLike(postId, user.id)
+      // Get current user token for authentication
+      const token = await getCurrentUserToken()
+      if (!token) {
+        console.error("No authentication token available")
+        return
+      }
+
+      // Call the toggleLikeDirect function
+      const result = await toggleLikeDirect(postId, user.id, token)
       
-      // Update the post state
+      // Update the post state with new like status
       setCurrentPost(prev => ({
         ...prev,
-        liked_by_user: !prev.liked_by_user,
-        likes_count: prev.liked_by_user ? prev.likes_count - 1 : prev.likes_count + 1
+        liked_by_user: result.liked,
+        likes_count: result.likesCount
       }))
     } catch (error) {
       console.error("Error toggling like:", error)
@@ -43,38 +52,35 @@ export function PostPageClient({ post, user, initialComments }: PostPageClientPr
   }
 
   const handleComment = async (postId: string, content: string) => {
-    if (!user) return
+    if (!user || !content.trim()) return false
 
     try {
-      const newComment = await createComment({
-        postId,
-        userId: user.id,
-        content
-      })
-
-      // Add the new comment to the list
-      const commentWithUser = {
-        id: newComment.id,
-        post_id: postId,
-        content,
-        created_at: newComment.created_at,
-        user: {
-          id: user.id,
-          name: user.name,
-          username: user.username,
-          avatar: user.avatar
-        }
+      // Get current user token for authentication
+      const token = await getCurrentUserToken()
+      if (!token) {
+        console.error("No authentication token available")
+        return false
       }
 
-      setComments(prev => [...prev, commentWithUser])
+      const newComment = await createCommentDirect({
+        post_id: postId,
+        user_id: user.id,
+        content: content.trim()
+      }, token)
+
+      // Add the new comment to the list
+      setComments(prev => [...prev, newComment])
       
       // Update comment count
       setCurrentPost(prev => ({
         ...prev,
         comments_count: prev.comments_count + 1
       }))
+
+      return true
     } catch (error) {
       console.error("Error creating comment:", error)
+      return false
     }
   }
 

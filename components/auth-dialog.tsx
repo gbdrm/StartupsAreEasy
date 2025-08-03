@@ -22,7 +22,16 @@ interface AuthDialogProps {
 export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
   const { login } = useAuth()
 
+  // Debug logging to see which authentication path is used
+  console.log('🔐 AuthDialog: Environment check', {
+    HAS_FAKE_LOGIN,
+    NODE_ENV: process.env.NODE_ENV,
+    hasDevEmail: !!process.env.NEXT_PUBLIC_DEV_EMAIL,
+    hasDevPassword: !!process.env.NEXT_PUBLIC_DEV_PASSWORD
+  })
+
   const handleTelegramAuth = (telegramUser: TelegramUser) => {
+    console.log('🔐 AuthDialog: handleTelegramAuth called with user:', telegramUser.username, telegramUser.first_name)
     login(telegramUser)
     onOpenChange(false)
   }

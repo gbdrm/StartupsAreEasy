@@ -22,18 +22,16 @@ function getAuthHeaders(token?: string) {
     }
 }
 
-// Posts API
-export async function getPostsDirect(userId?: string): Promise<Post[]> {
+// Internal shared function for getting posts with full details
+async function getPostsWithDetailsInternal(currentUserId?: string, filterByUserId?: string): Promise<Post[]> {
     try {
-        console.log(`[${new Date().toISOString()}] getPostsDirect: Starting for user:`, userId || 'anonymous')
-
         // Use the get_posts_with_details function to get all posts with like counts
         const url = `${supabaseUrl}/rest/v1/rpc/get_posts_with_details`
         const requestBody = {
-            user_id_param: userId || null
+            user_id_param: currentUserId || null
         }
 
-        console.log(`[${new Date().toISOString()}] getPostsDirect: Request body:`, requestBody)
+        logger.debug("getPostsWithDetailsInternal: Request body", { requestBody, filterByUserId })
 
         const response = await fetch(url, {
             method: 'POST',
@@ -46,28 +44,34 @@ export async function getPostsDirect(userId?: string): Promise<Post[]> {
 
         if (!response.ok) {
             const errorText = await response.text()
-            console.error(`[${new Date().toISOString()}] getPostsDirect: Error ${response.status}:`, errorText)
+            logger.error("getPostsWithDetailsInternal: Error", { status: response.status, error: errorText })
             throw new Error(`HTTP ${response.status}: ${errorText}`)
         }
 
-        const posts = await response.json()
-        console.log(`[${new Date().toISOString()}] getPostsDirect: Loaded ${posts.length} posts`)
+        let posts = await response.json()
+
+        // Filter by specific user if requested
+        if (filterByUserId) {
+            posts = posts.filter((post: any) => post.user_id === filterByUserId)
+        }
+
+        logger.debug("getPostsWithDetailsInternal: Loaded posts", { total: posts.length, filterByUserId })
 
         // Get unique startup IDs to fetch startup details
         const startupIds = [...new Set(posts.map((post: any) => post.startup_id).filter(Boolean))]
         let startupsMap = new Map()
 
         if (startupIds.length > 0) {
-            console.log(`[${new Date().toISOString()}] getPostsDirect: Fetching ${startupIds.length} startups`)
-            const startupsUrl = `${supabaseUrl}/rest/v1/startups?id=in.(${startupIds.join(',')})&select=id,name,description,slug,stage`
+            logger.debug("getPostsWithDetailsInternal: Fetching startup details", { count: startupIds.length })
+            const startupsUrl = `${supabaseUrl}/rest/v1/startups?id=in.(${startupIds.join(',')})&select=id,name,description,slug,stage,industry,target_market`
             const startupsResponse = await fetch(startupsUrl, { headers })
 
             if (startupsResponse.ok) {
                 const startups = await startupsResponse.json()
                 startupsMap = new Map(startups.map((s: any) => [s.id, s]))
-                console.log(`[${new Date().toISOString()}] getPostsDirect: Loaded ${startups.length} startup details`)
+                logger.debug("getPostsWithDetailsInternal: Loaded startup details", { count: startups.length })
             } else {
-                console.warn(`[${new Date().toISOString()}] getPostsDirect: Failed to fetch startups:`, startupsResponse.status)
+                logger.warn("getPostsWithDetailsInternal: Failed to fetch startups", { status: startupsResponse.status })
             }
         }
 
@@ -91,7 +95,18 @@ export async function getPostsDirect(userId?: string): Promise<Post[]> {
             startup: post.startup_id ? startupsMap.get(post.startup_id) || null : null,
         })) as Post[]
     } catch (error) {
-        console.error("Error fetching posts:", error)
+        logger.error("Error in getPostsWithDetailsInternal:", error)
+        throw error
+    }
+}
+
+// Posts API
+export async function getPostsDirect(userId?: string): Promise<Post[]> {
+    try {
+        logger.debug("getPostsDirect: Starting", { userId: userId || 'anonymous' })
+        return await getPostsWithDetailsInternal(userId)
+    } catch (error) {
+        logger.error("Error fetching posts:", error)
         throw error
     }
 }
@@ -321,15 +336,13 @@ export async function createPostDirect(data: {
     startup_id?: string
 }, token?: string): Promise<Post> {
     try {
-        console.log(`[${new Date().toISOString()}] createPostDirect: Creating post with data:`, data)
-        console.log(`[${new Date().toISOString()}] createPostDirect: Using token:`, token ? 'YES (length: ' + token.length + ')' : 'NO')
+        logger.debug("createPostDirect: Creating post", { type: data.type, userId: data.user_id, hasToken: !!token })
 
         const url = `${supabaseUrl}/rest/v1/posts`
         const requestHeaders = {
             ...getAuthHeaders(token),
             'Prefer': 'return=representation'  // Tell Supabase to return the created data
         }
-        console.log(`[${new Date().toISOString()}] createPostDirect: Request headers:`, requestHeaders)
 
         const response = await fetch(url, {
             method: 'POST',
@@ -337,22 +350,21 @@ export async function createPostDirect(data: {
             body: JSON.stringify(data)
         })
 
-        console.log(`[${new Date().toISOString()}] createPostDirect: Response status:`, response.status)
+        logger.debug("createPostDirect: Response received", { status: response.status })
         console.log(`[${new Date().toISOString()}] createPostDirect: Response headers:`, Object.fromEntries(response.headers.entries()))
 
         if (!response.ok) {
             const errorText = await response.text()
-            console.error(`[${new Date().toISOString()}] createPostDirect: Error response:`, errorText)
+            logger.error("createPostDirect: Error response", { status: response.status, error: errorText })
             throw new Error(`HTTP ${response.status}: ${errorText}`)
         }
 
         // Check if response has content before parsing JSON
         const responseText = await response.text()
-        console.log(`[${new Date().toISOString()}] createPostDirect: Raw response:`, responseText)
-        console.log(`[${new Date().toISOString()}] createPostDirect: Response length:`, responseText.length)
+        logger.debug("createPostDirect: Raw response", { length: responseText.length })
 
         if (!responseText || responseText.trim() === '') {
-            console.log(`[${new Date().toISOString()}] createPostDirect: Empty response but 201 status - post was created successfully`)
+            logger.debug("createPostDirect: Empty response but success status - post created")
             // Post was created successfully but no data returned
             // Return a minimal post object with the data we sent
             return {
@@ -378,12 +390,11 @@ export async function createPostDirect(data: {
         try {
             result = JSON.parse(responseText)
         } catch (parseError) {
-            console.error(`[${new Date().toISOString()}] createPostDirect: JSON parse error:`, parseError)
-            console.error(`[${new Date().toISOString()}] createPostDirect: Response was:`, responseText)
+            logger.error("createPostDirect: JSON parse error", { error: parseError, response: responseText.substring(0, 200) })
             throw new Error(`Invalid JSON response: ${responseText}`)
         }
 
-        console.log(`[${new Date().toISOString()}] createPostDirect: Post created successfully`, result)
+        logger.info("createPostDirect: Post created successfully", { id: result[0]?.id || result.id })
 
         // Return simplified post structure
         const post = result[0] || result
@@ -405,7 +416,7 @@ export async function createPostDirect(data: {
             liked_by_user: false,
         } as Post
     } catch (error) {
-        console.error("Error creating post:", error)
+        logger.error("Error creating post:", error)
         throw error
     }
 }
@@ -616,44 +627,21 @@ export async function getPostsByTypeDirect(type: string): Promise<Post[]> {
     }
 }
 
-// Get single post by ID
-export async function getPostByIdDirect(id: string): Promise<Post | null> {
+// Get single post by ID with full details (same as other post functions)
+export async function getPostByIdDirect(id: string, currentUserId?: string): Promise<Post | null> {
     try {
-        console.log(`[${new Date().toISOString()}] getPostByIdDirect: Starting for ID ${id}...`)
+        logger.debug("getPostByIdDirect: Starting", { id, currentUserId })
 
-        const url = `${supabaseUrl}/rest/v1/posts?id=eq.${id}&select=id,user_id,type,content,link,image,created_at,startup_id`
+        // Use the same internal function to get consistent data
+        const allPosts = await getPostsWithDetailsInternal(currentUserId)
 
-        const response = await fetch(url, { headers })
+        // Find the specific post by ID
+        const post = allPosts.find(p => p.id === id)
 
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${await response.text()}`)
-        }
-
-        const posts = await response.json()
-        console.log(`[${new Date().toISOString()}] getPostByIdDirect: Found ${posts.length} posts`)
-
-        if (posts.length === 0) return null
-
-        const post = posts[0]
-        return {
-            id: post.id,
-            user: {
-                id: post.user_id,
-                name: "User",
-                username: "user",
-                avatar: "",
-            },
-            type: post.type,
-            content: post.content,
-            link: post.link,
-            image: post.image,
-            created_at: post.created_at,
-            likes_count: 0,
-            comments_count: 0,
-            liked_by_user: false,
-        } as Post
+        logger.debug("getPostByIdDirect: Found post", { found: !!post })
+        return post || null
     } catch (error) {
-        console.error("Error fetching post by ID:", error)
+        logger.error("Error fetching post by ID:", error)
         throw error
     }
 }
@@ -802,58 +790,10 @@ export async function getUserProfileDirect(username: string): Promise<User | nul
 }
 
 // Get posts by user ID
-export async function getPostsByUserDirect(userId: string): Promise<Post[]> {
+export async function getPostsByUserDirect(userId: string, currentUserId?: string): Promise<Post[]> {
     try {
-        logger.api("getPostsByUserDirect: Starting", "GET", { userId })
-
-        // Join with profiles to get user information
-        const url = `${supabaseUrl}/rest/v1/posts?user_id=eq.${userId}&order=created_at.desc&select=id,user_id,type,content,link,image,created_at,startup_id,profiles!user_id(id,first_name,last_name,username,avatar_url)`
-
-        const response = await fetch(url, { headers })
-
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${await response.text()}`)
-        }
-
-        const posts = await response.json()
-        logger.debug("Loaded user posts", { count: posts.length })
-
-        // Get unique startup IDs to fetch startup details (same as in getPostsDirect)
-        const startupIds = [...new Set(posts.map((post: any) => post.startup_id).filter(Boolean))]
-        let startupsMap = new Map()
-
-        if (startupIds.length > 0) {
-            logger.debug("Fetching startup details for user posts", { count: startupIds.length })
-            const startupsUrl = `${supabaseUrl}/rest/v1/startups?id=in.(${startupIds.join(',')})&select=id,name,description,slug,stage,industry,target_market`
-            const startupsResponse = await fetch(startupsUrl, { headers })
-
-            if (startupsResponse.ok) {
-                const startups = await startupsResponse.json()
-                startupsMap = new Map(startups.map((s: any) => [s.id, s]))
-                logger.debug("Loaded startup details for user posts", { count: startups.length })
-            } else {
-                logger.warn("Failed to fetch startups for user posts", { status: startupsResponse.status })
-            }
-        }
-
-        return posts.map((post: any) => ({
-            id: post.id,
-            user: {
-                id: post.user_id,
-                name: post.profiles ? `${post.profiles.first_name || ''} ${post.profiles.last_name || ''}`.trim() || 'User' : 'User',
-                username: post.profiles?.username || 'user',
-                avatar: post.profiles?.avatar_url || '',
-            },
-            type: post.type,
-            content: post.content,
-            link: post.link,
-            image: post.image,
-            created_at: post.created_at,
-            likes_count: 0,
-            comments_count: 0,
-            liked_by_user: false,
-            startup: post.startup_id ? startupsMap.get(post.startup_id) || null : null,
-        })) as Post[]
+        logger.api("getPostsByUserDirect: Starting", "GET", { userId, currentUserId })
+        return await getPostsWithDetailsInternal(currentUserId, userId)
     } catch (error) {
         logger.error("Error fetching posts by user:", error)
         throw error

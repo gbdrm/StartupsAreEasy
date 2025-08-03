@@ -1,6 +1,10 @@
 // Environment and feature flags
 export const IS_DEVELOPMENT = process.env.NODE_ENV === 'development'
-export const HAS_FAKE_LOGIN = IS_DEVELOPMENT && !!(process.env.NEXT_PUBLIC_DEV_EMAIL && process.env.NEXT_PUBLIC_DEV_PASSWORD)
+
+// Extra safety: fake login only allowed in development AND localhost
+export const HAS_FAKE_LOGIN = IS_DEVELOPMENT &&
+    !!(process.env.NEXT_PUBLIC_DEV_EMAIL && process.env.NEXT_PUBLIC_DEV_PASSWORD) &&
+    (typeof window === 'undefined' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
 
 // UI Constants
 export const AVATAR_SIZES = {

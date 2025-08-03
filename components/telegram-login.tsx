@@ -1,6 +1,7 @@
 "use client"
 
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
+import { Loader2 } from "lucide-react"
 
 declare global {
   interface Window {
@@ -26,6 +27,8 @@ interface TelegramLoginProps {
 }
 
 export function TelegramLogin({ botName, onAuth }: TelegramLoginProps) {
+  const [isLoading, setIsLoading] = useState(true)
+
   useEffect(() => {
     // Create the callback function
     window.TelegramLoginWidget = {
@@ -43,6 +46,15 @@ export function TelegramLogin({ botName, onAuth }: TelegramLoginProps) {
     script.setAttribute("data-request-access", "write")
     script.async = true
 
+    // Hide loading when script loads
+    script.onload = () => {
+      setTimeout(() => setIsLoading(false), 500) // Small delay to ensure widget renders
+    }
+
+    script.onerror = () => {
+      setIsLoading(false) // Hide loading even on error
+    }
+
     const container = document.getElementById("telegram-login-container")
     if (container) {
       container.appendChild(script)
@@ -57,5 +69,20 @@ export function TelegramLogin({ botName, onAuth }: TelegramLoginProps) {
     }
   }, [botName, onAuth])
 
-  return <div id="telegram-login-container" />
+  return (
+    <div className="relative">
+      {isLoading && (
+        <div className="flex items-center justify-center py-8">
+          <div className="flex flex-col items-center gap-2">
+            <Loader2 className="h-6 w-6 animate-spin text-blue-500" />
+            <p className="text-sm text-muted-foreground">Loading Telegram login...</p>
+          </div>
+        </div>
+      )}
+      <div 
+        id="telegram-login-container" 
+        className={isLoading ? "opacity-0" : "opacity-100 transition-opacity duration-300"}
+      />
+    </div>
+  )
 }

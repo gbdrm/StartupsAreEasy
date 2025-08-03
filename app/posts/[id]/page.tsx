@@ -1,21 +1,23 @@
 import { notFound } from "next/navigation"
 import { PostClientWrapper } from "@/components/post-client-wrapper"
-import { getPostByIdDirect } from "@/lib/api-direct"
-import { getCommentsDirect } from "@/lib/api-direct"
+import { getPostByIdDirect, getCommentsDirect } from "@/lib/api-direct"
 
 interface PostPageProps {
   params: Promise<{
     id: string
   }>
+  searchParams?: Promise<{ userId?: string }>
 }
 
-export default async function PostPage({ params }: PostPageProps) {
+export default async function PostPage({ params, searchParams }: PostPageProps) {
   // Await params for Next.js 15 compatibility
   const { id } = await params
+  const search = await searchParams || {}
 
   try {
-    // Get the post
-    const post = await getPostByIdDirect(id)
+    // Get the post with current user context for like status
+    // Note: In SSR we don't have the current user, so client will need to refetch
+    const post = await getPostByIdDirect(id, search.userId)
     
     if (!post) {
       notFound()

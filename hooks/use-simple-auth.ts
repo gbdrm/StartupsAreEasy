@@ -75,11 +75,28 @@ export function useSimpleAuth() {
         isAuthInitialized = true
         hasInitialized.current = true
 
-        // Get initial session
+        // Get initial session with timeout
         const initAuth = async () => {
             try {
                 console.log(`[${new Date().toISOString()}] useSimpleAuth: Getting initial session...`)
-                const { data: { session } } = await supabase.auth.getSession()
+
+                // Add timeout to prevent hanging on initial session check
+                const sessionPromise = supabase.auth.getSession()
+                const timeoutPromise = new Promise<never>((_, reject) => {
+                    setTimeout(() => reject(new Error('Initial session timeout')), 8000) // 8 second timeout
+                })
+
+                let sessionResult
+                try {
+                    sessionResult = await Promise.race([sessionPromise, timeoutPromise])
+                } catch (timeoutError) {
+                    console.error(`[${new Date().toISOString()}] useSimpleAuth: Initial session timed out, clearing auth`)
+                    setGlobalUser(null)
+                    setGlobalLoading(false)
+                    return
+                }
+
+                const { data: { session } } = sessionResult
 
                 if (session?.user) {
                     console.log(`[${new Date().toISOString()}] useSimpleAuth: Found existing session for user:`, session.user.id)

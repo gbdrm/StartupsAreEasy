@@ -12,7 +12,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Separator } from "@/components/ui/separator"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Loader2, ArrowLeft, Calendar, MapPin, Link as LinkIcon } from "lucide-react"
-import { getUserProfileDirect, getPostsByUserDirect, getStartupsByUserDirect, getCommentsDirect, createCommentDirect } from "@/lib/api-direct"
+import { getUserProfileDirect, getPostsByUserDirect, getStartupsByUserDirect, getBulkCommentsDirect, createCommentDirect, toggleLikeDirect } from "@/lib/api-direct"
+import { getCurrentUserToken } from "@/lib/auth"
 import { useSimpleAuth } from "@/hooks/use-simple-auth"
 import type { User, Post, Comment as PostComment, Startup } from "@/lib/types"
 
@@ -34,7 +35,7 @@ export default function ProfilePage() {
     if (username) {
       loadProfile()
     }
-  }, [username])
+  }, [username, currentUser?.id]) // Reload when user changes to get correct like status
 
   const loadProfile = async () => {
     try {
@@ -51,26 +52,26 @@ export default function ProfilePage() {
 
       setProfileUser(profile)
 
-      // Load posts by user
-      const userPosts = await getPostsByUserDirect(profile.id)
+      // Load posts by user with current user context for like status
+      const userPosts = await getPostsByUserDirect(profile.id, currentUser?.id)
       setPosts(userPosts)
 
       // Load startups by user  
       const userStartups = await getStartupsByUserDirect(profile.id)
       setStartups(userStartups.filter(startup => startup.stage === "launched" || startup.stage === "scaling"))
 
-      // Load comments for all posts
+      // Load comments for all posts using bulk API (same as homepage)
       if (userPosts.length > 0) {
-        const allComments: PostComment[] = []
-        for (const post of userPosts) {
-          try {
-            const postComments = await getCommentsDirect(post.id)
-            allComments.push(...postComments)
-          } catch (err) {
-            console.error(`Error loading comments for post ${post.id}:`, err)
-          }
+        try {
+          const postIds = userPosts.map(post => post.id)
+          const allComments = await getBulkCommentsDirect(postIds)
+          setComments(allComments)
+        } catch (err) {
+          console.error("Error loading comments for user posts:", err)
+          setComments([])
         }
-        setComments(allComments)
+      } else {
+        setComments([])
       }
 
     } catch (error: any) {
@@ -85,23 +86,49 @@ export default function ProfilePage() {
     if (!currentUser) return
 
     try {
-      // For now, just toggle the like status locally
-      // You can implement toggleLikeDirect in api-direct.ts later
-      console.log("Like functionality not yet implemented with direct API")
+      // Get current user token for authentication
+      const token = await getCurrentUserToken()
+      if (!token) {
+        console.error("No authentication token available")
+        return
+      }
+
+      // Call the toggleLikeDirect function
+      const result = await toggleLikeDirect(postId, currentUser.id, token)
+      
+      // Update the post in local state with new like status
+      setPosts(prevPosts => 
+        prevPosts.map(post => 
+          post.id === postId 
+            ? { 
+                ...post, 
+                liked_by_user: result.liked, 
+                likes_count: result.likesCount 
+              }
+            : post
+        )
+      )
     } catch (error) {
       console.error("Error toggling like:", error)
     }
   }
 
   const handleAddComment = async (postId: string, content: string) => {
-    if (!currentUser || !content.trim()) return
+    if (!currentUser || !content.trim()) return false
 
     try {
+      // Get current user token for authentication (required for RLS)
+      const token = await getCurrentUserToken()
+      if (!token) {
+        console.error("No authentication token available")
+        return false
+      }
+
       const newComment = await createCommentDirect({
         post_id: postId,
         user_id: currentUser.id,
         content: content.trim()
-      })
+      }, token)
 
       setComments(prev => [...prev, newComment])
       return true
