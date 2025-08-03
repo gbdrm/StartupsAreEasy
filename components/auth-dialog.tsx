@@ -10,6 +10,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { TelegramLogin } from "./telegram-login"
+import { useAuth } from "@/components/auth-context"
 import type { TelegramUser } from "@/lib/auth"
 
 const isFakeLogin = typeof process !== 'undefined' && !!process.env.NEXT_PUBLIC_DEFAULT_USER_ID;
@@ -17,12 +18,13 @@ const isFakeLogin = typeof process !== 'undefined' && !!process.env.NEXT_PUBLIC_
 interface AuthDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onLogin: (telegramUser: TelegramUser) => void
 }
 
-export function AuthDialog({ open, onOpenChange, onLogin }: AuthDialogProps) {
+export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
+  const { login } = useAuth()
+
   const handleTelegramAuth = (telegramUser: TelegramUser) => {
-    onLogin(telegramUser)
+    login(telegramUser)
     onOpenChange(false)
   }
 

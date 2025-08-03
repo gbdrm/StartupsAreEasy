@@ -13,17 +13,18 @@ import { Heart, MessageCircle, ExternalLink } from "lucide-react"
 import { POST_TYPES, type Post, type Comment, type User } from "@/lib/types"
 import { formatDistanceToNow } from "date-fns"
 import { UserLink } from "./user-link"
+import { useAuth } from "@/components/auth-context"
 
 interface PostCardProps {
   post: Post
-  user: User | null
   comments: Comment[]
   onLike: (postId: string) => void
   onComment: (postId: string, content: string) => void
   clickable?: boolean // New prop to make post clickable
 }
 
-export function PostCard({ post, user, comments, onLike, onComment, clickable = true }: PostCardProps) {
+export function PostCard({ post, comments, onLike, onComment, clickable = true }: PostCardProps) {
+  const { user } = useAuth()
   const [commentContent, setCommentContent] = useState("")
   const [isCommenting, setIsCommenting] = useState(false)
   const [showComments, setShowComments] = useState(false)

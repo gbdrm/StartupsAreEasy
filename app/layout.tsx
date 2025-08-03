@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { GeistSans } from 'geist/font/sans'
 import { GeistMono } from 'geist/font/mono'
 import './globals.css'
+import { AuthProvider } from "@/components/auth-context"
 
 export const metadata: Metadata = {
   title: 'Startups Are Easy',
@@ -26,7 +27,9 @@ html {
         `}</style>
       </head>
       <body>
-        {children}
+        <AuthProvider>
+          {children}
+        </AuthProvider>
       </body>
     </html>
   )

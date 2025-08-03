@@ -18,7 +18,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { LogOut, User as UserIcon } from "lucide-react"
-import type { User } from "@/lib/types"
+import { useAuth } from "@/components/auth-context"
 import { TelegramLogin } from "./telegram-login"
 import { useState } from "react"
 import Link from "next/link"
@@ -34,17 +34,12 @@ interface TelegramUser {
   hash: string
 }
 
-interface AuthButtonProps {
-  user: User | null
-  onLogin: (telegramUser: TelegramUser) => void
-  onLogout: () => void
-}
-
-export function AuthButton({ user, onLogin, onLogout }: AuthButtonProps) {
+export function AuthButton() {
+  const { user, login, logout } = useAuth()
   const [showLoginDialog, setShowLoginDialog] = useState(false)
 
   const handleTelegramAuth = (telegramUser: TelegramUser) => {
-    onLogin(telegramUser)
+    login(telegramUser)
     setShowLoginDialog(false)
   }
 
@@ -117,7 +112,7 @@ export function AuthButton({ user, onLogin, onLogout }: AuthButtonProps) {
             <span>View Profile</span>
           </Link>
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={onLogout}>
+        <DropdownMenuItem onClick={logout}>
           <LogOut className="mr-2 h-4 w-4" />
           <span>Log out</span>
         </DropdownMenuItem>

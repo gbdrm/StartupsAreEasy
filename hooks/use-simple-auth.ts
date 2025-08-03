@@ -167,6 +167,10 @@ export function useSimpleAuth() {
         try {
             await signOut()
             resetAuth()
+            // Force reload to ensure all state is cleared and UI updates
+            if (typeof window !== 'undefined') {
+                window.location.reload()
+            }
         } catch (error) {
             console.error('Logout failed:', error)
             throw error

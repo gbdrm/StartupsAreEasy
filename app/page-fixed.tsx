@@ -15,7 +15,7 @@ import { createPostFromFormDirect } from "@/lib/api-direct"
 import type { PostFormData, Comment as PostComment } from "@/lib/types"
 
 export default function HomePage() {
-  const { user, loading: authLoading } = useAuth()
+  const { user, loading: authLoading, login } = useAuth()
   const {
     posts,
     loading: postsLoading,
@@ -99,6 +99,7 @@ export default function HomePage() {
             </Alert>
           )}
           <CollapsiblePostForm
+            user={user}
             onSubmit={handleCreatePost}
             userStartups={[]}
             isSubmitting={isCreatingPost}
@@ -107,6 +108,7 @@ export default function HomePage() {
           <AuthDialog
             open={showLoginDialog}
             onOpenChange={setShowLoginDialog}
+            onLogin={login}
           />
           <Separator />
           <div className="space-y-6">
@@ -114,6 +116,7 @@ export default function HomePage() {
               <PostCard
                 key={post.id}
                 post={post}
+                user={user}
                 comments={comments.filter((comment: PostComment) => comment.post_id === post.id)}
                 onLike={handleLikeWrapper}
                 onComment={handleComment}

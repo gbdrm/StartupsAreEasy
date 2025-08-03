@@ -7,8 +7,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { Button } from "@/components/ui/button"
 import { HelpCircle, Menu } from "lucide-react"
-import type { User } from "@/lib/types"
-import type { TelegramUser } from "@/lib/auth"
+import { useAuth } from "@/components/auth-context"
 
 // Simple VisuallyHidden component for accessibility
 const VisuallyHidden = ({ children }: { children: React.ReactNode }) => (
@@ -17,13 +16,8 @@ const VisuallyHidden = ({ children }: { children: React.ReactNode }) => (
   </span>
 )
 
-interface HeaderProps {
-  user: User | null
-  onLogin: (telegramUser: TelegramUser) => void
-  onLogout: () => void
-}
-
-export function Header({ user, onLogin, onLogout }: HeaderProps) {
+export function Header() {
+  const { user, login, logout } = useAuth()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   const navigationItems = [
@@ -74,7 +68,7 @@ export function Header({ user, onLogin, onLogout }: HeaderProps) {
               </TooltipContent>
             </Tooltip>
             
-            <AuthButton user={user} onLogin={onLogin} onLogout={onLogout} />
+            <AuthButton user={user} onLogin={login} onLogout={logout} />
           </div>
 
           {/* Mobile: Hamburger menu in top right */}
@@ -118,7 +112,7 @@ export function Header({ user, onLogin, onLogout }: HeaderProps) {
 
                   {/* Auth section in mobile menu */}
                   <div className="pt-4 border-t border-gray-200">
-                    <AuthButton user={user} onLogin={onLogin} onLogout={onLogout} />
+                    <AuthButton user={user} onLogin={login} onLogout={logout} />
                   </div>
                 </div>
               </SheetContent>
