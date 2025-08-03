@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import { Header } from "@/components/header"
 import { StartupDetail } from "@/components/startup-detail"
 import { PostCard } from "@/components/post-card"
-import { useAuth } from "@/hooks/use-auth"
+import { useSimpleAuth } from "@/hooks/use-simple-auth"
 import { useComments } from "@/hooks/use-comments"
 import { Separator } from "@/components/ui/separator"
 import type { Startup, Post } from "@/lib/types"
@@ -16,10 +16,51 @@ interface StartupClientWrapperProps {
 }
 
 export function StartupClientWrapper({ startup, relatedPosts }: StartupClientWrapperProps) {
-  const { user, login, logout } = useAuth()
+  const { user, login, logout } = useSimpleAuth()
   const router = useRouter()
   const [posts, setPosts] = useState(relatedPosts)
-  const { comments, loadComments, handleComment, handleLike } = useComments(user, setPosts)
+  
+  // Create refresh function for useComments
+  const refreshPosts = () => {
+    // In this component, we don't need to refresh from server
+    // as posts are static props, but we need to provide the callback
+  }
+
+  // Optimistic update functions
+  const updatePostLikeOptimistically = (postId: string, liked: boolean, likesCount: number) => {
+    setPosts(prevPosts => 
+      prevPosts.map(post => 
+        post.id === postId 
+          ? { ...post, liked_by_user: liked, likes_count: likesCount }
+          : post
+      )
+    )
+  }
+
+  const updatePostCommentsOptimistically = (postId: string, commentsCount: number) => {
+    setPosts(prevPosts => 
+      prevPosts.map(post => 
+        post.id === postId 
+          ? { ...post, comments_count: commentsCount }
+          : post
+      )
+    )
+  }
+
+  const { comments, loadComments, handleComment, handleLike } = useComments(
+    user, 
+    refreshPosts,
+    updatePostLikeOptimistically,
+    updatePostCommentsOptimistically
+  )
+
+  // Create wrapper function for onLike to match PostCard's expected signature
+  const handlePostLike = (postId: string) => {
+    const post = posts.find(p => p.id === postId)
+    if (post) {
+      handleLike(postId, post.liked_by_user || false, post.likes_count)
+    }
+  }
 
   // Load comments for related posts
   useEffect(() => {
@@ -40,7 +81,7 @@ export function StartupClientWrapper({ startup, relatedPosts }: StartupClientWra
 
   return (
     <div className="min-h-screen bg-background">
-      <Header user={user} onLogin={login} onLogout={logout} />
+      <Header />
 
       <main className="container mx-auto px-4 py-8 max-w-4xl">
         <div className="mb-6">
@@ -68,9 +109,8 @@ export function StartupClientWrapper({ startup, relatedPosts }: StartupClientWra
                 <PostCard
                   key={post.id}
                   post={post}
-                  user={user}
                   comments={comments.filter((comment) => comment.post_id === post.id)}
-                  onLike={handleLike}
+                  onLike={handlePostLike}
                   onComment={handleComment}
                   clickable={true}
                 />

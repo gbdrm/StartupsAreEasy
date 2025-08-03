@@ -8,6 +8,7 @@ import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from "@/co
 import { Button } from "@/components/ui/button"
 import { HelpCircle, Menu } from "lucide-react"
 import { useAuth } from "@/components/auth-context"
+import { logger } from "@/lib/logger"
 
 // Simple VisuallyHidden component for accessibility
 const VisuallyHidden = ({ children }: { children: React.ReactNode }) => (
@@ -19,6 +20,9 @@ const VisuallyHidden = ({ children }: { children: React.ReactNode }) => (
 export function Header() {
   const { user, login, logout } = useAuth()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+
+  // Debug logging - only shows in development
+  logger.debug("Header: user state", user)
 
   const navigationItems = [
     { href: "/", emoji: "🏠", label: "Home" },
@@ -68,7 +72,7 @@ export function Header() {
               </TooltipContent>
             </Tooltip>
             
-            <AuthButton user={user} onLogin={login} onLogout={logout} />
+            <AuthButton />
           </div>
 
           {/* Mobile: Hamburger menu in top right */}
@@ -112,7 +116,7 @@ export function Header() {
 
                   {/* Auth section in mobile menu */}
                   <div className="pt-4 border-t border-gray-200">
-                    <AuthButton user={user} onLogin={login} onLogout={logout} />
+                    <AuthButton />
                   </div>
                 </div>
               </SheetContent>

@@ -81,7 +81,6 @@ export function PostPageClient({ post, user, initialComments }: PostPageClientPr
   return (
     <PostCard
       post={currentPost}
-      user={user}
       comments={comments}
       onLike={handleLike}
       onComment={handleComment}

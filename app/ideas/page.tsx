@@ -16,7 +16,7 @@ import { useComments } from "@/hooks/use-comments"
 export default function IdeasPage() {
   const { user: currentUser, login: handleLogin, logout: handleLogout, loading: authLoading } = useSimpleAuth()
   const [posts, setPosts] = useState<Post[]>([])
-  const { comments, loadComments, handleComment, handleLike } = useComments(currentUser, setPosts)
+  const { comments, loadComments, handleComment, handleLike } = useComments(currentUser, () => setPosts([...posts]))
   const [userStartups, setUserStartups] = useState<Startup[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -179,7 +179,7 @@ export default function IdeasPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Header user={currentUser} onLogin={handleLogin} onLogout={handleLogout} />
+      <Header />
 
       <main className="container max-w-2xl mx-auto py-8 px-4">
         <div className="space-y-6">
@@ -199,7 +199,6 @@ export default function IdeasPage() {
 
           {/* Collapsible Post Form - Always visible */}
           <CollapsiblePostForm
-            user={currentUser}
             onSubmit={handleCreatePost}
             userStartups={userStartups}
             isSubmitting={isCreatingPost}
@@ -210,7 +209,6 @@ export default function IdeasPage() {
           <AuthDialog
             open={showLoginDialog}
             onOpenChange={setShowLoginDialog}
-            onLogin={handleLogin}
           />
 
           <Separator />
@@ -220,9 +218,8 @@ export default function IdeasPage() {
               <PostCard
                 key={post.id}
                 post={post}
-                user={currentUser}
                 comments={comments.filter((comment) => comment.post_id === post.id)}
-                onLike={handleLike}
+                onLike={(postId) => handleLike(postId, post.liked_by_user || false, post.likes_count || 0)}
                 onComment={handleComment}
               />
             ))}

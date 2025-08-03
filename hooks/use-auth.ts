@@ -15,7 +15,7 @@ export function useAuth() {
         // Listen for auth changes (this will also fire initially with current session)
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
             async (event, session) => {
-                logger.log(`[${new Date().toISOString()}] useAuth: Auth state changed - event:`, event, 'session:', session ? 'exists' : 'null')
+                logger.log(`useAuth: Auth state changed - event: ${event}`, { session: session ? 'exists' : 'null' })
 
                 if (session?.user) {
                     try {

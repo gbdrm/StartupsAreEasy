@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Loader2, Database, Users, FileText, Heart, MessageCircle, Building, CheckCircle, XCircle, AlertTriangle } from "lucide-react"
-import { useAuth } from "@/hooks/use-auth"
+import { useSimpleAuth } from "@/hooks/use-simple-auth"
 import { supabase } from "@/lib/supabase"
 
 interface DiagnosticResult {
@@ -19,7 +19,7 @@ interface DiagnosticResult {
 }
 
 export default function DiagnosticsPage() {
-  const { user: currentUser, login: handleLogin, logout: handleLogout } = useAuth()
+  const { user: currentUser, login: handleLogin, logout: handleLogout } = useSimpleAuth()
   const [diagnostics, setDiagnostics] = useState<DiagnosticResult[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -376,7 +376,7 @@ export default function DiagnosticsPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Header user={currentUser} onLogin={handleLogin} onLogout={handleLogout} />
+      <Header />
 
       <main className="container max-w-4xl mx-auto py-8 px-4">
         <div className="space-y-6">

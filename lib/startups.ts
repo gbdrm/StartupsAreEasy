@@ -1,19 +1,20 @@
 import { supabase } from "./supabase"
+import { logger } from "./logger"
 import type { Startup, StartupStage, User } from "./types"
 
 export async function getStartups(userId?: string): Promise<Startup[]> {
-    console.log(`[${new Date().toISOString()}] getStartups: Starting database query...`)
+    logger.info("getStartups: Starting database query...")
 
     try {
         // Use direct REST API approach to bypass auth client conflicts
-        console.log(`[${new Date().toISOString()}] getStartups: Using direct REST API approach...`)
+        logger.info("getStartups: Using direct REST API approach...")
 
         const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
         const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
         const url = `${supabaseUrl}/rest/v1/startups?is_public=eq.true&order=created_at.desc&select=id,name,slug,description,website_url,logo_url,industry,stage,founded_date,location,team_size,funding_raised,target_market,estimated_timeline,looking_for,launch_date,is_public,created_at,updated_at,user_id`
 
-        console.log(`[${new Date().toISOString()}] getStartups: Making direct HTTP request...`)
+        logger.api(url, 'GET')
 
         const response = await fetch(url, {
             headers: {
@@ -24,29 +25,20 @@ export async function getStartups(userId?: string): Promise<Startup[]> {
             }
         })
 
-        console.log(`[${new Date().toISOString()}] getStartups: HTTP response status:`, response.status)
+        logger.debug("getStartups: HTTP response status:", response.status)
 
         if (!response.ok) {
             const errorText = await response.text()
-            console.error(`[${new Date().toISOString()}] getStartups: HTTP error:`, errorText)
+            logger.error("getStartups: HTTP error:", errorText)
             throw new Error(`HTTP ${response.status}: ${errorText}`)
         }
 
         const data = await response.json()
-        console.log(`[${new Date().toISOString()}] getStartups: Successfully loaded ${data.length} startups`)
-
-        return data || []
-
-        console.log(`[${new Date().toISOString()}] getStartups: Database query completed`, { data: data?.length, error })
-
-        if (error) {
-            console.error("Error fetching startups:", error)
-            throw error
-        }
+        logger.info(`getStartups: Successfully loaded ${data.length} startups`)
 
         return data || []
     } catch (err) {
-        console.error(`[${new Date().toISOString()}] getStartups: Exception caught:`, err)
+        logger.error("getStartups: Exception caught:", err)
         throw err
     }
 }
@@ -60,7 +52,7 @@ export async function getStartupsByStage(stage: StartupStage): Promise<Startup[]
         .order("created_at", { ascending: false })
 
     if (error) {
-        console.error("Error fetching startups by stage:", error)
+        logger.error("Error fetching startups by stage:", error)
         throw error
     }
 
@@ -75,7 +67,7 @@ export async function getUserStartups(userId: string): Promise<Startup[]> {
         .order("created_at", { ascending: false })
 
     if (error) {
-        console.error("Error fetching user startups:", error)
+        logger.error("Error fetching user startups:", error)
         throw error
     }
 
@@ -113,7 +105,7 @@ export async function createStartup(startup: {
     // Generate initial slug from name
     let slug = baseSlug
 
-    console.log(`Generated initial slug: "${slug}"`)
+    logger.debug(`Generated initial slug: "${slug}"`)
 
     // Simple approach: just try to insert, and if it fails due to duplicate slug, add timestamp
     // This is simpler and less likely to hang than checking availability first
@@ -141,7 +133,7 @@ export async function createStartup(startup: {
         insertData.user_id = startup.userId
     }
 
-    console.log(`Attempting to create startup with slug: "${slug}"`)
+    logger.debug(`Attempting to create startup with slug: "${slug}"`)
 
     const { data, error } = await supabase
         .from("startups")
@@ -150,15 +142,15 @@ export async function createStartup(startup: {
         .single()
 
     if (error) {
-        console.error("Error creating startup:", error)
+        logger.error("Error creating startup:", error)
 
         // If we get a duplicate slug error, try with timestamp suffix
         if (error.code === '23505' && error.message?.includes('startups_slug_key')) {
-            console.warn("Duplicate slug detected, retrying with timestamp suffix...")
+            logger.warn("Duplicate slug detected, retrying with timestamp suffix...")
 
             // Generate a unique slug with timestamp and random suffix
             const uniqueSlug = `${baseSlug}-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`
-            console.log(`Retrying with unique slug: "${uniqueSlug}"`)
+            logger.debug(`Retrying with unique slug: "${uniqueSlug}"`)
 
             const retryData = { ...insertData, slug: uniqueSlug }
 
@@ -170,14 +162,14 @@ export async function createStartup(startup: {
                     .single()
 
                 if (retryError) {
-                    console.error("Error creating startup on retry:", retryError)
+                    logger.error("Error creating startup on retry:", retryError)
                     throw retryError
                 }
 
-                console.log("Startup created successfully on retry")
+                logger.info("Startup created successfully on retry")
                 return retryResult
             } catch (retryErr) {
-                console.error("Retry also failed:", retryErr)
+                logger.error("Retry also failed:", retryErr)
                 throw retryErr
             }
         }
@@ -186,7 +178,7 @@ export async function createStartup(startup: {
         throw error
     }
 
-    console.log("Startup created successfully")
+    logger.info("Startup created successfully")
     return data
 }
 
@@ -202,7 +194,7 @@ export async function updateStartup(
         .single()
 
     if (error) {
-        console.error("Error updating startup:", error)
+        logger.error("Error updating startup:", error)
         throw error
     }
 
@@ -216,7 +208,7 @@ export async function deleteStartup(startupId: string): Promise<void> {
         .eq("id", startupId)
 
     if (error) {
-        console.error("Error deleting startup:", error)
+        logger.error("Error deleting startup:", error)
         throw error
     }
 }
@@ -233,7 +225,7 @@ export async function getStartupBySlug(slug: string): Promise<Startup | null> {
         if (error.code === "PGRST116") {
             return null // Not found
         }
-        console.error("Error fetching startup by slug:", error)
+        logger.error("Error fetching startup by slug:", error)
         throw error
     }
 

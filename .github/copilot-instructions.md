@@ -1,0 +1,157 @@
+# AI Coding Agent Instructions for StartupsAreEasy
+
+## Architecture Overview
+This is a Next.js 15 social platform with a unique **direct REST API architecture** instead of traditional Supabase client patterns. The project uses TypeScript, Supabase PostgreSQL, and Telegram authentication.
+
+### Critical Architectural Decisions
+- **Direct REST API**: All database operations use `fetch()` to Supabase REST endpoints (`lib/api-direct.ts`) to avoid multiple GoTrueClient instances
+- **Global Auth State**: Single authentication system using `useSimpleAuth()` hook with pub-sub pattern
+- **Bulk Operations**: Always prefer single API calls over loops (e.g., `getBulkCommentsDirect()`)
+- **JWT Authentication**: All authenticated operations require token from `getCurrentUserToken()`
+
+## Essential Patterns
+
+### Logging (Use `lib/logger.ts` - NEVER console.log)
+```typescript
+import { logger } from "@/lib/logger"
+
+// ✅ Correct - Production-safe logging
+logger.debug("Component state", { user, loading })  // Development only
+logger.info("User action completed", { userId })     // Info level
+logger.warn("Deprecated feature used", context)      // Warnings
+logger.error("API call failed", error, context)      // Always shows
+logger.api("GET /api/posts", "GET", { userId })      // API calls (dev only)
+
+// ❌ Wrong - Exposes logs in production
+console.log("Debug info:", data)
+console.error("Error:", error)
+```
+
+### API Functions (Follow `lib/api-direct.ts` patterns)
+```typescript
+// All API functions must handle empty Supabase responses
+const requestHeaders = {
+    ...getAuthHeaders(token),
+    'Prefer': 'return=representation'  // Critical for POST requests
+}
+
+// Always check response.text() before JSON.parse()
+const responseText = await response.text()
+if (!responseText.trim()) {
+    return { id: `temp-${Date.now()}`, ...data } // Handle empty 201 responses
+}
+```
+
+### Authentication
+- Use `useSimpleAuth()` hook (NOT `useAuth()` - that's legacy)
+- Development has fake login: `HAS_FAKE_LOGIN` when `NEXT_PUBLIC_DEV_EMAIL/PASSWORD` set
+- Production uses Telegram authentication via `/supabase/functions/telegram.ts`
+
+### React Hooks
+```typescript
+// Always memoize async functions to prevent infinite loops
+const loadData = useCallback(async () => {
+    // Never include loading state in dependencies
+}, [userId]) // Only stable external dependencies
+
+// Auth pattern in components
+const { user, loading } = useSimpleAuth()
+if (loading) return <Loading />
+if (!user) return <LoginPrompt />
+```
+
+## Key File Structure
+- `lib/api-direct.ts` - All database operations (REST API pattern)
+- `hooks/use-simple-auth.ts` - Global auth state (preferred)
+- `hooks/use-auth.ts` - Legacy auth hook (avoid in new code)
+- `lib/constants.ts` - Environment flags and UI constants
+- `docs/DEV_PATTERNS.md` - Comprehensive development templates
+- `docs/SUPABASE_PATTERNS.md` - Supabase-specific issues and solutions
+
+## Development Workflow
+```bash
+# Start development
+pnpm dev
+
+# Run comprehensive tests
+npm test              # Main test suite with database checks
+node tests/test-*.js  # Individual component tests
+
+# TypeScript validation (essential for migrations)
+npx tsc --noEmit --incremental  # Check for compilation errors
+
+# Database setup
+# Run SQL scripts in order: scripts/01-create-tables.sql, 05-add-startups-schema.sql, etc.
+```
+
+## Migration Workflow
+When migrating components from legacy patterns:
+1. **Check TypeScript**: `npx tsc --noEmit --incremental` to identify all errors
+2. **Migrate Systematically**: Fix one component at a time, not all at once
+3. **Validate Each Step**: Run TypeScript check after each component fix
+4. **Component Interface Alignment**: Remove props that components now handle internally
+5. **Hook Signature Matching**: Ensure function signatures match component expectations
+
+## Common Pitfalls to Avoid
+1. **Multiple Supabase Clients**: Never create new `createClient()` instances
+2. **N+1 Queries**: Use bulk operations (`getBulkCommentsDirect()`) not loops
+3. **React Infinite Loops**: Include loading state setters in `useCallback` dependencies
+4. **Missing JWT Tokens**: All RLS operations need `getCurrentUserToken()`
+5. **Direct JSON Parsing**: Always use `response.text()` first, then parse
+6. **Component Prop Drilling**: Components like `Header`, `AuthDialog`, `CollapsiblePostForm`, and `PostCard` manage auth internally via `auth-context` - don't pass auth props
+7. **Hook Function Signatures**: `useComments()` expects callback function as second parameter, not setState directly
+8. **Production Logging**: NEVER use `console.log()` - always use `logger` from `lib/logger.ts` for production-safe logging
+
+## Component Migration Patterns
+
+### Auth Context Integration
+```typescript
+// ❌ Wrong - Prop drilling auth state
+<Header user={user} onLogin={login} onLogout={logout} />
+<AuthDialog open={show} onOpenChange={setShow} onLogin={login} />
+<CollapsiblePostForm user={user} onSubmit={handleSubmit} />
+
+// ✅ Correct - Components use auth-context internally
+<Header />
+<AuthDialog open={show} onOpenChange={setShow} />
+<CollapsiblePostForm onSubmit={handleSubmit} />
+```
+
+### Hook Usage Patterns
+```typescript
+// ❌ Wrong - Passing setState directly
+const { comments, handleLike } = useComments(user, setPosts)
+
+// ✅ Correct - Use callback wrapper
+const { comments, handleLike } = useComments(user, () => setPosts([...posts]))
+
+// ❌ Wrong - Component expects different signature
+<PostCard onLike={handleLike} />
+
+// ✅ Correct - Wrap with proper signature
+<PostCard onLike={(postId) => handleLike(postId, post.liked_by_user, post.likes_count)} />
+```
+
+## Database Patterns
+- PostgREST joins: `/posts?select=*,profiles!user_id(username,avatar_url)`
+- Bulk operations: `/posts?id=in.(${ids.join(',')})`
+- RLS policies require proper JWT tokens in Authorization header
+
+## Environment Setup
+```env
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
+SUPABASE_SERVICE_ROLE_KEY=your_service_key  # For admin operations
+NEXT_PUBLIC_DEV_EMAIL=test@example.com      # Development only
+NEXT_PUBLIC_DEV_PASSWORD=secure_password    # Development only
+```
+
+## Testing & Debugging
+- Comprehensive test suite covers all API endpoints and auth flows
+- Diagnostics page at `/diagnostics` for runtime system health checks
+- All API functions include timestamped logging for debugging
+- Use `lib/logger.ts` for environment-aware logging (mandatory - never use console.log)
+- Logger automatically filters debug logs in production, shows all errors
+- Debug logs: `logger.debug()`, Info: `logger.info()`, Errors: `logger.error()`
+
+Refer to `docs/` folder for detailed patterns, troubleshooting guides, and architectural decisions.

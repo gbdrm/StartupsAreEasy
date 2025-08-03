@@ -112,7 +112,7 @@ export default function StartupsPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Header user={user} onLogin={login} onLogout={logout} />
+      <Header />
 
       <main className="container max-w-6xl mx-auto py-8 px-4">
         <div className="space-y-6">
@@ -164,7 +164,6 @@ export default function StartupsPage() {
           <AuthDialog
             open={showLoginDialog}
             onOpenChange={setShowLoginDialog}
-            onLogin={login}
           />
 
           <StartupDetailDialog

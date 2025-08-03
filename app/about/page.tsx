@@ -4,18 +4,14 @@ import { Header } from "@/components/header"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { ExternalLink, MessageCircle, Github } from "lucide-react"
-import { useAuth } from "@/hooks/use-auth"
+import { useSimpleAuth } from "@/hooks/use-simple-auth"
 
 export default function AboutPage() {
-  const { user, login, logout } = useAuth()
+  const { user, login, logout } = useSimpleAuth()
 
   return (
     <div className="min-h-screen bg-background">
-      <Header
-        user={user}
-        onLogin={login}
-        onLogout={logout}
-      />
+      <Header />
       
       <main className="container mx-auto px-4 py-8 max-w-4xl">
         <Card>

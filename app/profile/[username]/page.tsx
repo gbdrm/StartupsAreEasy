@@ -114,7 +114,7 @@ export default function ProfilePage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-background">
-        <Header user={currentUser} onLogin={() => {}} onLogout={() => {}} />
+        <Header />
         <main className="container max-w-4xl mx-auto px-4 py-8">
           <div className="flex items-center justify-center min-h-[50vh]">
             <div className="flex flex-col items-center gap-4">
@@ -130,7 +130,7 @@ export default function ProfilePage() {
   if (error) {
     return (
       <div className="min-h-screen bg-background">
-        <Header user={currentUser} onLogin={() => {}} onLogout={() => {}} />
+        <Header />
         <main className="container max-w-4xl mx-auto py-8 px-4">
           <div className="flex items-center justify-center py-12">
             <Loader2 className="h-8 w-8 animate-spin" />
@@ -143,7 +143,7 @@ export default function ProfilePage() {
   if (error || !profileUser) {
     return (
       <div className="min-h-screen bg-background">
-        <Header user={currentUser} onLogin={() => {}} onLogout={() => {}} />
+        <Header />
         <main className="container max-w-4xl mx-auto py-8 px-4">
           <Button variant="ghost" onClick={() => router.back()} className="mb-4">
             <ArrowLeft className="h-4 w-4 mr-2" />
@@ -159,7 +159,7 @@ export default function ProfilePage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Header user={currentUser} onLogin={() => {}} onLogout={() => {}} />
+      <Header />
       <main className="container max-w-4xl mx-auto py-8 px-4">
         <Button variant="ghost" onClick={() => router.back()} className="mb-4">
           <ArrowLeft className="h-4 w-4 mr-2" />
@@ -233,7 +233,6 @@ export default function ProfilePage() {
                 <PostCard
                   key={post.id}
                   post={post}
-                  user={currentUser}
                   comments={comments.filter(c => c.post_id === post.id)}
                   onLike={handleLike}
                   onComment={handleAddComment}

@@ -23,6 +23,7 @@ import { TelegramLogin } from "./telegram-login"
 import { useState } from "react"
 import Link from "next/link"
 import { HAS_FAKE_LOGIN } from "@/lib/constants"
+import { logger } from "@/lib/logger"
 
 interface TelegramUser {
   id: number
@@ -37,6 +38,9 @@ interface TelegramUser {
 export function AuthButton() {
   const { user, login, logout } = useAuth()
   const [showLoginDialog, setShowLoginDialog] = useState(false)
+
+  // Debug logging - only shows in development
+  logger.debug("AuthButton: user state", user)
 
   const handleTelegramAuth = (telegramUser: TelegramUser) => {
     login(telegramUser)

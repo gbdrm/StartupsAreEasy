@@ -55,7 +55,7 @@ export default function BuildersPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Header user={user} onLogin={login} onLogout={logout} />
+      <Header />
 
       <main className="container max-w-4xl mx-auto py-8 px-4">
         <div className="space-y-6">
@@ -93,7 +93,6 @@ export default function BuildersPage() {
           <AuthDialog
             open={showLoginDialog}
             onOpenChange={setShowLoginDialog}
-            onLogin={login}
           />
         </div>
       </main>

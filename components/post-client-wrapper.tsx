@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Header } from "@/components/header" 
 import { PostPageClient } from "@/components/post-page-client"
-import { useAuth } from "@/hooks/use-auth"
+import { useSimpleAuth } from "@/hooks/use-simple-auth"
 import type { Post, Comment } from "@/lib/types"
 
 interface PostClientWrapperProps {
@@ -13,7 +13,7 @@ interface PostClientWrapperProps {
 }
 
 export function PostClientWrapper({ post, initialComments }: PostClientWrapperProps) {
-  const { user, login, logout } = useAuth()
+  const { user, login, logout } = useSimpleAuth()
   const router = useRouter()
 
   const handleBackClick = () => {
@@ -27,7 +27,7 @@ export function PostClientWrapper({ post, initialComments }: PostClientWrapperPr
 
   return (
     <div className="min-h-screen bg-background">
-      <Header user={user} onLogin={login} onLogout={logout} />
+      <Header />
 
       <main className="container mx-auto px-4 py-8 max-w-2xl">
         <div className="mb-6">
