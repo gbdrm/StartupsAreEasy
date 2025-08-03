@@ -106,6 +106,13 @@ export async function signInWithTelegram(telegramUser: TelegramUser): Promise<Us
   }
 
   console.log('🔵 Using real Telegram authentication')
+  console.log('🔵 Calling Telegram function with user data:', {
+    id: telegramUser.id,
+    username: telegramUser.username,
+    first_name: telegramUser.first_name,
+    expectedEmail: `telegram-${telegramUser.id}@telegram.local`
+  })
+
   // Call backend to get JWT
   const res = await fetch(API_ENDPOINTS.TELEGRAM_LOGIN, {
     method: "POST",
@@ -119,6 +126,8 @@ export async function signInWithTelegram(telegramUser: TelegramUser): Promise<Us
   }
   const { access_token, refresh_token } = await res.json();
 
+  console.log('🔵 Got tokens from Telegram function, setting session...')
+
   // Store JWT in localStorage and set session
   localStorage.setItem("sb-access-token", access_token);
   const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
@@ -131,6 +140,8 @@ export async function signInWithTelegram(telegramUser: TelegramUser): Promise<Us
     throw new Error("Failed to set session");
   }
 
+  console.log('🔵 Session set successfully, getting user data...')
+
   // Get user from JWT
   const { data: userData, error: userError } = await supabase.auth.getUser();
   if (userError || !userData?.user) {
@@ -139,7 +150,22 @@ export async function signInWithTelegram(telegramUser: TelegramUser): Promise<Us
   }
   const user = userData.user;
 
+  console.log('🔵 Got user from session:', {
+    id: user.id,
+    email: user.email,
+    userMetadata: user.user_metadata,
+    appMetadata: user.app_metadata
+  })
+
   // Upsert profile info
+  console.log('🔵 Upserting profile with data:', {
+    id: user.id,
+    username: telegramUser.username || `user_${telegramUser.id}`,
+    first_name: telegramUser.first_name,
+    last_name: telegramUser.last_name,
+    avatar_url: telegramUser.photo_url
+  })
+
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
     .upsert({
@@ -152,16 +178,30 @@ export async function signInWithTelegram(telegramUser: TelegramUser): Promise<Us
     })
     .select()
     .single();
-  if (profileError) throw profileError;
+  if (profileError) {
+    console.error('Profile upsert error:', profileError);
+    throw profileError;
+  }
 
-  return {
+  console.log('🔵 Profile upserted successfully:', {
+    id: profile.id,
+    username: profile.username,
+    first_name: profile.first_name,
+    last_name: profile.last_name
+  })
+
+  const userResult = {
     id: user.id,
     name: `${profile.first_name ?? ""} ${profile.last_name ?? ""}`.trim(),
     username: profile.username ?? "",
     avatar: profile.avatar_url ?? "",
     first_name: profile.first_name,
     last_name: profile.last_name,
-  };
+  }
+
+  console.log('🔵 Returning user object:', userResult)
+
+  return userResult;
 }
 
 export async function getCurrentUserProfile(): Promise<User | null> {
@@ -382,4 +422,23 @@ export function debugAuthConfig() {
 
   console.log('🔍 Auth Configuration:', config)
   return config
+}
+
+// Debug function to help diagnose email conflicts in production
+export async function debugTelegramUser(telegramId: number) {
+  const expectedEmail = `telegram-${telegramId}@telegram.local`
+
+  console.log('🔍 Debugging Telegram user lookup:', {
+    telegramId,
+    expectedEmail,
+    timestamp: new Date().toISOString()
+  })
+
+  // This would need to be called from a secure environment with service role key
+  // For now, it's just a diagnostic helper
+  return {
+    telegramId,
+    expectedEmail,
+    note: 'This function helps identify expected vs actual email lookup issues'
+  }
 }

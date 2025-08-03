@@ -1,7 +1,9 @@
 # AI Coding Agent Instructions for StartupsAreEasy
 
 ## Architecture Overview
-This is a Next.js 15 social platform with a unique **direct REST API architecture** instead of traditional Supabase client patterns. The project uses TypeScript, Supabase PostgreSQL, and Telegram authentication.
+This is a Next.js 15 social platform with a unique **direct REST API architecture** instead 12. **Auth Timeout Issues**: If app gets stuck on "Getting session...", user sessions may be stale after long inactivity - use `emergencyAuthReset()` for stuck states. Extended timeout to 15 seconds for production reliability.
+13. **Production Telegram Issues**: Telegram authentication may show wrong email or fail to update UI. Added comprehensive debugging and force page reload after successful sign-in to ensure UI consistency.
+14. **Email Conflicts**: Real emails in database can conflict with Telegram fake emails (`telegram-ID@telegram.local`). Use `debugTelegramUser()` function to diagnose expected vs actual email lookup issues.f traditional Supabase client patterns. The project uses TypeScript, Supabase PostgreSQL, and Telegram authentication.
 
 ### Critical Architectural Decisions
 - **Direct REST API**: All database operations use `fetch()` to Supabase REST endpoints (`lib/api-direct.ts`) to avoid multiple GoTrueClient instances

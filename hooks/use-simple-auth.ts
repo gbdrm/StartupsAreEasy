@@ -83,7 +83,7 @@ export function useSimpleAuth() {
                 // Add timeout to prevent hanging on initial session check
                 const sessionPromise = supabase.auth.getSession()
                 const timeoutPromise = new Promise<never>((_, reject) => {
-                    setTimeout(() => reject(new Error('Initial session timeout')), 8000) // 8 second timeout
+                    setTimeout(() => reject(new Error('Initial session timeout')), 15000) // 15 second timeout for production
                 })
 
                 let sessionResult
@@ -141,6 +141,15 @@ export function useSimpleAuth() {
                             const profile = await getCurrentUserProfile()
                             console.log(`[${new Date().toISOString()}] useSimpleAuth: Got profile after sign in:`, profile ? `${profile.first_name} ${profile.last_name} (@${profile.username})` : 'null')
                             setGlobalUser(profile)
+
+                            // Force a page reload after successful Telegram login to ensure UI consistency
+                            // This addresses the issue where the button doesn't update after sign-in
+                            console.log(`[${new Date().toISOString()}] useSimpleAuth: Forcing page reload for UI consistency`)
+                            setTimeout(() => {
+                                if (typeof window !== 'undefined') {
+                                    window.location.reload()
+                                }
+                            }, 1000) // 1 second delay to let the auth state settle
                         } catch (error) {
                             console.error(`[${new Date().toISOString()}] useSimpleAuth: Error getting profile:`, error)
                             setGlobalUser(null)
