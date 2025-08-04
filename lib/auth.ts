@@ -442,14 +442,14 @@ export async function getCurrentUserToken(): Promise<string | null> {
         try {
           const payload = JSON.parse(atob(token.split('.')[1]))
           const now = Math.floor(Date.now() / 1000)
-          
+
           if (payload.exp && payload.exp < now) {
             logger.warn('getCurrentUserToken: Stored token is expired, clearing auth state')
             await signOut()
             window.location.reload()
             return null
           }
-          
+
           logger.debug('getCurrentUserToken: Using production bypass with valid localStorage token')
           return token
         } catch (tokenParseError) {
@@ -474,7 +474,7 @@ export async function getCurrentUserToken(): Promise<string | null> {
           try {
             const payload = JSON.parse(atob(storedToken.split('.')[1]))
             const now = Math.floor(Date.now() / 1000)
-            
+
             if (payload.exp && payload.exp > now) {
               return {
                 data: {
@@ -501,7 +501,7 @@ export async function getCurrentUserToken(): Promise<string | null> {
           return await supabase.auth.getSession()
         } catch (error) {
           logger.warn('Direct session failed, trying refresh...')
-          
+
           // Second attempt: Refresh session
           const { data: refreshData } = await supabase.auth.refreshSession()
           return { data: { session: refreshData.session }, error: null }

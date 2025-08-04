@@ -74,7 +74,7 @@ export function useSimpleAuth() {
     useEffect(() => {
         if (isVisible && globalUser && !globalLoading) {
             logger.debug("useSimpleAuth: Page became visible, checking auth validity...")
-            
+
             // Validate current auth state when returning to tab
             const validateAuth = async () => {
                 try {
@@ -172,14 +172,14 @@ export function useSimpleAuth() {
                         return await Promise.race([quickPromise, quickTimeout])
                     } catch (quickError) {
                         logger.warn("useSimpleAuth: Quick session check failed, checking stored tokens...")
-                        
+
                         // Immediate fallback: Check if we have valid stored tokens
                         const storedToken = localStorage.getItem("sb-access-token")
                         if (storedToken) {
                             try {
                                 const payload = JSON.parse(atob(storedToken.split('.')[1]))
                                 const now = Math.floor(Date.now() / 1000)
-                                
+
                                 if (payload.exp && payload.exp > now) {
                                     logger.info("useSimpleAuth: Using valid stored token in development")
                                     const profile = await getCurrentUserProfile()
@@ -193,7 +193,7 @@ export function useSimpleAuth() {
                                 logger.error("useSimpleAuth: Stored token validation failed:", tokenError)
                             }
                         }
-                        
+
                         throw quickError
                     }
                 }

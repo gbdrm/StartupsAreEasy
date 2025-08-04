@@ -14,7 +14,7 @@ export function usePageVisibility() {
             // If page was hidden and is now visible, check auth token validity
             if (wasHidden && isNowVisible) {
                 logger.info('📄 Page became visible after being hidden - validating auth token...')
-                
+
                 try {
                     const token = await getCurrentUserToken()
                     if (!token) {
