@@ -285,9 +285,18 @@ export function emergencyAuthReset() {
             authSubscription = subscription
         }
 
+        // Listen for manual signout events (since we bypass supabase.auth.signOut)
+        const handleManualSignout = () => {
+            logger.info("useSimpleAuth: Manual signout event detected")
+            resetAuth()
+        }
+        window.addEventListener('manual-signout', handleManualSignout)
+
         return () => {
             // Clear failsafe timeout
             clearTimeout(failsafeTimeout)
+            // Remove manual signout listener
+            window.removeEventListener('manual-signout', handleManualSignout)
             // Don't unsubscribe on individual component unmount
             // Only when the entire app unmounts
         }

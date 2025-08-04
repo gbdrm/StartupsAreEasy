@@ -352,14 +352,9 @@ export async function signOut(): Promise<void> {
     return;
   }
 
-  // Development: Use proper Supabase signOut
-  logger.debug('🚪 signOut: Calling supabase.auth.signOut() in development...')
-  const { error } = await supabase.auth.signOut();
-  if (error) {
-    logger.error('🚪 signOut: SignOut error:', error);
-    throw new Error("Failed to sign out");
-  }
-  logger.debug('🚪 signOut: supabase.auth.signOut() completed successfully')
+  // BYPASS: Skip supabase.auth.signOut due to hanging issues
+  // Apply same bypass as getSession - Supabase auth calls are unreliable
+  logger.info('� BYPASS: Skipping supabase.auth.signOut() due to hanging issues (both prod and dev)')
 
   // Clear all our custom localStorage items
   localStorage.removeItem("sb-user");
@@ -374,19 +369,28 @@ export async function signOut(): Promise<void> {
     }
   });
 
-  logger.debug('signOut completed successfully')
+  // Since we're bypassing supabase.auth.signOut(), manually trigger auth state reset
+  // by dispatching a storage event that the auth system can listen to
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('manual-signout', { detail: { timestamp: Date.now() } }));
+  }
+
+  logger.debug('🚪 signOut: Manual signout completed successfully')
 }
 
 // Token validation and utilities
 export async function getCurrentUserToken(): Promise<string | null> {
-  logger.debug('getCurrentUserToken called')
+  const timestamp = new Date().toISOString()
+  logger.info(`🔍 [${timestamp}] getCurrentUserToken: Starting token retrieval`)
 
   try {
     // In production, read from localStorage directly
     const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production' || window.location.hostname !== 'localhost'
+    logger.debug(`🔍 [${timestamp}] getCurrentUserToken: Environment check - isProduction: ${isProduction}`)
 
     if (isProduction) {
       const token = localStorage.getItem("sb-access-token");
+      logger.info(`🔍 [${timestamp}] getCurrentUserToken: PRODUCTION BYPASS - token found: ${!!token}`)
       if (token) {
         logger.debug('🚨 PRODUCTION BYPASS: Found token in localStorage')
         return token;
@@ -396,17 +400,26 @@ export async function getCurrentUserToken(): Promise<string | null> {
     }
 
     // Development: Use proper Supabase session
+    logger.info(`🔍 [${timestamp}] getCurrentUserToken: DEVELOPMENT - calling supabase.auth.getSession()`)
+    const sessionStartTime = Date.now()
+
     const { data, error } = await supabase.auth.getSession();
+    const sessionEndTime = Date.now()
+    const sessionDuration = sessionEndTime - sessionStartTime
+
+    logger.info(`🔍 [${timestamp}] getCurrentUserToken: getSession completed in ${sessionDuration}ms`)
+
     if (error) {
-      logger.error('Error getting current session:', error);
+      logger.error(`🔍 [${timestamp}] getCurrentUserToken: Error getting current session:`, error);
       return null;
     }
 
     const token = data.session?.access_token;
+    logger.info(`🔍 [${timestamp}] getCurrentUserToken: Session result - hasSession: ${!!data.session}, hasToken: ${!!token}`)
     logger.debug('getCurrentUserToken result:', { hasToken: !!token });
     return token || null;
   } catch (error) {
-    logger.error('getCurrentUserToken error:', error);
+    logger.error(`🔍 [${timestamp}] getCurrentUserToken: EXCEPTION caught:`, error);
     return null;
   }
 }
