@@ -118,6 +118,9 @@ serve(async (req) => {
         const telegram_id = parsed.get('id');
         const first_name = parsed.get('first_name') || '';
         const username = parsed.get('username') || '';
+
+        console.log(`[DEBUG] Parsed telegram_id: "${telegram_id}" (typeof: ${typeof telegram_id})`);
+
         const email = `telegram-${telegram_id}@telegram.local`;
         console.log(`[INFO] Using email: ${email}`);
         let userId;
@@ -126,14 +129,43 @@ serve(async (req) => {
             username,
             first_name
         };
-        const { data: list, error: listError } = await supabase.auth.admin.listUsers({
-            email
-        });
-        if (listError) {
-            console.error('[ERROR] Failed to list users:', listError);
-            throw listError;
+
+        // First, try to find existing user by telegram_id in profiles table
+        console.log(`[INFO] Searching for existing user by telegram_id: ${telegram_id}`);
+        const { data: existingProfileByTelegramId, error: profileSearchError } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('telegram_id', telegram_id ? parseInt(telegram_id) : 0)
+            .single();
+
+        let existingUserId = null;
+        if (!profileSearchError && existingProfileByTelegramId) {
+            existingUserId = existingProfileByTelegramId.id;
+            console.log(`[INFO] Found existing user by telegram_id: ${existingUserId}`);
+        } else {
+            console.log(`[INFO] No existing user found by telegram_id, searching by email...`);
+
+            // Fallback: search by email (for users created with correct email pattern)
+            const { data: list, error: listError } = await supabase.auth.admin.listUsers({
+                email
+            });
+            if (listError) {
+                console.error('[ERROR] Failed to list users by email:', listError);
+                throw listError;
+            }
+            if (list?.users?.length) {
+                existingUserId = list.users[0].id;
+                console.log(`[INFO] Found existing user by email: ${existingUserId}`);
+            }
         }
-        if (!list?.users?.length) {
+
+        if (existingUserId) {
+            // User exists, use their ID
+            userId = existingUserId;
+            console.log(`[INFO] Using existing user: ${userId}`);
+        } else {
+            // User doesn't exist, create new one
+            console.log('[INFO] User not found, creating...');
             console.log('[INFO] User not found, creating...');
 
             // Add detailed logging before user creation
@@ -228,10 +260,8 @@ serve(async (req) => {
                     throw insertError;
                 }
             }
-        } else {
-            userId = list.users[0].id;
-            // Optionally update user_metadata if needed
         }
+
         if (!userId) {
             console.error('[ERROR] Could not determine user UUID');
             return new Response('Could not determine user UUID', {

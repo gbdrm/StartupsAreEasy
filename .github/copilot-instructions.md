@@ -151,6 +151,13 @@ npx tsc --noEmit --incremental  # Check for compilation errors
 # Run SQL scripts in order: scripts/01-create-tables.sql, 05-add-startups-schema.sql, etc.
 ```
 
+## Investigation-First Approach
+When debugging issues:
+1. **Ask diagnostic questions first** - Request database queries, logs, or specific data before assuming root cause
+2. **Gather evidence** - Use SQL queries, browser console commands, or network inspection to understand actual state
+3. **Avoid premature solutions** - Don't implement fixes based on assumptions; verify the problem first
+4. **Small, targeted changes** - Make minimal changes to test hypotheses rather than large refactors
+
 ## Migration Workflow
 When migrating components from legacy patterns:
 1. **Check TypeScript**: `npx tsc --noEmit --incremental` to identify all errors
