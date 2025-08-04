@@ -16,7 +16,7 @@
 1. **Token Expiration Validation**: Added JWT payload parsing to check expiration before API calls
 2. **Page Visibility Handling**: Enhanced `usePageVisibility` hook to validate auth when returning to tab
 3. **Automatic Error Recovery**: All auth-related API errors (403, JWT errors) now trigger page reload
-4. **Extended Session Timeouts**: Increased from 10s to 15s for better reliability
+4. **Smart Timeout Strategy**: Progressive timeouts (2s → fallback) with circuit breaker pattern instead of long waits
 5. **Auth Utilities**: New `auth-utils.ts` with comprehensive error detection and handling
 
 ### Supabase Auth Hanging Issue
@@ -158,9 +158,10 @@ This function:
 
 The auth system now automatically handles these error scenarios:
 - **Token expiration**: Validates JWT payload expiration before API calls
-- **Tab switch auth failure**: Re-validates auth when page becomes visible
+- **Tab switch auth failure**: Re-validates auth when page becomes visible  
 - **RLS policy violations**: Detects 403 errors and triggers auth refresh
-- **Session timeouts**: Extended timeout and better error handling
+- **Session timeouts**: Smart 2-second timeouts with immediate stored token fallback
+- **Circuit breaker**: Prevents repeated hangs by opening circuit after 3 failures (30s cooldown)
 
 ### Testing the Fixes
 
@@ -180,15 +181,18 @@ simulateTabSwitch()
 // Manual utilities
 isTokenExpired(yourToken)
 isAuthError(someError)
-getValidToken()
+// Test circuit breaker utilities
+authCircuitBreaker.isOpen()
+authCircuitBreaker.reset()
 ```
 
 #### Expected Behavior After Fixes
 1. **Tab Switch Recovery**: Switching tabs and returning should not break likes/comments
 2. **Token Validation**: Expired tokens are detected and trigger refresh automatically  
 3. **Error Recovery**: 403/auth errors trigger page reload for fresh authentication
-4. **Extended Timeouts**: Better handling of slow network conditions
-5. **Debug Tools**: Enhanced logging and browser console utilities for troubleshooting
+4. **Smart Timeouts**: Quick 2-second timeouts with immediate fallback to stored tokens
+5. **Circuit Breaker**: Prevents repeated hanging by falling back after 3 failures
+6. **Debug Tools**: Enhanced logging and browser console utilities for troubleshooting
 
 ### Monitoring & Logging
 

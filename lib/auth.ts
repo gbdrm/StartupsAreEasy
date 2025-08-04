@@ -1,6 +1,7 @@
 import { supabase } from "./supabase";
 import { HAS_FAKE_LOGIN, STORAGE_KEYS, API_ENDPOINTS } from "./constants";
-import { logger } from "./logger";
+import { logger } from './logger'
+import { authCircuitBreaker } from './auth-circuit-breaker'
 import type { User } from "./types";
 
 export type TelegramUser = {
@@ -463,18 +464,56 @@ export async function getCurrentUserToken(): Promise<string | null> {
       }
     }
 
-    // Add timeout to prevent hanging (development only)
-    const sessionPromise = supabase.auth.getSession()
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => reject(new Error('Session timeout')), 15000) // Increased to 15 seconds
-    })
+    // Use circuit breaker for session operations to prevent repeated hangs
+    const getSessionWithFallback = async () => {
+      // If circuit breaker is open, immediately fall back to stored token
+      if (authCircuitBreaker.isOpen()) {
+        logger.info('Session circuit breaker is open, using stored token fallback')
+        const storedToken = localStorage.getItem('sb-access-token')
+        if (storedToken) {
+          try {
+            const payload = JSON.parse(atob(storedToken.split('.')[1]))
+            const now = Math.floor(Date.now() / 1000)
+            
+            if (payload.exp && payload.exp > now) {
+              return {
+                data: {
+                  session: {
+                    access_token: storedToken,
+                    expires_at: payload.exp,
+                    user: { id: payload.sub }
+                  }
+                },
+                error: null
+              }
+            }
+          } catch (parseError) {
+            logger.error('Stored token validation failed:', parseError)
+          }
+        }
+        throw new Error('Circuit breaker open and no valid stored token')
+      }
+
+      // Try session operations with circuit breaker protection
+      return await authCircuitBreaker.execute(async () => {
+        // First attempt: Quick session check (2 seconds internal timeout)
+        try {
+          return await supabase.auth.getSession()
+        } catch (error) {
+          logger.warn('Direct session failed, trying refresh...')
+          
+          // Second attempt: Refresh session
+          const { data: refreshData } = await supabase.auth.refreshSession()
+          return { data: { session: refreshData.session }, error: null }
+        }
+      }, 'getSession')
+    }
 
     let sessionResult
     try {
-      sessionResult = await Promise.race([sessionPromise, timeoutPromise])
+      sessionResult = await getSessionWithFallback()
     } catch (timeoutError) {
-      logger.error('Session request timed out, clearing auth state', timeoutError)
-      // Force sign out and reload page
+      logger.error('Session operations failed, clearing auth state', timeoutError)
       await signOut()
       window.location.reload()
       return null

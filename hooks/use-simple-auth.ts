@@ -161,19 +161,53 @@ export function useSimpleAuth() {
                     return
                 }
 
-                // Normal session check for development
-                const sessionPromise = supabase.auth.getSession()
-                const timeoutPromise = new Promise<never>((_, reject) => {
-                    setTimeout(() => reject(new Error('Initial session timeout')), 5000) // 5 second timeout
-                })
+                // Smart session check for development with quick fallback
+                const getSessionWithQuickFallback = async () => {
+                    // First try: Quick session check (2 seconds)
+                    try {
+                        const quickPromise = supabase.auth.getSession()
+                        const quickTimeout = new Promise<never>((_, reject) => {
+                            setTimeout(() => reject(new Error('Quick timeout')), 2000)
+                        })
+                        return await Promise.race([quickPromise, quickTimeout])
+                    } catch (quickError) {
+                        logger.warn("useSimpleAuth: Quick session check failed, checking stored tokens...")
+                        
+                        // Immediate fallback: Check if we have valid stored tokens
+                        const storedToken = localStorage.getItem("sb-access-token")
+                        if (storedToken) {
+                            try {
+                                const payload = JSON.parse(atob(storedToken.split('.')[1]))
+                                const now = Math.floor(Date.now() / 1000)
+                                
+                                if (payload.exp && payload.exp > now) {
+                                    logger.info("useSimpleAuth: Using valid stored token in development")
+                                    const profile = await getCurrentUserProfile()
+                                    if (profile) {
+                                        setGlobalUser(profile)
+                                        setGlobalLoading(false)
+                                        return { success: true }
+                                    }
+                                }
+                            } catch (tokenError) {
+                                logger.error("useSimpleAuth: Stored token validation failed:", tokenError)
+                            }
+                        }
+                        
+                        throw quickError
+                    }
+                }
 
-                logger.debug("useSimpleAuth: About to race session vs timeout...")
+                logger.debug("useSimpleAuth: Starting smart session check...")
                 let sessionResult
                 try {
-                    sessionResult = await Promise.race([sessionPromise, timeoutPromise])
-                    logger.debug("useSimpleAuth: Session call completed successfully")
+                    const result = await getSessionWithQuickFallback()
+                    if (result && 'success' in result) {
+                        return // Already handled by stored token path
+                    }
+                    sessionResult = result
                 } catch (timeoutError) {
-                    logger.error("useSimpleAuth: Initial session timed out (5s), clearing auth", timeoutError)
+                    logger.error("useSimpleAuth: All session methods failed", timeoutError)
                     setGlobalUser(null)
                     setGlobalLoading(false)
                     return
