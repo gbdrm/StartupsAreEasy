@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge"
 import { Loader2, Database, Users, FileText, Heart, MessageCircle, Building, CheckCircle, XCircle, AlertTriangle } from "lucide-react"
 import { useSimpleAuth } from "@/hooks/use-simple-auth"
 import { supabase } from "@/lib/supabase"
+import { API_ENDPOINTS } from "@/lib/constants"
 
 interface DiagnosticResult {
   name: string
@@ -330,23 +331,7 @@ export default function DiagnosticsPage() {
 
       // Test 12: Test Telegram login endpoint (Client-side)
       try {
-        // Use environment variable if available, otherwise construct from Supabase URL
-        let telegramUrl = process.env.NEXT_PUBLIC_TELEGRAM_FUNCTION_URL
-        
-        if (!telegramUrl) {
-          const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-          if (!supabaseUrl) {
-            throw new Error('NEXT_PUBLIC_SUPABASE_URL not found')
-          }
-          
-          // Extract the project reference from the Supabase URL to construct the function URL
-          const urlParts = supabaseUrl.match(/https:\/\/([^.]+)\.supabase\.co/)
-          if (!urlParts) {
-            throw new Error('Invalid Supabase URL format')
-          }
-          const projectRef = urlParts[1]
-          telegramUrl = `https://${projectRef}.functions.supabase.co/tg-login`
-        }
+        const telegramUrl = API_ENDPOINTS.TELEGRAM_LOGIN
         
         const response = await fetch(telegramUrl, {
           method: 'GET'
@@ -370,7 +355,6 @@ export default function DiagnosticsPage() {
               : `Telegram function returned status: ${response.status}`,
           details: { 
             url: telegramUrl,
-            usingEnvVar: !!process.env.NEXT_PUBLIC_TELEGRAM_FUNCTION_URL,
             status: response.status, 
             statusText: response.statusText,
             responseBody: responseBody
@@ -391,6 +375,142 @@ export default function DiagnosticsPage() {
 
     setDiagnostics(results)
     setLoading(false)
+  }
+
+  // Helper function to run token tests when we have valid tokens
+  const runTokenTests = async (tokenData: any, results: DiagnosticResult[]) => {
+    // Step 4: Test Token Storage
+    const originalAccessToken = localStorage.getItem("sb-access-token")
+    const originalRefreshToken = localStorage.getItem("sb-refresh-token")
+
+    localStorage.setItem("sb-access-token", tokenData.access_token)
+    localStorage.setItem("sb-refresh-token", tokenData.refresh_token)
+
+    const storedAccessToken = localStorage.getItem("sb-access-token")
+    const storedRefreshToken = localStorage.getItem("sb-refresh-token")
+
+    results.push({
+      name: "Token Storage",
+      status: storedAccessToken && storedRefreshToken ? 'success' : 'error',
+      message: storedAccessToken && storedRefreshToken ? "Tokens stored successfully in localStorage" : "Failed to store tokens",
+      details: {
+        accessTokenStored: !!storedAccessToken,
+        refreshTokenStored: !!storedRefreshToken,
+        accessTokenLength: storedAccessToken?.length,
+        refreshTokenLength: storedRefreshToken?.length
+      }
+    })
+
+    // Step 5: Test getCurrentUserToken
+    try {
+      const { getCurrentUserToken } = await import('@/lib/auth')
+      const retrievedToken = await getCurrentUserToken()
+
+      results.push({
+        name: "Token Retrieval",
+        status: retrievedToken ? 'success' : 'error',
+        message: retrievedToken ? "getCurrentUserToken() works correctly" : "getCurrentUserToken() failed",
+        details: {
+          hasToken: !!retrievedToken,
+          tokenLength: retrievedToken?.length,
+          tokensMatch: retrievedToken === tokenData.access_token
+        }
+      })
+
+      // Step 6: Test Profile Loading
+      if (retrievedToken) {
+        try {
+          const { getCurrentUserProfile } = await import('@/lib/auth')
+          const profile = await getCurrentUserProfile()
+
+          results.push({
+            name: "Profile Loading",
+            status: profile ? 'success' : 'warning',
+            message: profile ? "Profile loaded successfully" : "No profile found (this is normal for mock user)",
+            details: profile ? {
+              id: profile.id,
+              username: profile.username,
+              firstName: profile.first_name,
+              lastName: profile.last_name,
+              loadMethod: process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production' || window.location.hostname !== 'localhost' ? 'production-bypass' : 'supabase-auth'
+            } : {
+              message: "No profile data",
+              loadMethod: process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production' || window.location.hostname !== 'localhost' ? 'production-bypass' : 'supabase-auth'
+            }
+          })
+        } catch (profileError) {
+          const errorMessage = profileError instanceof Error ? profileError.message : String(profileError)
+          results.push({
+            name: "Profile Loading",
+            status: errorMessage.includes('Auth session missing') ? 'error' : 'warning',
+            message: errorMessage.includes('Auth session missing') 
+              ? "Profile loading failed with auth session error - this indicates production bypass is needed" 
+              : "Profile loading failed (expected for mock user)",
+            details: {
+              error: errorMessage,
+              isAuthSessionError: errorMessage.includes('Auth session missing'),
+              loadMethod: process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production' || window.location.hostname !== 'localhost' ? 'production-bypass' : 'supabase-auth'
+            }
+          })
+        }
+      }
+
+      // Step 7: Test Database Query
+      if (retrievedToken) {
+        try {
+          const testResponse = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/posts?limit=1`, {
+            headers: {
+              'Authorization': `Bearer ${retrievedToken}`,
+              'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+              'Content-Type': 'application/json'
+            }
+          })
+
+          results.push({
+            name: "Database Query Test",
+            status: testResponse.ok ? 'success' : 'error',
+            message: testResponse.ok ? "Database queries work with token" : `Database query failed: ${testResponse.status}`,
+            details: {
+              status: testResponse.status,
+              statusText: testResponse.statusText,
+              url: testResponse.url
+            }
+          })
+        } catch (dbError) {
+          results.push({
+            name: "Database Query Test",
+            status: 'error',
+            message: "Database query threw error",
+            details: {
+              error: dbError instanceof Error ? dbError.message : String(dbError)
+            }
+          })
+        }
+      }
+
+    } catch (tokenError) {
+      results.push({
+        name: "Token Retrieval",
+        status: 'error',
+        message: "getCurrentUserToken() threw error",
+        details: {
+          error: tokenError instanceof Error ? tokenError.message : String(tokenError)
+        }
+      })
+    }
+
+    // Cleanup: Restore original tokens
+    if (originalAccessToken) {
+      localStorage.setItem("sb-access-token", originalAccessToken)
+    } else {
+      localStorage.removeItem("sb-access-token")
+    }
+
+    if (originalRefreshToken) {
+      localStorage.setItem("sb-refresh-token", originalRefreshToken)
+    } else {
+      localStorage.removeItem("sb-refresh-token")
+    }
   }
 
   // Debug Telegram Login with step-by-step verification
@@ -424,19 +544,22 @@ export default function DiagnosticsPage() {
         last_name: "Test",
         username: "debug_test",
         auth_date: Math.floor(Date.now() / 1000),
-        hash: "mock_hash_for_testing"
+        hash: "mock_hash_for_testing" // Invalid hash - will trigger 401 (expected)
       }
 
       results.push({
         name: "Mock Telegram User",
         status: 'success',
-        message: "Created mock Telegram user for testing",
-        details: mockTelegramUser
+        message: "Created mock Telegram user with invalid hash (will test endpoint validation)",
+        details: {
+          ...mockTelegramUser,
+          note: "Using invalid hash intentionally - real Telegram data requires valid HMAC-SHA256 hash"
+        }
       })
 
       // Step 3: Test Backend Login Endpoint
       try {
-        const loginResponse = await fetch('/supabase/functions/tg-login', {
+        const loginResponse = await fetch(API_ENDPOINTS.TELEGRAM_LOGIN, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(mockTelegramUser),
@@ -456,151 +579,49 @@ export default function DiagnosticsPage() {
             }
           })
 
-          // Step 4: Test Token Storage
-          const originalAccessToken = localStorage.getItem("sb-access-token")
-          const originalRefreshToken = localStorage.getItem("sb-refresh-token")
-
-          localStorage.setItem("sb-access-token", tokenData.access_token)
-          localStorage.setItem("sb-refresh-token", tokenData.refresh_token)
-
-          const storedAccessToken = localStorage.getItem("sb-access-token")
-          const storedRefreshToken = localStorage.getItem("sb-refresh-token")
-
-          results.push({
-            name: "Token Storage",
-            status: storedAccessToken && storedRefreshToken ? 'success' : 'error',
-            message: storedAccessToken && storedRefreshToken ? "Tokens stored successfully in localStorage" : "Failed to store tokens",
-            details: {
-              accessTokenStored: !!storedAccessToken,
-              refreshTokenStored: !!storedRefreshToken,
-              accessTokenLength: storedAccessToken?.length,
-              refreshTokenLength: storedRefreshToken?.length
-            }
-          })
-
-          // Step 5: Test getCurrentUserToken
-          try {
-            const { getCurrentUserToken } = await import('@/lib/auth')
-            const retrievedToken = await getCurrentUserToken()
-
-            results.push({
-              name: "Token Retrieval",
-              status: retrievedToken ? 'success' : 'error',
-              message: retrievedToken ? "getCurrentUserToken() works correctly" : "getCurrentUserToken() failed",
-              details: {
-                hasToken: !!retrievedToken,
-                tokenLength: retrievedToken?.length,
-                tokensMatch: retrievedToken === tokenData.access_token
-              }
-            })
-
-            // Step 6: Test Profile Loading
-            if (retrievedToken) {
-              try {
-                const { getCurrentUserProfile } = await import('@/lib/auth')
-                const profile = await getCurrentUserProfile()
-
-                results.push({
-                  name: "Profile Loading",
-                  status: profile ? 'success' : 'warning',
-                  message: profile ? "Profile loaded successfully" : "No profile found (this is normal for mock user)",
-                  details: profile ? {
-                    id: profile.id,
-                    username: profile.username,
-                    firstName: profile.first_name,
-                    lastName: profile.last_name,
-                    loadMethod: process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production' || window.location.hostname !== 'localhost' ? 'production-bypass' : 'supabase-auth'
-                  } : {
-                    message: "No profile data",
-                    loadMethod: process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production' || window.location.hostname !== 'localhost' ? 'production-bypass' : 'supabase-auth'
-                  }
-                })
-              } catch (profileError) {
-                const errorMessage = profileError instanceof Error ? profileError.message : String(profileError)
-                results.push({
-                  name: "Profile Loading",
-                  status: errorMessage.includes('Auth session missing') ? 'error' : 'warning',
-                  message: errorMessage.includes('Auth session missing') 
-                    ? "Profile loading failed with auth session error - this indicates production bypass is needed" 
-                    : "Profile loading failed (expected for mock user)",
-                  details: {
-                    error: errorMessage,
-                    isAuthSessionError: errorMessage.includes('Auth session missing'),
-                    loadMethod: process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production' || window.location.hostname !== 'localhost' ? 'production-bypass' : 'supabase-auth'
-                  }
-                })
-              }
-            }
-
-            // Step 7: Test Database Query
-            if (retrievedToken) {
-              try {
-                const testResponse = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/posts?limit=1`, {
-                  headers: {
-                    'Authorization': `Bearer ${retrievedToken}`,
-                    'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-                    'Content-Type': 'application/json'
-                  }
-                })
-
-                results.push({
-                  name: "Database Query Test",
-                  status: testResponse.ok ? 'success' : 'error',
-                  message: testResponse.ok ? "Database queries work with token" : `Database query failed: ${testResponse.status}`,
-                  details: {
-                    status: testResponse.status,
-                    statusText: testResponse.statusText,
-                    url: testResponse.url
-                  }
-                })
-              } catch (dbError) {
-                results.push({
-                  name: "Database Query Test",
-                  status: 'error',
-                  message: "Database query threw error",
-                  details: {
-                    error: dbError instanceof Error ? dbError.message : String(dbError)
-                  }
-                })
-              }
-            }
-
-          } catch (tokenError) {
-            results.push({
-              name: "Token Retrieval",
-              status: 'error',
-              message: "getCurrentUserToken() threw error",
-              details: {
-                error: tokenError instanceof Error ? tokenError.message : String(tokenError)
-              }
-            })
-          }
-
-          // Cleanup: Restore original tokens
-          if (originalAccessToken) {
-            localStorage.setItem("sb-access-token", originalAccessToken)
-          } else {
-            localStorage.removeItem("sb-access-token")
-          }
-
-          if (originalRefreshToken) {
-            localStorage.setItem("sb-refresh-token", originalRefreshToken)
-          } else {
-            localStorage.removeItem("sb-refresh-token")
-          }
+          // Only run token tests if we got valid tokens
+          await runTokenTests(tokenData, results)
 
         } else {
           const errorText = await loginResponse.text()
-          results.push({
-            name: "Backend Login Endpoint",
-            status: 'error',
-            message: `Backend login failed: ${loginResponse.status}`,
-            details: {
-              status: loginResponse.status,
-              statusText: loginResponse.statusText,
-              errorText: errorText
-            }
-          })
+          
+          if (loginResponse.status === 401) {
+            // 401 is expected for mock data with invalid hash - this means the endpoint is working!
+            results.push({
+              name: "Backend Login Endpoint",
+              status: 'success',
+              message: "Backend endpoint is working (401 expected for mock data with invalid hash)",
+              details: {
+                status: loginResponse.status,
+                statusText: loginResponse.statusText,
+                errorText: errorText,
+                explanation: "401 Unauthorized is the correct response for mock Telegram data with invalid HMAC-SHA256 hash. This confirms the endpoint is properly validating authentication data."
+              }
+            })
+
+            // Skip token tests since we don't have valid tokens
+            results.push({
+              name: "Token Tests",
+              status: 'warning',
+              message: "Token tests skipped due to invalid mock data (this is expected)",
+              details: {
+                reason: "Cannot test token storage, retrieval, and database access without valid authentication tokens",
+                note: "This is normal behavior - real Telegram login would provide valid tokens"
+              }
+            })
+
+          } else {
+            results.push({
+              name: "Backend Login Endpoint",
+              status: 'error',
+              message: `Backend login failed with unexpected status: ${loginResponse.status}`,
+              details: {
+                status: loginResponse.status,
+                statusText: loginResponse.statusText,
+                errorText: errorText
+              }
+            })
+          }
         }
       } catch (backendError) {
         results.push({

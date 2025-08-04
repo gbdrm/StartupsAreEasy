@@ -106,14 +106,17 @@ const isDuplicateSlug = response.status === 409 ||
 
 ### Authentication Architecture
 - **Global State**: Use `useSimpleAuth()` hook (NOT `useAuth()` - that's legacy) 
+- **Production Bypass**: In production, auth bypasses Supabase client calls that hang indefinitely - uses direct REST API with JWT tokens instead
+- **Token-Based Auth**: Production auth relies on localStorage tokens and direct database queries with Bearer authentication
 - **Page Reloads**: Auth state changes trigger `window.location.reload()` for consistency
 - **No Complex Syncing**: Avoid `useEffect` patterns to sync auth - let page reloads handle it
 - **Client-Only Auth**: Server components cannot access auth context - use client components for auth-dependent features
 - **Development**: Fake login available when `NEXT_PUBLIC_DEV_EMAIL/PASSWORD` environment variables are set
-- **Production**: Telegram authentication via `/supabase/functions/telegram.ts`
+- **Production**: Telegram authentication via backend function - bypasses hanging Supabase auth calls
 - **RLS Tokens**: All authenticated operations require `getCurrentUserToken()` for Row Level Security
-- **Timeout Handling**: Auth operations have 10-second timeouts to prevent hanging on stale sessions
+- **Timeout Handling**: Auth operations have 10-second timeouts in development to prevent hanging
 - **Emergency Reset**: Use `emergencyAuthReset()` function when auth state gets stuck after long inactivity
+- **Environment Detection**: Production bypass activates when `NODE_ENV=production`, `VERCEL_ENV=production`, or hostname ≠ localhost
 
 ### React Hooks
 ```typescript
@@ -181,6 +184,8 @@ When migrating components from legacy patterns:
 11. **Complex Auth Syncing**: Avoid `useEffect` patterns to sync auth state - rely on `window.location.reload()` for auth consistency
 12. **Server Component Auth**: Server components cannot access user auth context - handle auth-dependent features on client side
 13. **Auth Timeout Issues**: If app gets stuck on "Getting session...", user sessions may be stale after long inactivity - use `emergencyAuthReset()` for stuck states
+14. **Production Auth Hanging**: Never rely on `supabase.auth.getSession()` in production - use production bypass with localStorage tokens
+15. **Environment Detection**: Always use multi-method environment detection (`NODE_ENV`, `VERCEL_ENV`, hostname) for production bypass
 
 ## Component Migration Patterns
 

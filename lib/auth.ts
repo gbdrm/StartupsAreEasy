@@ -250,19 +250,19 @@ export async function signInWithTelegram(telegramUser: TelegramUser): Promise<Us
   })
 
   if (sessionError) {
-    console.error('Session error:', sessionError);
+    logger.error('Session error:', sessionError);
     throw new Error("Failed to set session");
   }
 
   // Get user from JWT
   const { data: userData, error: userError } = await supabase.auth.getUser();
   if (userError || !userData?.user) {
-    console.error('No authenticated user after setting session:', userError);
+    logger.error('No authenticated user after setting session:', userError);
     throw new Error("No authenticated user found after setting JWT");
   }
   const user = userData.user;
 
-  console.log('🔵 Got user from session:', {
+  logger.debug('Got user from session:', {
     id: user.id,
     email: user.email,
     userMetadata: user.user_metadata,
@@ -270,7 +270,7 @@ export async function signInWithTelegram(telegramUser: TelegramUser): Promise<Us
   })
 
   // Upsert profile info
-  console.log('🔵 Upserting profile with data:', {
+  logger.debug('Upserting profile with data:', {
     id: user.id,
     username: telegramUser.username || `user_${telegramUser.id}`,
     first_name: telegramUser.first_name,
@@ -291,11 +291,11 @@ export async function signInWithTelegram(telegramUser: TelegramUser): Promise<Us
     .select()
     .single();
   if (profileError) {
-    console.error('Profile upsert error:', profileError);
+    logger.error('Profile upsert error:', profileError);
     throw profileError;
   }
 
-  console.log('🔵 Profile upserted successfully:', {
+  logger.debug('Profile upserted successfully:', {
     id: profile.id,
     username: profile.username,
     first_name: profile.first_name,
@@ -311,7 +311,7 @@ export async function signInWithTelegram(telegramUser: TelegramUser): Promise<Us
     last_name: profile.last_name,
   }
 
-  console.log('🔵 Returning user object:', userResult)
+  logger.debug('Returning user object:', userResult)
 
   return userResult;
 }
