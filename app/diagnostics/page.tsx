@@ -266,22 +266,67 @@ export default function DiagnosticsPage() {
 
       // Test 10: Check environment variables (Client-side)
       const envChecks = {
-        SUPABASE_URL: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
-        SUPABASE_ANON_KEY: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-        TELEGRAM_BOT_TOKEN: !!process.env.NEXT_PUBLIC_TELEGRAM_BOT_TOKEN,
-        TELEGRAM_FUNCTION_URL: !!process.env.NEXT_PUBLIC_TELEGRAM_FUNCTION_URL
+        NEXT_PUBLIC_SUPABASE_URL: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+        NEXT_PUBLIC_TELEGRAM_BOT_TOKEN: !!process.env.NEXT_PUBLIC_TELEGRAM_BOT_TOKEN,
+        NEXT_PUBLIC_TELEGRAM_FUNCTION_URL: !!process.env.NEXT_PUBLIC_TELEGRAM_FUNCTION_URL,
+        NEXT_PUBLIC_DEV_EMAIL: !!process.env.NEXT_PUBLIC_DEV_EMAIL,
+        NEXT_PUBLIC_DEV_PASSWORD: !!process.env.NEXT_PUBLIC_DEV_PASSWORD,
+        NODE_ENV: process.env.NODE_ENV,
+        VERCEL_ENV: process.env.VERCEL_ENV
       }
 
-      const missingEnvVars = Object.entries(envChecks).filter(([key, exists]) => !exists).map(([key]) => key)
+      const requiredEnvVars = ['NEXT_PUBLIC_SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_ANON_KEY']
+      const optionalEnvVars = ['NEXT_PUBLIC_TELEGRAM_BOT_TOKEN', 'NEXT_PUBLIC_TELEGRAM_FUNCTION_URL', 'NEXT_PUBLIC_DEV_EMAIL', 'NEXT_PUBLIC_DEV_PASSWORD']
+      
+      const missingRequired = requiredEnvVars.filter(key => !envChecks[key as keyof typeof envChecks])
+      const missingOptional = optionalEnvVars.filter(key => !envChecks[key as keyof typeof envChecks])
       
       results.push({
         name: '[Client] Environment Variables',
-        status: missingEnvVars.length === 0 ? 'success' : 'warning',
-        message: missingEnvVars.length === 0 
-          ? 'All environment variables are set'
-          : `Missing (optional): ${missingEnvVars.join(', ')}`,
-        details: envChecks
+        status: missingRequired.length === 0 ? 'success' : 'error',
+        message: missingRequired.length === 0 
+          ? `All required env vars set${missingOptional.length > 0 ? ` (${missingOptional.length} optional missing)` : ''}`
+          : `Missing required: ${missingRequired.join(', ')}`,
+        details: {
+          ...envChecks,
+          missing_required: missingRequired,
+          missing_optional: missingOptional
+        }
       })
+
+      // Test 11: Auth State Verification (Client-side)
+      try {
+        const authState = {
+          hasCurrentUser: !!currentUser,
+          userId: currentUser?.id,
+          userName: currentUser?.name,
+          userEmail: currentUser?.username,
+          hasFakeLogin: !!(process.env.NEXT_PUBLIC_DEV_EMAIL && process.env.NEXT_PUBLIC_DEV_PASSWORD),
+          hasStoredToken: !!localStorage.getItem('sb-access-token'),
+          hasRefreshToken: !!localStorage.getItem('sb-refresh-token'),
+          isProduction: process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production' || (typeof window !== 'undefined' && window.location.hostname !== 'localhost')
+        }
+
+        const authStatus = currentUser ? 'success' : 'warning'
+        const authMessage = currentUser 
+          ? `Authenticated as ${currentUser.name} (${currentUser.username})`
+          : 'Not authenticated (this is normal for anonymous users)'
+
+        results.push({
+          name: '[Client] Auth State',
+          status: authStatus,
+          message: authMessage,
+          details: authState
+        })
+      } catch (authErr) {
+        results.push({
+          name: '[Client] Auth State',
+          status: 'error',
+          message: `Auth check failed: ${authErr instanceof Error ? authErr.message : String(authErr)}`,
+          details: authErr
+        })
+      }
 
       // Test 12: Test Telegram login endpoint (Client-side)
       try {

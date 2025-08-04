@@ -58,31 +58,22 @@ export async function signInWithTelegram(telegramUser: TelegramUser): Promise<Us
       localStorage.setItem("sb-refresh-token", refresh_token);
 
       logger.info('🚨 PRODUCTION BYPASS: Tokens stored, forcing page reload')
-
-      // Create a proper user object instead of minimal one
-      const userObj = {
-        id: `prod-${telegramUser.id}`,
-        name: telegramUser.first_name + (telegramUser.last_name ? ` ${telegramUser.last_name}` : ''),
-        username: telegramUser.username || `user${telegramUser.id}`,
-        avatar: telegramUser.photo_url || "",
-        telegram_id: telegramUser.id,
-        first_name: telegramUser.first_name,
-        last_name: telegramUser.last_name || "",
-        bio: undefined,
-        location: undefined,
-        website: undefined,
-        joined_at: new Date().toISOString()
-      } as User
-
-      // Force immediate page reload AFTER returning user object
-      setTimeout(() => {
-        if (typeof window !== 'undefined') {
-          logger.info('🚨 PRODUCTION BYPASS: Page reloading now...')
-          window.location.reload()
-        }
-      }, 200) // Slightly longer delay to ensure UI updates
-
-      return userObj
+      
+      // Don't return any user object - this prevents ANY database calls
+      // Force immediate page reload and let onAuthStateChange handle everything
+      
+      // Mark that we're in a reload state so components know to wait
+      localStorage.setItem("auth-reload-pending", "true")
+      
+      // Force immediate page reload - no user object returned
+      if (typeof window !== 'undefined') {
+        logger.info('🚨 PRODUCTION BYPASS: Page reloading immediately...')
+        window.location.reload()
+      }
+      
+      // This code should never be reached due to reload, but just in case:
+      // Throw a special error that the auth hook will handle gracefully
+      throw new Error("AUTH_RELOAD_IN_PROGRESS")
 
     } catch (error) {
       logger.error('🚨 PRODUCTION BYPASS ERROR:', error)

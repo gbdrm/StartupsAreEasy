@@ -164,12 +164,17 @@ export async function GET(request: NextRequest) {
 
         const optionalEnvVars = [
             'SUPABASE_SERVICE_ROLE_KEY',
-            'NEXT_PUBLIC_TELEGRAM_BOT_TOKEN'
+            'NEXT_PUBLIC_TELEGRAM_BOT_TOKEN',
+            'NEXT_PUBLIC_TELEGRAM_FUNCTION_URL',
+            'NEXT_PUBLIC_DEV_EMAIL',
+            'NEXT_PUBLIC_DEV_PASSWORD'
         ]
 
         const envStatus = {
-            required: requiredEnvVars.map(key => ({ key, exists: !!process.env[key] })),
-            optional: optionalEnvVars.map(key => ({ key, exists: !!process.env[key] }))
+            required: requiredEnvVars.map(key => ({ key, exists: !!process.env[key], value: process.env[key] ? '[SET]' : '[MISSING]' })),
+            optional: optionalEnvVars.map(key => ({ key, exists: !!process.env[key], value: process.env[key] ? '[SET]' : '[MISSING]' })),
+            NODE_ENV: process.env.NODE_ENV,
+            VERCEL_ENV: process.env.VERCEL_ENV
         }
 
         const missingRequired = envStatus.required.filter(env => !env.exists)
@@ -178,7 +183,7 @@ export async function GET(request: NextRequest) {
             name: 'Environment Variables',
             status: missingRequired.length === 0 ? 'success' : 'error',
             message: missingRequired.length === 0
-                ? 'All required environment variables are set'
+                ? `All required environment variables are set (${envStatus.optional.filter(e => e.exists).length}/${envStatus.optional.length} optional set)`
                 : `Missing required variables: ${missingRequired.map(env => env.key).join(', ')}`,
             details: envStatus
         })
