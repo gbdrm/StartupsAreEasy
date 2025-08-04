@@ -3,7 +3,8 @@
 ## Architecture Overview
 This is a Next.js 15 social platform with a unique **direct REST API architecture** instead 12. **Auth Timeout Issues**: If app gets stuck on "Getting session...", user sessions may be stale after long inactivity - use `emergencyAuthReset()` for stuck states. Extended timeout to 15 seconds for production reliability.
 13. **Production Telegram Issues**: Telegram authentication may show wrong email or fail to update UI. Added comprehensive debugging and force page reload after successful sign-in to ensure UI consistency.
-14. **Email Conflicts**: Real emails in database can conflict with Telegram fake emails (`telegram-ID@telegram.local`). Use `debugTelegramUser()` function to diagnose expected vs actual email lookup issues.f traditional Supabase client patterns. The project uses TypeScript, Supabase PostgreSQL, and Telegram authentication.
+14. **Email Conflicts**: Real emails in database can conflict with Telegram fake emails (`telegram-ID@telegram.local`). Use `debugTelegramUser()` function to diagnose expected vs actual email lookup issues.
+15. **Production Auth Hanging**: In production, `supabase.auth.getSession()` may hang indefinitely even when auth endpoints return 200. Use production bypass in `useSimpleAuth` hook to skip session check and start with clean state. Auth still works through `onAuthStateChange` listener and login flows.f traditional Supabase client patterns. The project uses TypeScript, Supabase PostgreSQL, and Telegram authentication.
 
 ### Critical Architectural Decisions
 - **Direct REST API**: All database operations use `fetch()` to Supabase REST endpoints (`lib/api-direct.ts`) to avoid multiple GoTrueClient instances
@@ -257,5 +258,25 @@ NEXT_PUBLIC_DEV_PASSWORD=secure_password    # Development only
 - Use `lib/logger.ts` for environment-aware logging (mandatory - never use console.log)
 - Logger automatically filters debug logs in production, shows all errors
 - Debug logs: `logger.debug()`, Info: `logger.info()`, Errors: `logger.error()`
+
+## Production Auth Issues & Solutions
+### Supabase Auth Hanging Issue
+- **Problem**: `supabase.auth.getSession()` may hang indefinitely in production even when auth endpoints return 200 status
+- **Symptoms**: Page loads with extended timeouts, "Failsafe timeout" and "Initial session timed out" errors after 10-15 seconds
+- **Root Cause**: Supabase JavaScript client has issues with session retrieval in production environments, while REST endpoints work fine
+- **Solution**: Production bypass in `useSimpleAuth` hook that skips initial session check but preserves all auth functionality through `onAuthStateChange` listener
+
+### Auth Debugging Steps
+1. **Test auth endpoints directly**: `fetch('https://your-project.supabase.co/auth/v1/settings')` should return 200
+2. **Check REST API**: `fetch('https://your-project.supabase.co/rest/v1/')` should work normally  
+3. **Environment check**: Verify `NODE_ENV` and that production/development use same Supabase URLs
+4. **Network inspection**: Look for hanging requests in browser Network tab
+5. **Production bypass**: Temporary skip of `getSession()` in production while maintaining login functionality
+
+### Telegram Authentication Debugging
+- **Profile Missing telegram_id**: Check if user profile has `telegram_id` field populated for proper lookup
+- **Email Conflicts**: Database may have both real email users and fake telegram email users - use SQL queries to verify
+- **UI Update Issues**: Force page reload after successful authentication to ensure UI consistency
+- **JWT vs Session Mismatch**: JWT payload may contain correct user while session shows different email
 
 Refer to `docs/` folder for detailed patterns, troubleshooting guides, and architectural decisions.

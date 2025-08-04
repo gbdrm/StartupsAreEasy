@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { getCurrentUserProfile, signInWithTelegram, signOut } from '@/lib/auth'
+import { logger } from '@/lib/logger'
 import type { TelegramUser } from '@/lib/auth'
 import type { User } from '@/lib/types'
 
@@ -24,13 +25,13 @@ function setGlobalUser(user: User | null) {
 }
 
 function setGlobalLoading(loading: boolean) {
-    console.log(`[${new Date().toISOString()}] useSimpleAuth: Setting global loading to ${loading}`)
+    logger.debug(`useSimpleAuth: Setting global loading to ${loading}`)
     globalLoading = loading
     notifySubscribers()
 }
 
 function resetAuth() {
-    console.log(`[${new Date().toISOString()}] useSimpleAuth: Resetting auth state`)
+    logger.debug("useSimpleAuth: Resetting auth state")
 
     // Clear any localStorage items
     if (typeof window !== 'undefined') {
@@ -80,17 +81,29 @@ export function useSimpleAuth() {
             try {
                 console.log(`[${new Date().toISOString()}] useSimpleAuth: Getting initial session...`)
 
-                // Add timeout to prevent hanging on initial session check
+                // TEMPORARY: Skip session check only in production due to hanging issue
+                const isProduction = process.env.NODE_ENV === 'production'
+                if (isProduction) {
+                    console.log(`[${new Date().toISOString()}] useSimpleAuth: Bypassing session check due to production hanging issue`)
+                    console.log(`[${new Date().toISOString()}] useSimpleAuth: Starting with clean auth state`)
+                    setGlobalUser(null)
+                    setGlobalLoading(false)
+                    return
+                }
+
+                // Normal session check for development
                 const sessionPromise = supabase.auth.getSession()
                 const timeoutPromise = new Promise<never>((_, reject) => {
-                    setTimeout(() => reject(new Error('Initial session timeout')), 15000) // 15 second timeout for production
+                    setTimeout(() => reject(new Error('Initial session timeout')), 5000) // 5 second timeout
                 })
 
+                console.log(`[${new Date().toISOString()}] useSimpleAuth: About to race session vs timeout...`)
                 let sessionResult
                 try {
                     sessionResult = await Promise.race([sessionPromise, timeoutPromise])
+                    console.log(`[${new Date().toISOString()}] useSimpleAuth: Session call completed successfully`)
                 } catch (timeoutError) {
-                    console.error(`[${new Date().toISOString()}] useSimpleAuth: Initial session timed out, clearing auth`)
+                    console.error(`[${new Date().toISOString()}] useSimpleAuth: Initial session timed out (5s), clearing auth`)
                     setGlobalUser(null)
                     setGlobalLoading(false)
                     return

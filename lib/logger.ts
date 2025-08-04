@@ -30,7 +30,7 @@ function shouldLog(level: LogLevel): boolean {
 function formatMessage(level: LogLevel, message: string, context?: any): string {
     const timestamp = config.timestamp ? `[${new Date().toISOString()}]` : ''
     const levelTag = `[${level.toUpperCase()}]`
-    return `  `
+    return `${timestamp} ${levelTag} ${message}`
 }
 
 export const logger = {
