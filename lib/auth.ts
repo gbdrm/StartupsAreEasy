@@ -58,19 +58,19 @@ export async function signInWithTelegram(telegramUser: TelegramUser): Promise<Us
       localStorage.setItem("sb-refresh-token", refresh_token);
 
       logger.info('🚨 PRODUCTION BYPASS: Tokens stored, forcing page reload')
-      
+
       // Don't return any user object - this prevents ANY database calls
       // Force immediate page reload and let onAuthStateChange handle everything
-      
+
       // Mark that we're in a reload state so components know to wait
       localStorage.setItem("auth-reload-pending", "true")
-      
+
       // Force immediate page reload - no user object returned
       if (typeof window !== 'undefined') {
         logger.info('🚨 PRODUCTION BYPASS: Page reloading immediately...')
         window.location.reload()
       }
-      
+
       // This code should never be reached due to reload, but just in case:
       // Throw a special error that the auth hook will handle gracefully
       throw new Error("AUTH_RELOAD_IN_PROGRESS")

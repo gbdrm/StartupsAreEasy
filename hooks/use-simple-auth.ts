@@ -83,7 +83,7 @@ export function useSimpleAuth() {
                 // Check if we're in the middle of an auth reload
                 if (typeof window !== 'undefined' && localStorage.getItem("auth-reload-pending")) {
                     logger.info("useSimpleAuth: Auth reload pending, waiting for page reload...")
-                    
+
                     // Failsafe: Clear the reload state after 5 seconds if page doesn't reload
                     setTimeout(() => {
                         if (localStorage.getItem("auth-reload-pending")) {
@@ -92,7 +92,7 @@ export function useSimpleAuth() {
                             setGlobalLoading(false)
                         }
                     }, 5000)
-                    
+
                     // Keep loading state while waiting for reload
                     setGlobalUser(null)
                     setGlobalLoading(true)
