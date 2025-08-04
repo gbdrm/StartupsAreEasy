@@ -4,13 +4,6 @@ import { logger } from './logger'
 import { authCircuitBreaker } from './auth-circuit-breaker'
 import type { User } from "./types";
 
-// Safe reload function that works in both browser and SSR
-function safeReload() {
-  if (typeof window !== 'undefined') {
-    window.location.reload()
-  }
-}
-
 export type TelegramUser = {
   id: number;
   first_name: string;
@@ -33,12 +26,12 @@ export async function signInWithTelegram(telegramUser: TelegramUser): Promise<Us
   })
 
   // AGGRESSIVE PRODUCTION BYPASS: Skip all Supabase auth calls in production
-  const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production' || typeof window !== 'undefined' && window.location.hostname !== 'localhost'
+  const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production' || window.location.hostname !== 'localhost'
 
   logger.info('🔍 Environment detection', {
     NODE_ENV: process.env.NODE_ENV,
     VERCEL_ENV: process.env.VERCEL_ENV,
-    hostname: typeof window !== 'undefined' ? window.location.hostname : 'server',
+    hostname: window.location.hostname,
     isProduction
   })
 
@@ -61,28 +54,71 @@ export async function signInWithTelegram(telegramUser: TelegramUser): Promise<Us
 
       const { access_token, refresh_token } = await res.json();
 
-      // Store tokens directly and reload (only in browser)
-      if (typeof localStorage !== 'undefined') {
-        localStorage.setItem("sb-access-token", access_token);
-        localStorage.setItem("sb-refresh-token", refresh_token);
+      // Store tokens directly
+      localStorage.setItem("sb-access-token", access_token);
+      localStorage.setItem("sb-refresh-token", refresh_token);
 
-        logger.info('🚨 PRODUCTION BYPASS: Tokens stored, skipping setSession (causes hanging)')
+      logger.info('🚨 PRODUCTION BYPASS: Tokens stored, skipping setSession (causes hanging)')
 
-        // Store tokens for getCurrentUserToken() to find
-        localStorage.setItem("sb-access-token", access_token);
-        localStorage.setItem("sb-refresh-token", refresh_token);
+      // Mark that we completed login successfully (prevents reload loops)
+      localStorage.setItem("telegram-login-complete", "true")
 
-        // Mark that we completed login successfully (prevents reload loops)
-        localStorage.setItem("telegram-login-complete", "true")
+      // Try to get the real user profile using the stored JWT
+      try {
+        logger.info('🚨 PRODUCTION BYPASS: Attempting to fetch real user profile')
+
+        // Parse JWT to get user ID
+        const payload = JSON.parse(atob(access_token.split('.')[1]));
+        const userId = payload.sub;
+
+        // Make direct API call to get user profile using the JWT
+        const profileResponse = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/profiles?select=*&id=eq.${userId}`, {
+          headers: {
+            'Authorization': `Bearer ${access_token}`,
+            'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (profileResponse.ok) {
+          const profiles = await profileResponse.json();
+          if (profiles && profiles.length > 0) {
+            const profile = profiles[0];
+            const realUser: User = {
+              id: profile.id,
+              name: `${profile.first_name ?? ""} ${profile.last_name ?? ""}`.trim(),
+              username: profile.username ?? "",
+              avatar: profile.avatar_url ?? "",
+              telegram_id: profile.telegram_id,
+              first_name: profile.first_name,
+              last_name: profile.last_name,
+              bio: profile.bio,
+              location: profile.location,
+              website: profile.website,
+              joined_at: profile.created_at
+            };
+
+            logger.info('🚨 PRODUCTION BYPASS: Successfully fetched real user profile')
+            return realUser;
+          }
+        }
+      } catch (profileError) {
+        logger.warn('🚨 PRODUCTION BYPASS: Failed to fetch real profile, will reload page:', profileError);
       }
 
-      // Return a minimal user that will get replaced by onAuthStateChange
-      // when the auth hook detects the stored tokens
-      const tempUser: User = {
-        id: 'temp-loading', // Safe ID that won't cause UUID errors
-        name: telegramUser.first_name || 'Loading...',
-        username: telegramUser.username || 'loading',
-        avatar: '',
+      // If we couldn't get the real profile, trigger a page reload
+      // This ensures the auth hook can properly load the user
+      logger.info('🚨 PRODUCTION BYPASS: Could not fetch profile, forcing reload for proper auth flow')
+      setTimeout(() => {
+        window.location.reload()
+      }, 500);
+
+      // Return a minimal placeholder that won't be used (page will reload)
+      return {
+        id: `loading-${Date.now()}`,
+        name: "Loading...",
+        username: "loading",
+        avatar: "",
         telegram_id: telegramUser.id,
         first_name: telegramUser.first_name || 'Loading',
         last_name: telegramUser.last_name || '',
@@ -90,10 +126,7 @@ export async function signInWithTelegram(telegramUser: TelegramUser): Promise<Us
         location: undefined,
         website: undefined,
         joined_at: new Date().toISOString()
-      }
-
-      logger.info('🚨 PRODUCTION BYPASS: Returning temp user, auth hook will load real profile')
-      return tempUser
+      } as User
 
     } catch (error) {
       logger.error('🚨 PRODUCTION BYPASS ERROR:', error)
@@ -202,41 +235,8 @@ export async function signInWithTelegram(telegramUser: TelegramUser): Promise<Us
 
   logger.debug('Setting session...')
 
-  // Store JWT in localStorage for production bypass (only in browser)
-  if (typeof localStorage !== 'undefined') {
-    localStorage.setItem("sb-access-token", access_token);
-  }
-
-  // PRODUCTION BYPASS: Skip setSession in production due to hanging issue
-  if (isProduction) {
-    logger.info('Production bypass: Skipping setSession call due to hanging issue')
-    logger.info('Tokens stored, forcing page reload for session consistency')
-
-    // Store tokens in localStorage for manual session management
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem("sb-refresh-token", refresh_token);
-    }
-
-    // Force page reload to let onAuthStateChange handle the session
-    setTimeout(() => {
-      safeReload()
-    }, 500) // Short delay to ensure tokens are stored
-
-    // Return a temporary user object - the reload will establish proper session
-    return {
-      id: `temp-${Date.now()}`,
-      name: "Loading...",
-      username: "loading",
-      avatar: "",
-      telegram_id: undefined,
-      first_name: "Loading...",
-      last_name: "",
-      bio: undefined,
-      location: undefined,
-      website: undefined,
-      joined_at: new Date().toISOString()
-    } as User
-  }
+  // Store JWT in localStorage for potential future use
+  localStorage.setItem("sb-access-token", access_token);
 
   logger.debug('Calling supabase.auth.setSession...')
 
@@ -328,28 +328,24 @@ export async function signInWithTelegram(telegramUser: TelegramUser): Promise<Us
 export async function signOut(): Promise<void> {
   logger.debug('signOut called')
 
-  // Clear localStorage tokens first (only in browser)
-  if (typeof localStorage !== 'undefined') {
-    localStorage.removeItem("sb-access-token");
-    localStorage.removeItem("sb-refresh-token");
-    localStorage.removeItem("telegram-login-complete");
-  }
+  // Clear localStorage tokens first
+  localStorage.removeItem("sb-access-token");
+  localStorage.removeItem("sb-refresh-token");
+  localStorage.removeItem("telegram-login-complete");
 
   // PRODUCTION BYPASS: Skip supabase.auth.signOut in production
-  const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production' || typeof window !== 'undefined' && window.location.hostname !== 'localhost'
+  const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production' || window.location.hostname !== 'localhost'
 
   if (isProduction) {
     logger.info('🚨 PRODUCTION BYPASS: Skipping supabase.auth.signOut()')
     // Clear all our custom localStorage items
-    if (typeof localStorage !== 'undefined') {
-      localStorage.removeItem("sb-user");
-      localStorage.removeItem("sb-access-token");
-      localStorage.removeItem("sb-refresh-token");
-    }
+    localStorage.removeItem("sb-user");
+    localStorage.removeItem("sb-access-token");
+    localStorage.removeItem("sb-refresh-token");
 
     // Force page reload to clear state
     setTimeout(() => {
-      safeReload()
+      window.location.reload()
     }, 100)
     return;
   }
@@ -361,12 +357,10 @@ export async function signOut(): Promise<void> {
     throw new Error("Failed to sign out");
   }
 
-  // Clear all our custom localStorage items (only in browser)
-  if (typeof localStorage !== 'undefined') {
-    localStorage.removeItem("sb-user");
-    localStorage.removeItem("sb-access-token");
-    localStorage.removeItem("sb-refresh-token");
-  }
+  // Clear all our custom localStorage items
+  localStorage.removeItem("sb-user");
+  localStorage.removeItem("sb-access-token");
+  localStorage.removeItem("sb-refresh-token");
 
   logger.debug('signOut completed successfully')
 }
@@ -376,16 +370,14 @@ export async function getCurrentUserToken(): Promise<string | null> {
   logger.debug('getCurrentUserToken called')
 
   try {
-    // In production, read from localStorage directly (SSR safe)
-    const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production' || typeof window !== 'undefined' && window.location.hostname !== 'localhost'
+    // In production, read from localStorage directly
+    const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production' || window.location.hostname !== 'localhost'
 
     if (isProduction) {
-      if (typeof localStorage !== 'undefined') {
-        const token = localStorage.getItem("sb-access-token");
-        if (token) {
-          logger.debug('🚨 PRODUCTION BYPASS: Found token in localStorage')
-          return token;
-        }
+      const token = localStorage.getItem("sb-access-token");
+      if (token) {
+        logger.debug('🚨 PRODUCTION BYPASS: Found token in localStorage')
+        return token;
       }
       logger.debug('🚨 PRODUCTION BYPASS: No token found in localStorage')
       return null;
@@ -411,30 +403,28 @@ export async function getCurrentUser(): Promise<User | null> {
   logger.debug('getCurrentUser called')
 
   try {
-    // In production, bypass Supabase and use localStorage (SSR safe)
-    const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production' || typeof window !== 'undefined' && window.location.hostname !== 'localhost'
+    // In production, bypass Supabase and use localStorage
+    const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production' || window.location.hostname !== 'localhost'
 
     if (isProduction) {
       logger.info('🚨 PRODUCTION BYPASS: getCurrentUser bypassing Supabase')
 
       // Check if we have stored tokens
-      if (typeof localStorage !== 'undefined') {
-        const hasToken = localStorage.getItem("sb-access-token");
-        if (!hasToken) {
-          logger.debug('🚨 PRODUCTION BYPASS: No access token found')
-          return null;
-        }
+      const hasToken = localStorage.getItem("sb-access-token");
+      if (!hasToken) {
+        logger.debug('🚨 PRODUCTION BYPASS: No access token found')
+        return null;
+      }
 
-        // Check if we have cached user data
-        const cachedUser = localStorage.getItem("sb-user");
-        if (cachedUser) {
-          try {
-            const user = JSON.parse(cachedUser);
-            logger.debug('🚨 PRODUCTION BYPASS: Returning cached user')
-            return user;
-          } catch (e) {
-            logger.debug('🚨 PRODUCTION BYPASS: Failed to parse cached user')
-          }
+      // Check if we have cached user data
+      const cachedUser = localStorage.getItem("sb-user");
+      if (cachedUser) {
+        try {
+          const user = JSON.parse(cachedUser);
+          logger.debug('🚨 PRODUCTION BYPASS: Returning cached user')
+          return user;
+        } catch (e) {
+          logger.debug('🚨 PRODUCTION BYPASS: Failed to parse cached user')
         }
       }
 
@@ -485,7 +475,7 @@ export async function getCurrentUser(): Promise<User | null> {
 export async function refreshAuthSession(): Promise<void> {
   logger.debug('refreshAuthSession called');
 
-  const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production' || typeof window !== 'undefined' && window.location.hostname !== 'localhost'
+  const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production' || window.location.hostname !== 'localhost'
 
   if (isProduction) {
     logger.info('🚨 PRODUCTION BYPASS: Skipping session refresh')
@@ -525,7 +515,7 @@ export async function handleAuthError(error: any): Promise<boolean> {
 
       // If that doesn't work, force a page reload
       setTimeout(() => {
-        safeReload();
+        window.location.reload();
       }, 1000);
 
       return true; // Indicate we handled the error
@@ -533,7 +523,7 @@ export async function handleAuthError(error: any): Promise<boolean> {
       logger.error('Auth recovery failed:', refreshError);
       // Force reload as last resort
       setTimeout(() => {
-        safeReload();
+        window.location.reload();
       }, 1000);
       return true;
     }

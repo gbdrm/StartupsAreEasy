@@ -420,8 +420,8 @@ export default function DiagnosticsPage() {
       // Step 6: Test Profile Loading
       if (retrievedToken) {
         try {
-          const { getCurrentUserProfile } = await import('@/lib/auth')
-          const profile = await getCurrentUserProfile()
+          const { getCurrentUser } = await import('@/lib/auth')
+          const profile = await getCurrentUser()
 
           results.push({
             name: "Profile Loading",

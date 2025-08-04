@@ -305,29 +305,7 @@ export function useSimpleAuth() {
     const login = async (telegramUser: TelegramUser) => {
         try {
             const user = await signInWithTelegram(telegramUser)
-
-            // If we got a temp user (production bypass), start loading the real profile
-            if (user && user.id === 'temp-loading') {
-                logger.info("useSimpleAuth: Got temp user, will load real profile shortly")
-                setGlobalUser(user) // Show temp user immediately
-
-                // Try to load real profile after a short delay
-                setTimeout(async () => {
-                    try {
-                        const realProfile = await getCurrentUser()
-                        if (realProfile) {
-                            logger.info("useSimpleAuth: Loaded real profile, replacing temp user")
-                            setGlobalUser(realProfile)
-                        }
-                    } catch (profileError) {
-                        logger.error("useSimpleAuth: Failed to load real profile:", profileError)
-                    }
-                }, 500) // Half-second delay
-
-            } else {
-                // Normal dev login
-                setGlobalUser(user)
-            }
+            setGlobalUser(user)
 
         } catch (error) {
             if (error instanceof Error && error.message === "AUTH_RELOAD_IN_PROGRESS") {
