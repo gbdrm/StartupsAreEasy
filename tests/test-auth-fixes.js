@@ -95,6 +95,12 @@ async function testCurrentAuthState() {
 function simulateTabSwitch() {
     console.log('\n📋 Test 4: Simulating Tab Switch')
 
+    // Skip test if not in browser environment
+    if (typeof document === 'undefined') {
+        console.log('⚠️ Skipping tab switch test - not in browser environment')
+        return true
+    }
+
     // Simulate page becoming hidden then visible
     Object.defineProperty(document, 'hidden', {
         writable: true,

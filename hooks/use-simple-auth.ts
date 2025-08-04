@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import { getCurrentUserProfile, signInWithTelegram, signOut } from '@/lib/auth'
+import { getCurrentUser, signInWithTelegram, signOut } from '@/lib/auth'
 import { logger } from '@/lib/logger'
 import { usePageVisibility } from '@/hooks/use-page-visibility'
 import type { TelegramUser } from '@/lib/auth'
@@ -78,7 +78,7 @@ export function useSimpleAuth() {
             // Validate current auth state when returning to tab
             const validateAuth = async () => {
                 try {
-                    const profile = await getCurrentUserProfile()
+                    const profile = await getCurrentUser()
                     if (!profile && globalUser) {
                         logger.warn("useSimpleAuth: Auth validation failed after tab switch, clearing state")
                         resetAuth()
@@ -143,7 +143,7 @@ export function useSimpleAuth() {
                     if (hasStoredToken && loginComplete) {
                         logger.info("useSimpleAuth: Found stored tokens, loading user profile")
                         try {
-                            const profile = await getCurrentUserProfile()
+                            const profile = await getCurrentUser()
                             if (profile) {
                                 logger.info("useSimpleAuth: Successfully loaded profile from stored tokens")
                                 setGlobalUser(profile)
@@ -182,7 +182,7 @@ export function useSimpleAuth() {
 
                                 if (payload.exp && payload.exp > now) {
                                     logger.info("useSimpleAuth: Using valid stored token in development")
-                                    const profile = await getCurrentUserProfile()
+                                    const profile = await getCurrentUser()
                                     if (profile) {
                                         setGlobalUser(profile)
                                         setGlobalLoading(false)
@@ -217,7 +217,7 @@ export function useSimpleAuth() {
 
                 if (session?.user) {
                     logger.info("useSimpleAuth: Found existing session for user", { userId: session.user.id })
-                    const profile = await getCurrentUserProfile()
+                    const profile = await getCurrentUser()
                     logger.debug("useSimpleAuth: Got profile", {
                         profile: profile ? `${profile.first_name} ${profile.last_name} (@${profile.username})` : 'null'
                     })
@@ -265,7 +265,7 @@ export function useSimpleAuth() {
                                 localStorage.removeItem("auth-reload-pending")
                             }
 
-                            const profile = await getCurrentUserProfile()
+                            const profile = await getCurrentUser()
                             logger.debug("useSimpleAuth: Got profile after sign in", {
                                 profile: profile ? `${profile.first_name} ${profile.last_name} (@${profile.username})` : 'null'
                             })
@@ -314,7 +314,7 @@ export function useSimpleAuth() {
                 // Try to load real profile after a short delay
                 setTimeout(async () => {
                     try {
-                        const realProfile = await getCurrentUserProfile()
+                        const realProfile = await getCurrentUser()
                         if (realProfile) {
                             logger.info("useSimpleAuth: Loaded real profile, replacing temp user")
                             setGlobalUser(realProfile)

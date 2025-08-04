@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react"
-import { signInWithTelegram, getCurrentUserProfile, signOut } from "@/lib/auth"
+import { signInWithTelegram, getCurrentUser, signOut } from "@/lib/auth"
 import { supabase } from "@/lib/supabase"
 import type { User } from "@/lib/types"
 import type { TelegramUser } from "@/lib/auth"
@@ -23,7 +23,7 @@ export function useAuth() {
                         if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN') {
                             logger.log(`[${new Date().toISOString()}] useAuth: Fetching user profile for event:`, event)
 
-                            const user = await getCurrentUserProfile()
+                            const user = await getCurrentUser()
 
                             logger.log(`[${new Date().toISOString()}] useAuth: Got user profile:`, user ? `${user.name} (${user.id})` : 'null')
                             setCurrentUser(user)

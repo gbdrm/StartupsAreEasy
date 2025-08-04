@@ -3,9 +3,16 @@ import { getCurrentUserToken } from '@/lib/auth'
 import { logger } from '@/lib/logger'
 
 export function usePageVisibility() {
-    const [isVisible, setIsVisible] = useState(!document.hidden)
+    const [isVisible, setIsVisible] = useState(() => {
+        // Safe check for document availability during SSR
+        if (typeof document === 'undefined') return true
+        return !document.hidden
+    })
 
     useEffect(() => {
+        // Skip if not in browser environment
+        if (typeof document === 'undefined') return
+
         const handleVisibilityChange = async () => {
             const wasHidden = !isVisible
             const isNowVisible = !document.hidden

@@ -4,6 +4,13 @@ import { logger } from './logger'
 import { authCircuitBreaker } from './auth-circuit-breaker'
 import type { User } from "./types";
 
+// Safe reload function that works in both browser and SSR
+function safeReload() {
+  if (typeof window !== 'undefined') {
+    window.location.reload()
+  }
+}
+
 export type TelegramUser = {
   id: number;
   first_name: string;
@@ -54,18 +61,20 @@ export async function signInWithTelegram(telegramUser: TelegramUser): Promise<Us
 
       const { access_token, refresh_token } = await res.json();
 
-      // Store tokens directly and reload
-      localStorage.setItem("sb-access-token", access_token);
-      localStorage.setItem("sb-refresh-token", refresh_token);
+      // Store tokens directly and reload (only in browser)
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem("sb-access-token", access_token);
+        localStorage.setItem("sb-refresh-token", refresh_token);
 
-      logger.info('🚨 PRODUCTION BYPASS: Tokens stored, skipping setSession (causes hanging)')
+        logger.info('🚨 PRODUCTION BYPASS: Tokens stored, skipping setSession (causes hanging)')
 
-      // Store tokens for getCurrentUserToken() to find
-      localStorage.setItem("sb-access-token", access_token);
-      localStorage.setItem("sb-refresh-token", refresh_token);
+        // Store tokens for getCurrentUserToken() to find
+        localStorage.setItem("sb-access-token", access_token);
+        localStorage.setItem("sb-refresh-token", refresh_token);
 
-      // Mark that we completed login successfully (prevents reload loops)
-      localStorage.setItem("telegram-login-complete", "true")
+        // Mark that we completed login successfully (prevents reload loops)
+        localStorage.setItem("telegram-login-complete", "true")
+      }
 
       // Return a minimal user that will get replaced by onAuthStateChange
       // when the auth hook detects the stored tokens
@@ -193,8 +202,10 @@ export async function signInWithTelegram(telegramUser: TelegramUser): Promise<Us
 
   logger.debug('Setting session...')
 
-  // Store JWT in localStorage for production bypass
-  localStorage.setItem("sb-access-token", access_token);
+  // Store JWT in localStorage for production bypass (only in browser)
+  if (typeof localStorage !== 'undefined') {
+    localStorage.setItem("sb-access-token", access_token);
+  }
 
   // PRODUCTION BYPASS: Skip setSession in production due to hanging issue
   if (isProduction) {
@@ -202,13 +213,13 @@ export async function signInWithTelegram(telegramUser: TelegramUser): Promise<Us
     logger.info('Tokens stored, forcing page reload for session consistency')
 
     // Store tokens in localStorage for manual session management
-    localStorage.setItem("sb-refresh-token", refresh_token);
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem("sb-refresh-token", refresh_token);
+    }
 
     // Force page reload to let onAuthStateChange handle the session
     setTimeout(() => {
-      if (typeof window !== 'undefined') {
-        window.location.reload()
-      }
+      safeReload()
     }, 500) // Short delay to ensure tokens are stored
 
     // Return a temporary user object - the reload will establish proper session
@@ -291,406 +302,259 @@ export async function signInWithTelegram(telegramUser: TelegramUser): Promise<Us
     })
     .select()
     .single();
-  if (profileError) {
-    logger.error('Profile upsert error:', profileError);
-    throw profileError;
+
+  if (profileError || !profile) {
+    logger.error('Profile upsert failed:', profileError);
+    throw new Error("Failed to update profile");
   }
 
-  logger.debug('Profile upserted successfully:', {
-    id: profile.id,
-    username: profile.username,
-    first_name: profile.first_name,
-    last_name: profile.last_name
-  })
+  logger.debug('Profile upserted successfully:', profile)
 
-  const userResult = {
-    id: user.id,
+  return {
+    id: profile.id,
     name: `${profile.first_name ?? ""} ${profile.last_name ?? ""}`.trim(),
     username: profile.username ?? "",
     avatar: profile.avatar_url ?? "",
+    telegram_id: profile.telegram_id,
     first_name: profile.first_name,
     last_name: profile.last_name,
-  }
-
-  logger.debug('Returning user object:', userResult)
-
-  return userResult;
+    bio: profile.bio,
+    location: profile.location,
+    website: profile.website,
+    joined_at: profile.created_at
+  };
 }
 
-export async function getCurrentUserProfile(): Promise<User | null> {
+export async function signOut(): Promise<void> {
+  logger.debug('signOut called')
+
+  // Clear localStorage tokens first (only in browser)
+  if (typeof localStorage !== 'undefined') {
+    localStorage.removeItem("sb-access-token");
+    localStorage.removeItem("sb-refresh-token");
+    localStorage.removeItem("telegram-login-complete");
+  }
+
+  // PRODUCTION BYPASS: Skip supabase.auth.signOut in production
+  const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production' || typeof window !== 'undefined' && window.location.hostname !== 'localhost'
+
+  if (isProduction) {
+    logger.info('🚨 PRODUCTION BYPASS: Skipping supabase.auth.signOut()')
+    // Clear all our custom localStorage items
+    if (typeof localStorage !== 'undefined') {
+      localStorage.removeItem("sb-user");
+      localStorage.removeItem("sb-access-token");
+      localStorage.removeItem("sb-refresh-token");
+    }
+
+    // Force page reload to clear state
+    setTimeout(() => {
+      safeReload()
+    }, 100)
+    return;
+  }
+
+  // Development: Use proper Supabase signOut
+  const { error } = await supabase.auth.signOut();
+  if (error) {
+    logger.error('SignOut error:', error);
+    throw new Error("Failed to sign out");
+  }
+
+  // Clear all our custom localStorage items (only in browser)
+  if (typeof localStorage !== 'undefined') {
+    localStorage.removeItem("sb-user");
+    localStorage.removeItem("sb-access-token");
+    localStorage.removeItem("sb-refresh-token");
+  }
+
+  logger.debug('signOut completed successfully')
+}
+
+// Token validation and utilities
+export async function getCurrentUserToken(): Promise<string | null> {
+  logger.debug('getCurrentUserToken called')
+
   try {
-    // PRODUCTION BYPASS: Use token-based profile lookup in production
+    // In production, read from localStorage directly (SSR safe)
     const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production' || typeof window !== 'undefined' && window.location.hostname !== 'localhost'
 
     if (isProduction) {
-      logger.info('getCurrentUserProfile: Using production bypass with token-based lookup')
-
-      const token = await getCurrentUserToken()
-      if (!token) {
-        logger.debug('getCurrentUserProfile: No token available in production bypass')
-        return null
+      if (typeof localStorage !== 'undefined') {
+        const token = localStorage.getItem("sb-access-token");
+        if (token) {
+          logger.debug('🚨 PRODUCTION BYPASS: Found token in localStorage')
+          return token;
+        }
       }
+      logger.debug('🚨 PRODUCTION BYPASS: No token found in localStorage')
+      return null;
+    }
 
-      // Use the JWT token to get user info from the profiles table
-      // In production, we rely on RLS policies to return the correct profile
-      try {
-        const response = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/profiles?select=id,username,first_name,last_name,avatar_url&limit=1`, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-            'Content-Type': 'application/json'
+    // Development: Use proper Supabase session
+    const { data, error } = await supabase.auth.getSession();
+    if (error) {
+      logger.error('Error getting current session:', error);
+      return null;
+    }
+
+    const token = data.session?.access_token;
+    logger.debug('getCurrentUserToken result:', { hasToken: !!token });
+    return token || null;
+  } catch (error) {
+    logger.error('getCurrentUserToken error:', error);
+    return null;
+  }
+}
+
+export async function getCurrentUser(): Promise<User | null> {
+  logger.debug('getCurrentUser called')
+
+  try {
+    // In production, bypass Supabase and use localStorage (SSR safe)
+    const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production' || typeof window !== 'undefined' && window.location.hostname !== 'localhost'
+
+    if (isProduction) {
+      logger.info('🚨 PRODUCTION BYPASS: getCurrentUser bypassing Supabase')
+
+      // Check if we have stored tokens
+      if (typeof localStorage !== 'undefined') {
+        const hasToken = localStorage.getItem("sb-access-token");
+        if (!hasToken) {
+          logger.debug('🚨 PRODUCTION BYPASS: No access token found')
+          return null;
+        }
+
+        // Check if we have cached user data
+        const cachedUser = localStorage.getItem("sb-user");
+        if (cachedUser) {
+          try {
+            const user = JSON.parse(cachedUser);
+            logger.debug('🚨 PRODUCTION BYPASS: Returning cached user')
+            return user;
+          } catch (e) {
+            logger.debug('🚨 PRODUCTION BYPASS: Failed to parse cached user')
           }
-        })
-
-        if (!response.ok) {
-          logger.error('getCurrentUserProfile: Profile fetch failed in production', { status: response.status })
-          return null
         }
-
-        const profiles = await response.json()
-        if (!profiles || profiles.length === 0) {
-          logger.debug('getCurrentUserProfile: No profile found for token in production')
-          return null
-        }
-
-        const profile = profiles[0]
-        logger.info('getCurrentUserProfile: Profile loaded successfully in production', { username: profile.username })
-
-        return {
-          id: profile.id,
-          name: `${profile.first_name ?? ""} ${profile.last_name ?? ""}`.trim(),
-          username: profile.username ?? "",
-          avatar: profile.avatar_url ?? "",
-          first_name: profile.first_name,
-          last_name: profile.last_name,
-        }
-
-      } catch (fetchError) {
-        logger.error('getCurrentUserProfile: Production profile fetch error', fetchError)
-        return null
       }
+
+      logger.debug('🚨 PRODUCTION BYPASS: No cached user, returning null (auth hook will handle)')
+      return null;
     }
 
-    // DEVELOPMENT: Use normal Supabase auth
-    logger.debug('getCurrentUserProfile: Using normal Supabase auth for development')
-
-    // Get current user from Supabase auth
-    const { data: userData, error: authError } = await supabase.auth.getUser();
-
-    if (authError) {
-      logger.debug(`getCurrentUserProfile: Auth error:`, authError.message)
-      return null
+    // Development: Use proper Supabase authentication
+    const { data: userData, error: userError } = await supabase.auth.getUser();
+    if (userError || !userData?.user) {
+      logger.debug('No authenticated user:', userError?.message);
+      return null;
     }
-
-    if (!userData?.user) {
-      logger.debug(`getCurrentUserProfile: No authenticated user found`)
-      return null // No need to log this, it's normal when not authenticated
-    }
-
-    const user = userData.user;
-    logger.debug(`getCurrentUserProfile: Found authenticated user`, { userId: user.id, email: user.email })
 
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
-      .select("id, username, first_name, last_name, avatar_url")
-      .eq("id", user.id)
+      .select("*")
+      .eq("id", userData.user.id)
       .single();
 
-    if (profileError) {
-      logger.debug(`getCurrentUserProfile: Profile error`, { error: profileError.message })
-      return null
+    if (profileError || !profile) {
+      logger.error('Profile fetch failed:', profileError);
+      return null;
     }
 
-    if (!profile) {
-      logger.debug(`getCurrentUserProfile: No profile found for user`, { userId: user.id })
-      return null
-    }
-
-    logger.debug(`getCurrentUserProfile: Found profile`, {
-      firstName: profile.first_name,
-      lastName: profile.last_name,
-      username: profile.username
-    })
-
-    const userProfile = {
-      id: user.id,
+    const user: User = {
+      id: profile.id,
       name: `${profile.first_name ?? ""} ${profile.last_name ?? ""}`.trim(),
       username: profile.username ?? "",
       avatar: profile.avatar_url ?? "",
+      telegram_id: profile.telegram_id,
       first_name: profile.first_name,
       last_name: profile.last_name,
-    }
+      bio: profile.bio,
+      location: profile.location,
+      website: profile.website,
+      joined_at: profile.created_at
+    };
 
-    return userProfile
+    logger.debug('getCurrentUser success:', { userId: user.id, username: user.username });
+    return user;
   } catch (error) {
-    logger.error(`getCurrentUserProfile: Unexpected error`, error)
-    return null
+    logger.error('getCurrentUser error:', error);
+    return null;
   }
 }
 
-export async function getCurrentUserToken(): Promise<string | null> {
+export async function refreshAuthSession(): Promise<void> {
+  logger.debug('refreshAuthSession called');
+
+  const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production' || typeof window !== 'undefined' && window.location.hostname !== 'localhost'
+
+  if (isProduction) {
+    logger.info('🚨 PRODUCTION BYPASS: Skipping session refresh')
+    return;
+  }
+
+  // Development: Use proper Supabase session refresh
   try {
-    logger.debug('getCurrentUserToken: Getting session...')
-
-    // PRODUCTION BYPASS: Use localStorage token directly in production
-    const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production' || typeof window !== 'undefined' && window.location.hostname !== 'localhost'
-
-    if (isProduction) {
-      const token = localStorage.getItem('sb-access-token')
-      if (token) {
-        // Validate the token by checking if it's expired
-        try {
-          const payload = JSON.parse(atob(token.split('.')[1]))
-          const now = Math.floor(Date.now() / 1000)
-
-          if (payload.exp && payload.exp < now) {
-            logger.warn('getCurrentUserToken: Stored token is expired, clearing auth state')
-            await signOut()
-            window.location.reload()
-            return null
-          }
-
-          logger.debug('getCurrentUserToken: Using production bypass with valid localStorage token')
-          return token
-        } catch (tokenParseError) {
-          logger.error('getCurrentUserToken: Invalid token format, clearing auth state', tokenParseError)
-          await signOut()
-          window.location.reload()
-          return null
-        }
-      } else {
-        logger.debug('getCurrentUserToken: No token in localStorage for production bypass')
-        return null
-      }
-    }
-
-    // Use circuit breaker for session operations to prevent repeated hangs
-    const getSessionWithFallback = async () => {
-      // If circuit breaker is open, immediately fall back to stored token
-      if (authCircuitBreaker.isOpen()) {
-        logger.info('Session circuit breaker is open, using stored token fallback')
-        const storedToken = localStorage.getItem('sb-access-token')
-        if (storedToken) {
-          try {
-            const payload = JSON.parse(atob(storedToken.split('.')[1]))
-            const now = Math.floor(Date.now() / 1000)
-
-            if (payload.exp && payload.exp > now) {
-              return {
-                data: {
-                  session: {
-                    access_token: storedToken,
-                    expires_at: payload.exp,
-                    user: { id: payload.sub }
-                  }
-                },
-                error: null
-              }
-            }
-          } catch (parseError) {
-            logger.error('Stored token validation failed:', parseError)
-          }
-        }
-        throw new Error('Circuit breaker open and no valid stored token')
-      }
-
-      // Try session operations with circuit breaker protection
-      return await authCircuitBreaker.execute(async () => {
-        // First attempt: Quick session check (2 seconds internal timeout)
-        try {
-          return await supabase.auth.getSession()
-        } catch (error) {
-          logger.warn('Direct session failed, trying refresh...')
-
-          // Second attempt: Refresh session
-          const { data: refreshData } = await supabase.auth.refreshSession()
-          return { data: { session: refreshData.session }, error: null }
-        }
-      }, 'getSession')
-    }
-
-    let sessionResult
-    try {
-      sessionResult = await getSessionWithFallback()
-    } catch (timeoutError) {
-      logger.error('Session operations failed, clearing auth state', timeoutError)
-      await signOut()
-      window.location.reload()
-      return null
-    }
-
-    const { data: { session }, error } = sessionResult
-
+    const { data, error } = await supabase.auth.refreshSession();
     if (error) {
-      logger.error('Error getting session', error)
-      // Try to refresh the session
-      logger.debug('Attempting to refresh session...')
-      try {
-        const refreshPromise = supabase.auth.refreshSession()
-        const refreshTimeoutPromise = new Promise<never>((_, reject) => {
-          setTimeout(() => reject(new Error('Refresh timeout')), 10000)
-        })
-
-        const { data: refreshData, error: refreshError } = await Promise.race([refreshPromise, refreshTimeoutPromise])
-
-        if (refreshError || !refreshData.session) {
-          logger.error('Session refresh failed', refreshError)
-          // Clear auth state and reload
-          await signOut()
-          window.location.reload()
-          return null
-        }
-
-        logger.info('Session refreshed successfully')
-        return refreshData.session.access_token
-      } catch (refreshErr) {
-        logger.error('Session refresh threw error', refreshErr)
-        await signOut()
-        window.location.reload()
-        return null
-      }
+      logger.error('Session refresh failed:', error);
+      // Don't throw - let the app handle auth state naturally
+      return;
     }
-
-    logger.debug('Session found', { hasSession: !!session, hasAccessToken: !!session?.access_token })
-
-    if (!session) {
-      logger.debug('No session found - user might not be authenticated')
-      // Clear any stale auth state and reload
-      await signOut()
-      window.location.reload()
-      return null
-    }
-
-    // Check if token is close to expiring (within 5 minutes)
-    const now = Math.floor(Date.now() / 1000)
-    const tokenExp = session.expires_at || 0
-    const timeUntilExpiry = tokenExp - now
-
-    if (timeUntilExpiry < 300) { // 5 minutes
-      logger.debug('Token expires soon, refreshing...')
-      try {
-        const refreshPromise = supabase.auth.refreshSession()
-        const timeoutPromise = new Promise<never>((_, reject) => {
-          setTimeout(() => reject(new Error('Refresh timeout')), 10000) // 10 second timeout
-        })
-
-        const { data: refreshData, error: refreshError } = await Promise.race([refreshPromise, timeoutPromise])
-
-        if (refreshError || !refreshData.session) {
-          logger.warn('Token refresh failed, clearing auth state', refreshError)
-          await signOut()
-          window.location.reload()
-          return null
-        }
-
-        logger.info('Token refreshed proactively')
-        return refreshData.session.access_token
-      } catch (refreshErr) {
-        logger.error('Token refresh timeout or error', refreshErr)
-        await signOut()
-        window.location.reload()
-        return null
-      }
-    }
-
-    const token = session.access_token
-    logger.debug('Returning token', { hasToken: !!token, tokenLength: token?.length })
-    return token
+    logger.debug('Session refreshed successfully');
   } catch (error) {
-    logger.error("Error getting user token", error)
-    // On any unexpected error, clear auth state and reload
+    logger.error('refreshAuthSession error:', error);
+  }
+}
+
+export async function handleAuthError(error: any): Promise<boolean> {
+  logger.debug('handleAuthError called', { error });
+
+  // Check if this is an auth-related error
+  if (
+    error?.status === 403 ||
+    error?.message?.includes('JWT') ||
+    error?.message?.includes('token') ||
+    error?.message?.includes('unauthorized') ||
+    error?.message?.includes('Unauthorized')
+  ) {
+    logger.info('🔧 Auth error detected, attempting recovery');
+
     try {
-      await signOut()
-      window.location.reload()
-    } catch (signOutError) {
-      logger.error("Error during emergency signout", signOutError)
-      window.location.reload()
+      // Try to refresh the session first
+      await refreshAuthSession();
+
+      // If that doesn't work, force a page reload
+      setTimeout(() => {
+        safeReload();
+      }, 1000);
+
+      return true; // Indicate we handled the error
+    } catch (refreshError) {
+      logger.error('Auth recovery failed:', refreshError);
+      // Force reload as last resort
+      setTimeout(() => {
+        safeReload();
+      }, 1000);
+      return true;
     }
-    return null
   }
+
+  return false; // Not an auth error
 }
 
-export async function signOut() {
+export async function validateAuthState(): Promise<boolean> {
+  logger.debug('validateAuthState called');
+
   try {
-    // Clear localStorage items
-    localStorage.removeItem(STORAGE_KEYS.SUPABASE_ACCESS_TOKEN)
-    localStorage.removeItem(STORAGE_KEYS.FAKE_USER_SESSION)
+    const token = await getCurrentUserToken();
+    const user = await getCurrentUser();
 
-    // Sign out from Supabase
-    await supabase.auth.signOut()
+    const isValid = !!(token && user);
+    logger.debug('Auth state validation:', { hasToken: !!token, hasUser: !!user, isValid });
 
-    console.log('✅ Successfully signed out and cleared all local storage')
+    return isValid;
   } catch (error) {
-    console.error('❌ Error during signOut:', error)
-    // Even if there's an error, clear local storage
-    localStorage.removeItem(STORAGE_KEYS.SUPABASE_ACCESS_TOKEN)
-    localStorage.removeItem(STORAGE_KEYS.FAKE_USER_SESSION)
-    throw error
+    logger.error('validateAuthState error:', error);
+    return false;
   }
-}
-
-// Emergency function to clear all auth state and reload page
-// Call this when the app gets stuck or auth is in a bad state
-export async function emergencyAuthReset() {
-  console.log('🚨 Emergency auth reset triggered')
-  try {
-    // Clear all possible auth storage
-    localStorage.clear()
-    sessionStorage.clear()
-
-    // Force sign out
-    await supabase.auth.signOut()
-
-    // Clear any cookies (if any)
-    document.cookie.split(";").forEach(function (c) {
-      document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
-    })
-
-    console.log('🚨 Emergency reset complete, reloading page')
-    window.location.href = '/' // Force full reload
-  } catch (error) {
-    console.error('❌ Error during emergency reset:', error)
-    // Even if there's an error, force reload
-    window.location.href = '/'
-  }
-}
-
-// Diagnostic function to check auth configuration (useful for debugging)
-export function debugAuthConfig() {
-  const config = {
-    NODE_ENV: process.env.NODE_ENV,
-    IS_DEVELOPMENT: process.env.NODE_ENV === 'development',
-    hostname: typeof window !== 'undefined' ? window.location.hostname : 'server',
-    hasDevEmail: !!process.env.NEXT_PUBLIC_DEV_EMAIL,
-    hasDevPassword: !!process.env.NEXT_PUBLIC_DEV_PASSWORD,
-    HAS_FAKE_LOGIN: HAS_FAKE_LOGIN,
-    telegramEndpoint: API_ENDPOINTS.TELEGRAM_LOGIN
-  }
-
-  console.log('🔍 Auth Configuration:', config)
-  return config
-}
-
-// Debug function to help diagnose email conflicts in production
-export async function debugTelegramUser(telegramId: number) {
-  const expectedEmail = `telegram-${telegramId}@telegram.local`
-
-  console.log('🔍 Debugging Telegram user lookup:', {
-    telegramId,
-    expectedEmail,
-    timestamp: new Date().toISOString()
-  })
-
-  return {
-    telegramId,
-    expectedEmail,
-    telegramEndpoint: API_ENDPOINTS.TELEGRAM_LOGIN
-  }
-}
-
-// Add this to window for debugging in browser console
-if (typeof window !== 'undefined') {
-  (window as any).debugTelegramUser = debugTelegramUser;
-  (window as any).debugAuthConfig = debugAuthConfig;
-  (window as any).emergencyAuthReset = emergencyAuthReset;
 }
