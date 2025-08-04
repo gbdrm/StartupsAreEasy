@@ -70,13 +70,21 @@ export default function DiagnosticsPage() {
   const [logoutTestLoading, setLogoutTestLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [testLogs, setTestLogs] = useState<string[]>([])
+  const [isClient, setIsClient] = useState(false)
+
+  // Ensure we're on the client side
+  useEffect(() => {
+    setIsClient(true)
+  }, [])
 
   // Auto-refresh auth state
   useEffect(() => {
+    if (!isClient) return
+    
     refreshAuthState()
     const interval = setInterval(refreshAuthState, 5000)
     return () => clearInterval(interval)
-  }, [])
+  }, [isClient])
 
   const refreshAuthState = () => {
     const state: AuthState = {
@@ -1757,7 +1765,7 @@ export default function DiagnosticsPage() {
                         >
                           Test Token Retrieval
                         </Button>
-                        {authState?.testResults.tokenTest && (
+                        {authState?.testResults?.tokenTest && (
                           <div className={`p-2 rounded text-xs ${
                             authState.testResults.tokenTest.status === 'success' ? 'bg-green-100 text-green-800' :
                             authState.testResults.tokenTest.status === 'error' ? 'bg-red-100 text-red-800' :
@@ -1789,7 +1797,7 @@ export default function DiagnosticsPage() {
                         >
                           Test Logout Flow
                         </Button>
-                        {authState.testResults.logoutTest && (
+                        {authState?.testResults?.logoutTest && (
                           <div className={`p-2 rounded text-xs ${
                             authState.testResults.logoutTest.status === 'success' ? 'bg-green-100 text-green-800' :
                             authState.testResults.logoutTest.status === 'error' ? 'bg-red-100 text-red-800' :
@@ -1821,7 +1829,7 @@ export default function DiagnosticsPage() {
                         >
                           Test Tab Switching
                         </Button>
-                        {authState.testResults.visibilityTest && (
+                        {authState?.testResults?.visibilityTest && (
                           <div className={`p-2 rounded text-xs ${
                             authState.testResults.visibilityTest.status === 'success' ? 'bg-green-100 text-green-800' :
                             authState.testResults.visibilityTest.status === 'error' ? 'bg-red-100 text-red-800' :
@@ -1853,7 +1861,7 @@ export default function DiagnosticsPage() {
                         >
                           Emergency Reset
                         </Button>
-                        {authState.testResults.resetTest && (
+                        {authState?.testResults?.resetTest && (
                           <div className={`p-2 rounded text-xs ${
                             authState.testResults.resetTest.status === 'success' ? 'bg-green-100 text-green-800' :
                             authState.testResults.resetTest.status === 'error' ? 'bg-red-100 text-red-800' :
@@ -1886,7 +1894,7 @@ export default function DiagnosticsPage() {
                       >
                         Clear All Auth Data
                       </Button>
-                      {authState.testResults.clearTest && (
+                      {authState?.testResults?.clearTest && (
                         <div className={`p-2 rounded text-xs ${
                           authState.testResults.clearTest.status === 'success' ? 'bg-green-100 text-green-800' :
                           authState.testResults.clearTest.status === 'error' ? 'bg-red-100 text-red-800' :
@@ -1929,8 +1937,8 @@ export default function DiagnosticsPage() {
                             <div>
                               <strong>Tokens:</strong>
                               <div className="mt-1 p-2 bg-muted rounded">
-                                <div>Access: {authState.hasAccessToken ? '✅ Present' : '❌ Missing'}</div>
-                                <div>Refresh: {authState.hasRefreshToken ? '✅ Present' : '❌ Missing'}</div>
+                                <div>Access: {authState?.hasAccessToken ? '✅ Present' : '❌ Missing'}</div>
+                                <div>Refresh: {authState?.hasRefreshToken ? '✅ Present' : '❌ Missing'}</div>
                               </div>
                             </div>
                           </div>
@@ -1938,7 +1946,7 @@ export default function DiagnosticsPage() {
                           <div>
                             <strong className="text-xs">Environment:</strong>
                             <div className="mt-1 p-2 bg-muted rounded text-xs">
-                              <div>Production Mode: {authState.isProduction ? '✅ Yes' : '❌ No'}</div>
+                              <div>Production Mode: {authState?.isProduction ? '✅ Yes' : '❌ No'}</div>
                               <div>NODE_ENV: {process.env.NODE_ENV}</div>
                               <div>Hostname: {typeof window !== 'undefined' ? window.location.hostname : 'SSR'}</div>
                             </div>
@@ -1947,15 +1955,15 @@ export default function DiagnosticsPage() {
                           <div>
                             <strong className="text-xs">Auth Flags:</strong>
                             <div className="mt-1 p-2 bg-muted rounded text-xs">
-                              <div>Login Complete: {authState.loginComplete ? '✅ Yes' : '❌ No'}</div>
-                              <div>Reload Pending: {authState.authReloadPending ? '⚠️ Yes' : '✅ No'}</div>
+                              <div>Login Complete: {authState?.loginComplete ? '✅ Yes' : '❌ No'}</div>
+                              <div>Reload Pending: {authState?.authReloadPending ? '⚠️ Yes' : '✅ No'}</div>
                             </div>
                           </div>
 
                           <div>
                             <strong className="text-xs">Last Updated:</strong>
                             <div className="mt-1 p-2 bg-muted rounded text-xs">
-                              {authState.lastUpdate}
+                              {authState?.lastUpdate}
                             </div>
                           </div>
                         </div>
@@ -2127,7 +2135,7 @@ export default function DiagnosticsPage() {
                           </div>
                         </div>
 
-                        {authState && authState.testResults.debugResult && (
+                        {authState?.testResults?.debugResult && (
                           <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded">
                             <h4 className="text-sm font-semibold text-blue-800 mb-2">Debug Results</h4>
                             <div className={`p-2 rounded text-xs ${
