@@ -72,20 +72,20 @@ export function useSimpleAuth() {
             return
         }
 
-        console.log(`[${new Date().toISOString()}] useSimpleAuth: Initializing auth (singleton)...`)
+        logger.debug("useSimpleAuth: Initializing auth (singleton)...")
         isAuthInitialized = true
         hasInitialized.current = true
 
         // Get initial session with timeout
         const initAuth = async () => {
             try {
-                console.log(`[${new Date().toISOString()}] useSimpleAuth: Getting initial session...`)
+                logger.debug("useSimpleAuth: Getting initial session...")
 
                 // TEMPORARY: Skip session check only in production due to hanging issue
                 const isProduction = process.env.NODE_ENV === 'production'
                 if (isProduction) {
-                    console.log(`[${new Date().toISOString()}] useSimpleAuth: Bypassing session check due to production hanging issue`)
-                    console.log(`[${new Date().toISOString()}] useSimpleAuth: Starting with clean auth state`)
+                    logger.info("useSimpleAuth: Bypassing session check due to production hanging issue")
+                    logger.debug("useSimpleAuth: Starting with clean auth state")
                     setGlobalUser(null)
                     setGlobalLoading(false)
                     return
@@ -97,13 +97,13 @@ export function useSimpleAuth() {
                     setTimeout(() => reject(new Error('Initial session timeout')), 5000) // 5 second timeout
                 })
 
-                console.log(`[${new Date().toISOString()}] useSimpleAuth: About to race session vs timeout...`)
+                logger.debug("useSimpleAuth: About to race session vs timeout...")
                 let sessionResult
                 try {
                     sessionResult = await Promise.race([sessionPromise, timeoutPromise])
-                    console.log(`[${new Date().toISOString()}] useSimpleAuth: Session call completed successfully`)
+                    logger.debug("useSimpleAuth: Session call completed successfully")
                 } catch (timeoutError) {
-                    console.error(`[${new Date().toISOString()}] useSimpleAuth: Initial session timed out (5s), clearing auth`)
+                    logger.error("useSimpleAuth: Initial session timed out (5s), clearing auth", timeoutError)
                     setGlobalUser(null)
                     setGlobalLoading(false)
                     return
@@ -112,19 +112,21 @@ export function useSimpleAuth() {
                 const { data: { session } } = sessionResult
 
                 if (session?.user) {
-                    console.log(`[${new Date().toISOString()}] useSimpleAuth: Found existing session for user:`, session.user.id)
+                    logger.info("useSimpleAuth: Found existing session for user", { userId: session.user.id })
                     const profile = await getCurrentUserProfile()
-                    console.log(`[${new Date().toISOString()}] useSimpleAuth: Got profile:`, profile ? `${profile.first_name} ${profile.last_name} (@${profile.username})` : 'null')
+                    logger.debug("useSimpleAuth: Got profile", {
+                        profile: profile ? `${profile.first_name} ${profile.last_name} (@${profile.username})` : 'null'
+                    })
                     setGlobalUser(profile)
                 } else {
-                    console.log(`[${new Date().toISOString()}] useSimpleAuth: No existing session`)
+                    logger.debug("useSimpleAuth: No existing session")
                     setGlobalUser(null)
                 }
             } catch (error) {
-                console.error(`[${new Date().toISOString()}] useSimpleAuth: Error getting session:`, error)
+                logger.error("useSimpleAuth: Error getting session", error)
                 setGlobalUser(null)
             } finally {
-                console.log(`[${new Date().toISOString()}] useSimpleAuth: Setting loading to false`)
+                logger.debug("useSimpleAuth: Setting loading to false")
                 setGlobalLoading(false)
             }
         }
@@ -134,7 +136,7 @@ export function useSimpleAuth() {
         // Failsafe: Ensure loading is set to false after maximum timeout
         const failsafeTimeout = setTimeout(() => {
             if (globalLoading) {
-                console.warn(`[${new Date().toISOString()}] useSimpleAuth: Failsafe timeout - forcing loading to false`)
+                logger.warn("useSimpleAuth: Failsafe timeout - forcing loading to false")
                 setGlobalLoading(false)
             }
         }, 10000) // 10 second maximum
@@ -143,40 +145,45 @@ export function useSimpleAuth() {
         if (!authSubscription) {
             const { data: { subscription } } = supabase.auth.onAuthStateChange(
                 async (event, session) => {
-                    console.log(`[${new Date().toISOString()}] useSimpleAuth: Auth event:`, event)
+                    logger.info("useSimpleAuth: Auth event", { event })
 
                     if (event === 'SIGNED_OUT') {
-                        console.log(`[${new Date().toISOString()}] useSimpleAuth: User signed out`)
+                        logger.info("useSimpleAuth: User signed out")
                         resetAuth()
                     } else if (event === 'SIGNED_IN' && session?.user) {
-                        console.log(`[${new Date().toISOString()}] useSimpleAuth: User signed in as:`, session.user.id, session.user.email)
+                        logger.info("useSimpleAuth: User signed in", {
+                            userId: session.user.id,
+                            email: session.user.email
+                        })
                         try {
                             const profile = await getCurrentUserProfile()
-                            console.log(`[${new Date().toISOString()}] useSimpleAuth: Got profile after sign in:`, profile ? `${profile.first_name} ${profile.last_name} (@${profile.username})` : 'null')
+                            logger.debug("useSimpleAuth: Got profile after sign in", {
+                                profile: profile ? `${profile.first_name} ${profile.last_name} (@${profile.username})` : 'null'
+                            })
                             setGlobalUser(profile)
 
                             // Force a page reload after successful Telegram login to ensure UI consistency
                             // This addresses the issue where the button doesn't update after sign-in
-                            console.log(`[${new Date().toISOString()}] useSimpleAuth: Forcing page reload for UI consistency`)
+                            logger.info("useSimpleAuth: Forcing page reload for UI consistency")
                             setTimeout(() => {
                                 if (typeof window !== 'undefined') {
                                     window.location.reload()
                                 }
                             }, 1000) // 1 second delay to let the auth state settle
                         } catch (error) {
-                            console.error(`[${new Date().toISOString()}] useSimpleAuth: Error getting profile:`, error)
+                            logger.error("useSimpleAuth: Error getting profile", error)
                             setGlobalUser(null)
                         } finally {
                             // Ensure loading is set to false after SIGNED_IN event
-                            console.log(`[${new Date().toISOString()}] useSimpleAuth: SIGNED_IN complete, setting loading to false`)
+                            logger.debug("useSimpleAuth: SIGNED_IN complete, setting loading to false")
                             setGlobalLoading(false)
                         }
                     } else if (event === 'TOKEN_REFRESHED') {
                         // Don't change loading state for token refresh
-                        console.log(`[${new Date().toISOString()}] useSimpleAuth: Token refreshed`)
+                        logger.debug("useSimpleAuth: Token refreshed")
                     } else {
                         // For any other event, ensure loading is false
-                        console.log(`[${new Date().toISOString()}] useSimpleAuth: Other auth event (${event}), ensuring loading is false`)
+                        logger.debug(`useSimpleAuth: Other auth event (${event}), ensuring loading is false`)
                         setGlobalLoading(false)
                     }
                 }

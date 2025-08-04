@@ -1,5 +1,6 @@
 import { supabase } from "./supabase";
 import { HAS_FAKE_LOGIN, STORAGE_KEYS, API_ENDPOINTS } from "./constants";
+import { logger } from "./logger";
 import type { User } from "./types";
 
 export type TelegramUser = {
@@ -13,7 +14,7 @@ export type TelegramUser = {
 };
 
 export async function signInWithTelegram(telegramUser: TelegramUser): Promise<User> {
-  console.log('🔐 signInWithTelegram called with:', {
+  logger.debug('signInWithTelegram called', {
     id: telegramUser.id,
     username: telegramUser.username,
     first_name: telegramUser.first_name,
@@ -25,7 +26,7 @@ export async function signInWithTelegram(telegramUser: TelegramUser): Promise<Us
 
   // Local dev override - use proper Supabase authentication
   if (HAS_FAKE_LOGIN) {
-    console.log('🟡 Using fake login for development')
+    logger.info('Using fake login for development')
     // For local development, sign in with a test email/password
     // This creates a real Supabase session with proper auth.uid()
     const testEmail = process.env.NEXT_PUBLIC_DEV_EMAIL;
@@ -43,7 +44,7 @@ export async function signInWithTelegram(telegramUser: TelegramUser): Promise<Us
 
     // If user doesn't exist, create them
     if (authError && authError.message.includes("Invalid login credentials")) {
-      console.log("Creating test user for local development...");
+      logger.info("Creating test user for local development...");
       const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email: testEmail,
         password: testPassword,
@@ -114,22 +115,54 @@ export async function signInWithTelegram(telegramUser: TelegramUser): Promise<Us
   });
   if (!res.ok) {
     const errorText = await res.text();
-    console.error('Telegram login failed:', res.status, errorText);
+    logger.error('Telegram login failed', { status: res.status, errorText });
     throw new Error("Telegram login failed");
   }
 
-  console.log('🔵 Response OK, parsing JSON...')
+  logger.debug('Response OK, parsing JSON...')
   const { access_token, refresh_token } = await res.json();
-  console.log('🔵 JSON parsed successfully')
+  logger.debug('JSON parsed successfully')
 
-  console.log('🔵 Setting session...')
+  logger.debug('Setting session...')
 
-  // Store JWT in localStorage and set session
+  // Store JWT in localStorage for production bypass
   localStorage.setItem("sb-access-token", access_token);
 
-  console.log('🔵 Calling supabase.auth.setSession...')
+  // PRODUCTION BYPASS: Skip setSession in production due to hanging issue
+  const isProduction = process.env.NODE_ENV === 'production'
+  if (isProduction) {
+    logger.info('Production bypass: Skipping setSession call due to hanging issue')
+    logger.info('Tokens stored, forcing page reload for session consistency')
 
-  // Add timeout wrapper to prevent hanging
+    // Store tokens in localStorage for manual session management
+    localStorage.setItem("sb-refresh-token", refresh_token);
+
+    // Force page reload to let onAuthStateChange handle the session
+    setTimeout(() => {
+      if (typeof window !== 'undefined') {
+        window.location.reload()
+      }
+    }, 500) // Short delay to ensure tokens are stored
+
+    // Return a temporary user object - the reload will establish proper session
+    return {
+      id: `temp-${Date.now()}`,
+      name: "Loading...",
+      username: "loading",
+      avatar: "",
+      telegram_id: undefined,
+      first_name: "Loading...",
+      last_name: "",
+      bio: undefined,
+      location: undefined,
+      website: undefined,
+      joined_at: new Date().toISOString()
+    } as User
+  }
+
+  logger.debug('Calling supabase.auth.setSession...')
+
+  // Add timeout wrapper to prevent hanging (development only)
   const setSessionPromise = supabase.auth.setSession({
     access_token,
     refresh_token
@@ -144,7 +177,7 @@ export async function signInWithTelegram(telegramUser: TelegramUser): Promise<Us
     timeoutPromise
   ]);
 
-  console.log('🔵 setSession completed:', {
+  logger.debug('setSession completed', {
     hasSessionData: !!sessionData,
     hasError: !!sessionError,
     errorMessage: sessionError?.message
@@ -271,9 +304,22 @@ export async function getCurrentUserProfile(): Promise<User | null> {
 
 export async function getCurrentUserToken(): Promise<string | null> {
   try {
-    console.log('🔑 getCurrentUserToken: Getting session...')
+    logger.debug('getCurrentUserToken: Getting session...')
 
-    // Add timeout to prevent hanging
+    // PRODUCTION BYPASS: Use localStorage token directly in production
+    const isProduction = process.env.NODE_ENV === 'production'
+    if (isProduction) {
+      const token = localStorage.getItem('sb-access-token')
+      if (token) {
+        logger.debug('getCurrentUserToken: Using production bypass with localStorage token')
+        return token
+      } else {
+        logger.debug('getCurrentUserToken: No token in localStorage for production bypass')
+        return null
+      }
+    }
+
+    // Add timeout to prevent hanging (development only)
     const sessionPromise = supabase.auth.getSession()
     const timeoutPromise = new Promise<never>((_, reject) => {
       setTimeout(() => reject(new Error('Session timeout')), 10000) // 10 second timeout
@@ -283,7 +329,7 @@ export async function getCurrentUserToken(): Promise<string | null> {
     try {
       sessionResult = await Promise.race([sessionPromise, timeoutPromise])
     } catch (timeoutError) {
-      console.error('❌ Session request timed out, clearing auth state')
+      logger.error('Session request timed out, clearing auth state', timeoutError)
       // Force sign out and reload page
       await signOut()
       window.location.reload()
@@ -293,34 +339,34 @@ export async function getCurrentUserToken(): Promise<string | null> {
     const { data: { session }, error } = sessionResult
 
     if (error) {
-      console.error('❌ Error getting session:', error)
+      logger.error('Error getting session', error)
       // Try to refresh the session
-      console.log('🔄 Attempting to refresh session...')
+      logger.debug('Attempting to refresh session...')
       try {
         const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession()
 
         if (refreshError || !refreshData.session) {
-          console.error('❌ Session refresh failed:', refreshError)
+          logger.error('Session refresh failed', refreshError)
           // Clear auth state and reload
           await signOut()
           window.location.reload()
           return null
         }
 
-        console.log('✅ Session refreshed successfully')
+        logger.info('Session refreshed successfully')
         return refreshData.session.access_token
       } catch (refreshErr) {
-        console.error('❌ Session refresh threw error:', refreshErr)
+        logger.error('Session refresh threw error', refreshErr)
         await signOut()
         window.location.reload()
         return null
       }
     }
 
-    console.log('🔑 Session found:', !!session, 'has access_token:', !!session?.access_token)
+    logger.debug('Session found', { hasSession: !!session, hasAccessToken: !!session?.access_token })
 
     if (!session) {
-      console.log('❌ No session found - user might not be authenticated')
+      logger.debug('No session found - user might not be authenticated')
       // Clear any stale auth state and reload
       await signOut()
       window.location.reload()
@@ -333,7 +379,7 @@ export async function getCurrentUserToken(): Promise<string | null> {
     const timeUntilExpiry = tokenExp - now
 
     if (timeUntilExpiry < 300) { // 5 minutes
-      console.log('🔄 Token expires soon, refreshing...')
+      logger.debug('Token expires soon, refreshing...')
       try {
         const refreshPromise = supabase.auth.refreshSession()
         const timeoutPromise = new Promise<never>((_, reject) => {
@@ -343,16 +389,16 @@ export async function getCurrentUserToken(): Promise<string | null> {
         const { data: refreshData, error: refreshError } = await Promise.race([refreshPromise, timeoutPromise])
 
         if (refreshError || !refreshData.session) {
-          console.warn('⚠️ Token refresh failed, clearing auth state:', refreshError)
+          logger.warn('Token refresh failed, clearing auth state', refreshError)
           await signOut()
           window.location.reload()
           return null
         }
 
-        console.log('✅ Token refreshed proactively')
+        logger.info('Token refreshed proactively')
         return refreshData.session.access_token
       } catch (refreshErr) {
-        console.error('❌ Token refresh timeout or error:', refreshErr)
+        logger.error('Token refresh timeout or error', refreshErr)
         await signOut()
         window.location.reload()
         return null
@@ -360,16 +406,16 @@ export async function getCurrentUserToken(): Promise<string | null> {
     }
 
     const token = session.access_token
-    console.log('🔑 Returning token:', token ? 'YES (length: ' + token.length + ')' : 'NO')
+    logger.debug('Returning token', { hasToken: !!token, tokenLength: token?.length })
     return token
   } catch (error) {
-    console.error("❌ Error getting user token:", error)
+    logger.error("Error getting user token", error)
     // On any unexpected error, clear auth state and reload
     try {
       await signOut()
       window.location.reload()
     } catch (signOutError) {
-      console.error("❌ Error during emergency signout:", signOutError)
+      logger.error("Error during emergency signout", signOutError)
       window.location.reload()
     }
     return null
