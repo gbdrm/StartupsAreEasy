@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { getCurrentUserProfile, signInWithTelegram, signOut } from '@/lib/auth'
 import { logger } from '@/lib/logger'
+import { usePageVisibility } from '@/hooks/use-page-visibility'
 import type { TelegramUser } from '@/lib/auth'
 import type { User } from '@/lib/types'
 
@@ -50,6 +51,7 @@ export function useSimpleAuth() {
     const [user, setUser] = useState<User | null>(globalUser)
     const [loading, setLoading] = useState(globalLoading)
     const hasInitialized = useRef(false)
+    const isVisible = usePageVisibility()
 
     // Subscribe to global auth state changes
     useEffect(() => {
@@ -67,6 +69,33 @@ export function useSimpleAuth() {
             }
         }
     }, [])
+
+    // Handle page visibility changes - refresh auth when returning to tab
+    useEffect(() => {
+        if (isVisible && globalUser && !globalLoading) {
+            logger.debug("useSimpleAuth: Page became visible, checking auth validity...")
+            
+            // Validate current auth state when returning to tab
+            const validateAuth = async () => {
+                try {
+                    const profile = await getCurrentUserProfile()
+                    if (!profile && globalUser) {
+                        logger.warn("useSimpleAuth: Auth validation failed after tab switch, clearing state")
+                        resetAuth()
+                        window.location.reload()
+                    }
+                } catch (error) {
+                    logger.error("useSimpleAuth: Auth validation error after tab switch:", error)
+                    resetAuth()
+                    window.location.reload()
+                }
+            }
+
+            // Debounce the validation to avoid too many calls
+            const timeoutId = setTimeout(validateAuth, 1000)
+            return () => clearTimeout(timeoutId)
+        }
+    }, [isVisible])
 
     useEffect(() => {
         // Only initialize once globally

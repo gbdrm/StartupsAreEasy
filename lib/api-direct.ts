@@ -2,7 +2,8 @@
 // These functions use fetch() directly instead of the Supabase JS client
 
 import type { Post, Comment, User, Startup, StartupStage } from "./types"
-import { logger } from "./logger"
+import { logger } from './logger'
+import { isAuthError, handleApiError } from './auth-utils'
 import { getCurrentUserToken } from "./auth"
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -750,6 +751,12 @@ export async function createCommentDirect(data: {
         } as Comment
     } catch (error) {
         console.error("Error creating comment:", error)
+        
+        // Check if it's an auth error that should trigger refresh
+        if (isAuthError(error)) {
+            handleApiError(error, 'createCommentDirect')
+        }
+        
         throw error
     }
 }
@@ -915,6 +922,12 @@ export async function toggleLikeDirect(postId: string, userId: string, token?: s
         return result
     } catch (error) {
         console.error("💥 Error toggling like:", error)
+        
+        // Check if it's an auth error that should trigger refresh
+        if (isAuthError(error)) {
+            handleApiError(error, 'toggleLikeDirect')
+        }
+        
         throw error
     }
 }

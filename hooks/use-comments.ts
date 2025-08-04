@@ -72,8 +72,25 @@ export function useComments(
             return true
         } catch (error) {
             console.error("Error creating comment:", error)
-            // Remove temp comment on error
-            setComments(prev => prev.filter(c => c.id !== `temp-${Date.now()}`))
+            
+            // Remove temp comment on error  
+            setComments(prev => prev.filter(c => !c.id.startsWith('temp-')))
+
+            // Check if it's an auth-related error
+            if (error instanceof Error) {
+                const errorMessage = error.message.toLowerCase()
+                
+                if (errorMessage.includes('session timeout') || 
+                    errorMessage.includes('authentication token required') ||
+                    errorMessage.includes('row-level security policy') ||
+                    errorMessage.includes('403')) {
+                    
+                    console.log('🔄 Auth error detected while commenting, triggering page reload...')
+                    window.location.reload()
+                    return false
+                }
+            }
+            
             return false
         }
     }, [currentUser, refreshPosts, comments, updatePostCommentsOptimistically])
@@ -122,11 +139,21 @@ export function useComments(
             // Revert optimistic update on error
             updatePostLikeOptimistically?.(postId, currentLiked, currentCount)
 
-            // If it's an auth error, try refreshing the page
-            if (error instanceof Error && error.message.includes('Session timeout')) {
-                console.log('🔄 Session expired, reloading page...')
-                window.location.reload()
+            // Check if it's an auth-related error
+            if (error instanceof Error) {
+                const errorMessage = error.message.toLowerCase()
+                
+                if (errorMessage.includes('session timeout') || 
+                    errorMessage.includes('authentication token required') ||
+                    errorMessage.includes('row-level security policy') ||
+                    errorMessage.includes('403')) {
+                    
+                    console.log('🔄 Auth error detected, triggering page reload for fresh auth...')
+                    window.location.reload()
+                    return null
+                }
             }
+            
             return null
         }
     }, [currentUser, updatePostLikeOptimistically])

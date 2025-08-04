@@ -2,6 +2,23 @@
 
 ## Production Auth Issues & Solutions
 
+### Tab Switching Auth Failures (FIXED)
+**Problem**: Likes and comments return 403 Forbidden errors after switching tabs and returning
+
+**Symptoms**: 
+- "new row violates row-level security policy for table 'likes'" after tab switch
+- Authentication token appears valid but RLS policies fail
+- Session timeout errors appearing after idle time
+
+**Root Cause**: JWT tokens expire or become invalid while tab is inactive, but the app doesn't detect this properly
+
+**Solution Implemented**:
+1. **Token Expiration Validation**: Added JWT payload parsing to check expiration before API calls
+2. **Page Visibility Handling**: Enhanced `usePageVisibility` hook to validate auth when returning to tab
+3. **Automatic Error Recovery**: All auth-related API errors (403, JWT errors) now trigger page reload
+4. **Extended Session Timeouts**: Increased from 10s to 15s for better reliability
+5. **Auth Utilities**: New `auth-utils.ts` with comprehensive error detection and handling
+
 ### Supabase Auth Hanging Issue
 **Problem**: `supabase.auth.getSession()` may hang indefinitely in production even when auth endpoints return 200 status
 
@@ -124,13 +141,67 @@ This function:
 3. **Use `getCurrentUserToken()` for all authenticated API calls**
 4. **Test in both development and production environments**
 5. **Monitor auth state with diagnostics page during development**
+6. **Handle tab switching gracefully** - auth system now validates tokens when returning to tab
+7. **Automatic recovery from auth failures** - likes/comments will trigger page reload on 403 errors
+
+### Common Issues After Tab Switching
+
+**Problem**: Likes and comments return 403 Forbidden errors after switching tabs and returning
+**Cause**: JWT tokens expire or become stale while tab is inactive
+**Solution**: Updated auth system now:
+- Validates stored tokens for expiration before use
+- Automatically refreshes auth state when returning to tab
+- Triggers page reload on RLS policy violations (403 errors)
+- Extends session timeout to 15 seconds for better reliability
+
+### Error Recovery Mechanisms
+
+The auth system now automatically handles these error scenarios:
+- **Token expiration**: Validates JWT payload expiration before API calls
+- **Tab switch auth failure**: Re-validates auth when page becomes visible
+- **RLS policy violations**: Detects 403 errors and triggers auth refresh
+- **Session timeouts**: Extended timeout and better error handling
+
+### Testing the Fixes
+
+#### Browser Console Tests
+Run these commands in browser console to test auth resilience:
+
+```javascript
+// Test all auth fixes
+runAuthTests()
+
+// Test individual components
+testTokenValidation()
+testAuthErrorDetection() 
+testCurrentAuthState()
+simulateTabSwitch()
+
+// Manual utilities
+isTokenExpired(yourToken)
+isAuthError(someError)
+getValidToken()
+```
+
+#### Expected Behavior After Fixes
+1. **Tab Switch Recovery**: Switching tabs and returning should not break likes/comments
+2. **Token Validation**: Expired tokens are detected and trigger refresh automatically  
+3. **Error Recovery**: 403/auth errors trigger page reload for fresh authentication
+4. **Extended Timeouts**: Better handling of slow network conditions
+5. **Debug Tools**: Enhanced logging and browser console utilities for troubleshooting
 
 ### Monitoring & Logging
 
 The auth system uses `lib/logger.ts` for production-safe logging:
 - `logger.debug()`: Development-only debugging info
-- `logger.info()`: Important auth events (login, logout, bypass activation)
+- `logger.info()`: Important auth events (login, logout, bypass activation, token refresh)
 - `logger.error()`: Auth errors and failures
 - `logger.warn()`: Deprecated features or unusual conditions
+
+Enhanced logging now includes:
+- Token expiration checks and validation results
+- Page visibility auth state validation  
+- Detailed error categorization for auth vs non-auth errors
+- Tab switch simulation results
 
 View logs in browser console during development, they're filtered in production.

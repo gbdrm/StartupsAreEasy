@@ -437,8 +437,26 @@ export async function getCurrentUserToken(): Promise<string | null> {
     if (isProduction) {
       const token = localStorage.getItem('sb-access-token')
       if (token) {
-        logger.debug('getCurrentUserToken: Using production bypass with localStorage token')
-        return token
+        // Validate the token by checking if it's expired
+        try {
+          const payload = JSON.parse(atob(token.split('.')[1]))
+          const now = Math.floor(Date.now() / 1000)
+          
+          if (payload.exp && payload.exp < now) {
+            logger.warn('getCurrentUserToken: Stored token is expired, clearing auth state')
+            await signOut()
+            window.location.reload()
+            return null
+          }
+          
+          logger.debug('getCurrentUserToken: Using production bypass with valid localStorage token')
+          return token
+        } catch (tokenParseError) {
+          logger.error('getCurrentUserToken: Invalid token format, clearing auth state', tokenParseError)
+          await signOut()
+          window.location.reload()
+          return null
+        }
       } else {
         logger.debug('getCurrentUserToken: No token in localStorage for production bypass')
         return null
@@ -448,7 +466,7 @@ export async function getCurrentUserToken(): Promise<string | null> {
     // Add timeout to prevent hanging (development only)
     const sessionPromise = supabase.auth.getSession()
     const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => reject(new Error('Session timeout')), 10000) // 10 second timeout
+      setTimeout(() => reject(new Error('Session timeout')), 15000) // Increased to 15 seconds
     })
 
     let sessionResult
@@ -469,7 +487,12 @@ export async function getCurrentUserToken(): Promise<string | null> {
       // Try to refresh the session
       logger.debug('Attempting to refresh session...')
       try {
-        const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession()
+        const refreshPromise = supabase.auth.refreshSession()
+        const refreshTimeoutPromise = new Promise<never>((_, reject) => {
+          setTimeout(() => reject(new Error('Refresh timeout')), 10000)
+        })
+
+        const { data: refreshData, error: refreshError } = await Promise.race([refreshPromise, refreshTimeoutPromise])
 
         if (refreshError || !refreshData.session) {
           logger.error('Session refresh failed', refreshError)
