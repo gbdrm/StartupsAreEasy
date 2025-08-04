@@ -24,6 +24,55 @@ export async function signInWithTelegram(telegramUser: TelegramUser): Promise<Us
     hasEnvPassword: !!process.env.NEXT_PUBLIC_DEV_PASSWORD
   })
 
+  // AGGRESSIVE PRODUCTION BYPASS: Skip all Supabase auth calls in production
+  const isProduction = process.env.NODE_ENV === 'production'
+  if (isProduction) {
+    logger.info('🚨 AGGRESSIVE PRODUCTION BYPASS: Skipping all Supabase auth calls')
+    
+    // Call backend to get JWT (this part works)
+    const res = await fetch(API_ENDPOINTS.TELEGRAM_LOGIN, {
+      method: "POST", 
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(telegramUser),
+    });
+    
+    if (!res.ok) {
+      const errorText = await res.text();
+      logger.error('Telegram login failed', { status: res.status, errorText });
+      throw new Error("Telegram login failed");
+    }
+
+    const { access_token, refresh_token } = await res.json();
+    
+    // Store tokens directly and reload
+    localStorage.setItem("sb-access-token", access_token);
+    localStorage.setItem("sb-refresh-token", refresh_token);
+    
+    logger.info('🚨 PRODUCTION BYPASS: Tokens stored, forcing page reload')
+    
+    // Force immediate page reload
+    setTimeout(() => {
+      if (typeof window !== 'undefined') {
+        window.location.reload()
+      }
+    }, 100) // Very short delay
+    
+    // Return minimal user object
+    return {
+      id: `temp-prod-${Date.now()}`,
+      name: telegramUser.first_name,
+      username: telegramUser.username || 'user',
+      avatar: "",
+      telegram_id: telegramUser.id,
+      first_name: telegramUser.first_name,
+      last_name: telegramUser.last_name || "",
+      bio: undefined,
+      location: undefined,
+      website: undefined,
+      joined_at: new Date().toISOString()
+    } as User
+  }
+
   // Local dev override - use proper Supabase authentication
   if (HAS_FAKE_LOGIN) {
     logger.info('Using fake login for development')
@@ -106,7 +155,7 @@ export async function signInWithTelegram(telegramUser: TelegramUser): Promise<Us
     };
   }
 
-  console.log('🔵 Using real Telegram authentication')
+  logger.info('Using real Telegram authentication')
   // Call backend to get JWT
   const res = await fetch(API_ENDPOINTS.TELEGRAM_LOGIN, {
     method: "POST",
@@ -129,7 +178,6 @@ export async function signInWithTelegram(telegramUser: TelegramUser): Promise<Us
   localStorage.setItem("sb-access-token", access_token);
 
   // PRODUCTION BYPASS: Skip setSession in production due to hanging issue
-  const isProduction = process.env.NODE_ENV === 'production'
   if (isProduction) {
     logger.info('Production bypass: Skipping setSession call due to hanging issue')
     logger.info('Tokens stored, forcing page reload for session consistency')
