@@ -25,52 +25,69 @@ export async function signInWithTelegram(telegramUser: TelegramUser): Promise<Us
   })
 
   // AGGRESSIVE PRODUCTION BYPASS: Skip all Supabase auth calls in production
-  const isProduction = process.env.NODE_ENV === 'production'
+  const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production' || typeof window !== 'undefined' && window.location.hostname !== 'localhost'
+
+  logger.info('🔍 Environment detection', {
+    NODE_ENV: process.env.NODE_ENV,
+    VERCEL_ENV: process.env.VERCEL_ENV,
+    hostname: typeof window !== 'undefined' ? window.location.hostname : 'server',
+    isProduction
+  })
+
   if (isProduction) {
     logger.info('🚨 AGGRESSIVE PRODUCTION BYPASS: Skipping all Supabase auth calls')
-    
-    // Call backend to get JWT (this part works)
-    const res = await fetch(API_ENDPOINTS.TELEGRAM_LOGIN, {
-      method: "POST", 
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(telegramUser),
-    });
-    
-    if (!res.ok) {
-      const errorText = await res.text();
-      logger.error('Telegram login failed', { status: res.status, errorText });
-      throw new Error("Telegram login failed");
-    }
 
-    const { access_token, refresh_token } = await res.json();
-    
-    // Store tokens directly and reload
-    localStorage.setItem("sb-access-token", access_token);
-    localStorage.setItem("sb-refresh-token", refresh_token);
-    
-    logger.info('🚨 PRODUCTION BYPASS: Tokens stored, forcing page reload')
-    
-    // Force immediate page reload
-    setTimeout(() => {
-      if (typeof window !== 'undefined') {
-        window.location.reload()
+    try {
+      // Call backend to get JWT (this part works)
+      const res = await fetch(API_ENDPOINTS.TELEGRAM_LOGIN, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(telegramUser),
+      });
+
+      if (!res.ok) {
+        const errorText = await res.text();
+        logger.error('Telegram login failed', { status: res.status, errorText });
+        throw new Error("Telegram login failed");
       }
-    }, 100) // Very short delay
-    
-    // Return minimal user object
-    return {
-      id: `temp-prod-${Date.now()}`,
-      name: telegramUser.first_name,
-      username: telegramUser.username || 'user',
-      avatar: "",
-      telegram_id: telegramUser.id,
-      first_name: telegramUser.first_name,
-      last_name: telegramUser.last_name || "",
-      bio: undefined,
-      location: undefined,
-      website: undefined,
-      joined_at: new Date().toISOString()
-    } as User
+
+      const { access_token, refresh_token } = await res.json();
+
+      // Store tokens directly and reload
+      localStorage.setItem("sb-access-token", access_token);
+      localStorage.setItem("sb-refresh-token", refresh_token);
+
+      logger.info('🚨 PRODUCTION BYPASS: Tokens stored, forcing page reload')
+
+      // Create a proper user object instead of minimal one
+      const userObj = {
+        id: `prod-${telegramUser.id}`,
+        name: telegramUser.first_name + (telegramUser.last_name ? ` ${telegramUser.last_name}` : ''),
+        username: telegramUser.username || `user${telegramUser.id}`,
+        avatar: telegramUser.photo_url || "",
+        telegram_id: telegramUser.id,
+        first_name: telegramUser.first_name,
+        last_name: telegramUser.last_name || "",
+        bio: undefined,
+        location: undefined,
+        website: undefined,
+        joined_at: new Date().toISOString()
+      } as User
+
+      // Force immediate page reload AFTER returning user object
+      setTimeout(() => {
+        if (typeof window !== 'undefined') {
+          logger.info('🚨 PRODUCTION BYPASS: Page reloading now...')
+          window.location.reload()
+        }
+      }, 200) // Slightly longer delay to ensure UI updates
+
+      return userObj
+
+    } catch (error) {
+      logger.error('🚨 PRODUCTION BYPASS ERROR:', error)
+      throw error
+    }
   }
 
   // Local dev override - use proper Supabase authentication
@@ -355,7 +372,8 @@ export async function getCurrentUserToken(): Promise<string | null> {
     logger.debug('getCurrentUserToken: Getting session...')
 
     // PRODUCTION BYPASS: Use localStorage token directly in production
-    const isProduction = process.env.NODE_ENV === 'production'
+    const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production' || typeof window !== 'undefined' && window.location.hostname !== 'localhost'
+
     if (isProduction) {
       const token = localStorage.getItem('sb-access-token')
       if (token) {
