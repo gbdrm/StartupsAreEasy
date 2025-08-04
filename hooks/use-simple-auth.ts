@@ -47,6 +47,25 @@ function resetAuth() {
     notifySubscribers()
 }
 
+// Emergency auth reset for stuck states
+export function emergencyAuthReset() {
+    logger.warn("emergencyAuthReset: Forcing complete auth reset")
+    resetAuth()
+
+    // Clear any remaining localStorage items
+    if (typeof window !== 'undefined') {
+        const keys = Object.keys(localStorage)
+        keys.forEach(key => {
+            if (key.startsWith('sb-') || key.includes('auth') || key.includes('telegram')) {
+                localStorage.removeItem(key)
+            }
+        })
+    }
+
+    // Force page reload
+    window.location.reload()
+}
+
 export function useSimpleAuth() {
     const [user, setUser] = useState<User | null>(globalUser)
     const [loading, setLoading] = useState(globalLoading)
@@ -69,33 +88,6 @@ export function useSimpleAuth() {
             }
         }
     }, [])
-
-    // Handle page visibility changes - refresh auth when returning to tab
-    useEffect(() => {
-        if (isVisible && globalUser && !globalLoading) {
-            logger.debug("useSimpleAuth: Page became visible, checking auth validity...")
-
-            // Validate current auth state when returning to tab
-            const validateAuth = async () => {
-                try {
-                    const profile = await getCurrentUser()
-                    if (!profile && globalUser) {
-                        logger.warn("useSimpleAuth: Auth validation failed after tab switch, clearing state")
-                        resetAuth()
-                        window.location.reload()
-                    }
-                } catch (error) {
-                    logger.error("useSimpleAuth: Auth validation error after tab switch:", error)
-                    resetAuth()
-                    window.location.reload()
-                }
-            }
-
-            // Debounce the validation to avoid too many calls
-            const timeoutId = setTimeout(validateAuth, 1000)
-            return () => clearTimeout(timeoutId)
-        }
-    }, [isVisible])
 
     useEffect(() => {
         // Only initialize once globally

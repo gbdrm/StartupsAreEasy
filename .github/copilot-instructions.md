@@ -129,7 +129,6 @@ if (!user) return <LoginPrompt />
 ## Key File Structure
 - `lib/api-direct.ts` - All database operations (REST API pattern)
 - `hooks/use-simple-auth.ts` - Global auth state (preferred)
-- `hooks/use-auth.ts` - Legacy auth hook (avoid in new code)
 - `lib/constants.ts` - Environment flags and UI constants
 - `docs/DEV_PATTERNS.md` - Comprehensive development templates
 - `docs/SUPABASE_PATTERNS.md` - Supabase-specific issues and solutions

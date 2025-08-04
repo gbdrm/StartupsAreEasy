@@ -1,24 +1,38 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { getCurrentUserToken } from '@/lib/auth'
 import { logger } from '@/lib/logger'
 
 export function usePageVisibility() {
     const [isVisible, setIsVisible] = useState(true) // Default to visible
+    const wasVisibleRef = useRef(true) // Track previous state
 
     useEffect(() => {
         // Set initial state after component mounts (client-side only)
-        setIsVisible(!document.hidden)
+        const initialVisibility = !document.hidden
+        setIsVisible(initialVisibility)
+        wasVisibleRef.current = initialVisibility
 
         // Set up page visibility listeners
 
         const handleVisibilityChange = async () => {
-            const wasHidden = !isVisible
+            const wasHidden = !wasVisibleRef.current
             const isNowVisible = !document.hidden
             setIsVisible(isNowVisible)
+            wasVisibleRef.current = isNowVisible
 
             // If page was hidden and is now visible, check auth token validity
             if (wasHidden && isNowVisible) {
                 logger.info('📄 Page became visible after being hidden - validating auth token...')
+
+                // Add a small delay to avoid race conditions with logout
+                await new Promise(resolve => setTimeout(resolve, 100))
+
+                // Check if logout is in progress (common localStorage keys would be missing)
+                const hasTokens = localStorage.getItem("sb-access-token") || localStorage.getItem("telegram-login-complete")
+                if (!hasTokens) {
+                    logger.debug('📄 No auth tokens found - likely logged out, skipping validation')
+                    return
+                }
 
                 try {
                     const token = await getCurrentUserToken()
@@ -40,7 +54,7 @@ export function usePageVisibility() {
         return () => {
             document.removeEventListener('visibilitychange', handleVisibilityChange)
         }
-    }, [isVisible]) // Include isVisible in dependencies to track previous state
+    }, []) // Remove isVisible from dependencies since we use ref now
 
     return isVisible
 }
