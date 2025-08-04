@@ -436,7 +436,7 @@ export default function DiagnosticsPage() {
 
       // Step 3: Test Backend Login Endpoint
       try {
-        const loginResponse = await fetch('/supabase/functions/telegram', {
+        const loginResponse = await fetch('/supabase/functions/tg-login', {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(mockTelegramUser),
@@ -508,16 +508,25 @@ export default function DiagnosticsPage() {
                     id: profile.id,
                     username: profile.username,
                     firstName: profile.first_name,
-                    lastName: profile.last_name
-                  } : "No profile data"
+                    lastName: profile.last_name,
+                    loadMethod: process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production' || window.location.hostname !== 'localhost' ? 'production-bypass' : 'supabase-auth'
+                  } : {
+                    message: "No profile data",
+                    loadMethod: process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production' || window.location.hostname !== 'localhost' ? 'production-bypass' : 'supabase-auth'
+                  }
                 })
               } catch (profileError) {
+                const errorMessage = profileError instanceof Error ? profileError.message : String(profileError)
                 results.push({
                   name: "Profile Loading",
-                  status: 'warning',
-                  message: "Profile loading failed (expected for mock user)",
+                  status: errorMessage.includes('Auth session missing') ? 'error' : 'warning',
+                  message: errorMessage.includes('Auth session missing') 
+                    ? "Profile loading failed with auth session error - this indicates production bypass is needed" 
+                    : "Profile loading failed (expected for mock user)",
                   details: {
-                    error: profileError instanceof Error ? profileError.message : String(profileError)
+                    error: errorMessage,
+                    isAuthSessionError: errorMessage.includes('Auth session missing'),
+                    loadMethod: process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production' || window.location.hostname !== 'localhost' ? 'production-bypass' : 'supabase-auth'
                   }
                 })
               }

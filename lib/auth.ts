@@ -318,21 +318,76 @@ export async function signInWithTelegram(telegramUser: TelegramUser): Promise<Us
 
 export async function getCurrentUserProfile(): Promise<User | null> {
   try {
+    // PRODUCTION BYPASS: Use token-based profile lookup in production
+    const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production' || typeof window !== 'undefined' && window.location.hostname !== 'localhost'
+
+    if (isProduction) {
+      logger.info('getCurrentUserProfile: Using production bypass with token-based lookup')
+
+      const token = await getCurrentUserToken()
+      if (!token) {
+        logger.debug('getCurrentUserProfile: No token available in production bypass')
+        return null
+      }
+
+      // Use the JWT token to get user info from the profiles table
+      // In production, we rely on RLS policies to return the correct profile
+      try {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/profiles?select=id,username,first_name,last_name,avatar_url&limit=1`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+            'Content-Type': 'application/json'
+          }
+        })
+
+        if (!response.ok) {
+          logger.error('getCurrentUserProfile: Profile fetch failed in production', { status: response.status })
+          return null
+        }
+
+        const profiles = await response.json()
+        if (!profiles || profiles.length === 0) {
+          logger.debug('getCurrentUserProfile: No profile found for token in production')
+          return null
+        }
+
+        const profile = profiles[0]
+        logger.info('getCurrentUserProfile: Profile loaded successfully in production', { username: profile.username })
+
+        return {
+          id: profile.id,
+          name: `${profile.first_name ?? ""} ${profile.last_name ?? ""}`.trim(),
+          username: profile.username ?? "",
+          avatar: profile.avatar_url ?? "",
+          first_name: profile.first_name,
+          last_name: profile.last_name,
+        }
+
+      } catch (fetchError) {
+        logger.error('getCurrentUserProfile: Production profile fetch error', fetchError)
+        return null
+      }
+    }
+
+    // DEVELOPMENT: Use normal Supabase auth
+    logger.debug('getCurrentUserProfile: Using normal Supabase auth for development')
+
     // Get current user from Supabase auth
     const { data: userData, error: authError } = await supabase.auth.getUser();
 
     if (authError) {
-      console.log(`getCurrentUserProfile: Auth error:`, authError.message)
+      logger.debug(`getCurrentUserProfile: Auth error:`, authError.message)
       return null
     }
 
     if (!userData?.user) {
-      console.log(`getCurrentUserProfile: No authenticated user found`)
+      logger.debug(`getCurrentUserProfile: No authenticated user found`)
       return null // No need to log this, it's normal when not authenticated
     }
 
     const user = userData.user;
-    console.log(`getCurrentUserProfile: Found authenticated user:`, user.id, user.email)
+    logger.debug(`getCurrentUserProfile: Found authenticated user`, { userId: user.id, email: user.email })
 
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
@@ -341,16 +396,20 @@ export async function getCurrentUserProfile(): Promise<User | null> {
       .single();
 
     if (profileError) {
-      console.log(`getCurrentUserProfile: Profile error:`, profileError.message)
+      logger.debug(`getCurrentUserProfile: Profile error`, { error: profileError.message })
       return null
     }
 
     if (!profile) {
-      console.log(`getCurrentUserProfile: No profile found for user:`, user.id)
+      logger.debug(`getCurrentUserProfile: No profile found for user`, { userId: user.id })
       return null
     }
 
-    console.log(`getCurrentUserProfile: Found profile:`, profile.first_name, profile.last_name, `(@${profile.username})`)
+    logger.debug(`getCurrentUserProfile: Found profile`, {
+      firstName: profile.first_name,
+      lastName: profile.last_name,
+      username: profile.username
+    })
 
     const userProfile = {
       id: user.id,
@@ -363,7 +422,7 @@ export async function getCurrentUserProfile(): Promise<User | null> {
 
     return userProfile
   } catch (error) {
-    console.error(`getCurrentUserProfile: Unexpected error:`, error)
+    logger.error(`getCurrentUserProfile: Unexpected error`, error)
     return null
   }
 }
