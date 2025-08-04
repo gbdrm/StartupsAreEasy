@@ -15,21 +15,16 @@ This is a Next.js 15 social platform with a unique **direct REST API architectur
 ### Page Architecture Patterns
 The app uses different rendering strategies depending on the page:
 
-**Client-Only Pages** (Most Common):
+**Client-Only Pages** (All Pages):
 - `app/page.tsx` (Homepage) - Full client component with `useEffect` data fetching
 - `app/profile/[username]/page.tsx` - Full client component with auth-dependent data loading
+- `app/posts/[id]/page.tsx` - Client component with data fetching and interactions
 - Pattern: `"use client"` at top, all data fetching in `useEffect`, auth handled by global state
-
-**Server + Client Hybrid** (Specific Use Cases):
-- `app/posts/[id]/page.tsx` - Server component for initial data + client wrapper for interactions
-- Pattern: Server fetches public data, client handles auth-dependent features
-- Note: Server components cannot access user auth context, so like status requires client-side updates
 
 **Auth Consistency Rules**:
 - All auth state changes trigger `window.location.reload()` for data consistency
 - Never use complex `useEffect` patterns to sync auth state - rely on page reloads
-- Client-only pages are preferred for auth-dependent features
-- Server components are only used for public data that benefits from SSR/SEO
+- All pages are client-only for consistent auth handling
 
 ## Essential Patterns
 
@@ -110,7 +105,7 @@ const isDuplicateSlug = response.status === 409 ||
 - **Token-Based Auth**: Production auth relies on localStorage tokens and direct database queries with Bearer authentication
 - **Page Reloads**: Auth state changes trigger `window.location.reload()` for consistency
 - **No Complex Syncing**: Avoid `useEffect` patterns to sync auth - let page reloads handle it
-- **Client-Only Auth**: Server components cannot access auth context - use client components for auth-dependent features
+- **Client-Only Auth**: All components are client-side and can access auth context directly
 - **Development**: Fake login available when `NEXT_PUBLIC_DEV_EMAIL/PASSWORD` environment variables are set
 - **Production**: Telegram authentication via backend function - bypasses hanging Supabase auth calls
 - **RLS Tokens**: All authenticated operations require `getCurrentUserToken()` for Row Level Security
@@ -182,7 +177,7 @@ When migrating components from legacy patterns:
 9. **Error Handling**: Centralize error handling in API functions - don't duplicate error detection patterns across pages
 10. **Availability Checks**: Use dedicated availability check functions instead of catching duplicate errors
 11. **Complex Auth Syncing**: Avoid `useEffect` patterns to sync auth state - rely on `window.location.reload()` for auth consistency
-12. **Server Component Auth**: Server components cannot access user auth context - handle auth-dependent features on client side
+12. **Client-Only Architecture**: All components are client-side - no server component considerations needed
 13. **Auth Timeout Issues**: If app gets stuck on "Getting session...", user sessions may be stale after long inactivity - use `emergencyAuthReset()` for stuck states
 14. **Production Auth Hanging**: Never rely on `supabase.auth.getSession()` in production - use production bypass with localStorage tokens
 15. **Environment Detection**: Always use multi-method environment detection (`NODE_ENV`, `VERCEL_ENV`, hostname) for production bypass

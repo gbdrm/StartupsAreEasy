@@ -16,7 +16,7 @@ export default async function PostPage({ params, searchParams }: PostPageProps) 
 
   try {
     // Get the post with current user context for like status
-    // Note: In SSR we don't have the current user, so client will need to refetch
+    // Note: Initial load without user context, client will update like status
     const post = await getPostByIdDirect(id, search.userId)
     
     if (!post) {

@@ -33,7 +33,7 @@ export default function DiagnosticsPage() {
     const results: DiagnosticResult[] = []
 
     try {
-      // First, run server-side diagnostics
+      // First, try to run API route diagnostics (if available)
       try {
         const response = await fetch('/api/diagnostics')
         const serverDiagnostics = await response.json()
@@ -41,21 +41,21 @@ export default function DiagnosticsPage() {
         if (serverDiagnostics.success) {
           results.push(...serverDiagnostics.results.map((r: any) => ({
             ...r,
-            name: `[Server] ${r.name}`
+            name: `[API] ${r.name}`
           })))
         } else {
           results.push({
-            name: '[Server] Server-side Diagnostics',
+            name: '[API] API Route Diagnostics',
             status: 'error',
-            message: `Server diagnostics failed: ${serverDiagnostics.error}`,
+            message: `API diagnostics failed: ${serverDiagnostics.error}`,
             details: serverDiagnostics
           })
         }
       } catch (err: any) {
         results.push({
-          name: '[Server] Server-side Diagnostics',
+          name: '[API] API Route Diagnostics',
           status: 'error',
-          message: `Failed to run server diagnostics: ${err.message}`,
+          message: `Failed to run API diagnostics: ${err.message}`,
           details: err
         })
       }
