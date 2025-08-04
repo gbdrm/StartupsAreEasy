@@ -27,6 +27,12 @@ export function usePageVisibility() {
                 // Add a small delay to avoid race conditions with logout
                 await new Promise(resolve => setTimeout(resolve, 100))
 
+                // Check if logout is in progress - skip validation entirely
+                if (localStorage.getItem('logout-in-progress')) {
+                    logger.debug('📄 Logout in progress, skipping auth validation')
+                    return
+                }
+
                 // Check if logout is in progress (common localStorage keys would be missing)
                 const hasTokens = localStorage.getItem("sb-access-token") || localStorage.getItem("telegram-login-complete")
                 if (!hasTokens) {

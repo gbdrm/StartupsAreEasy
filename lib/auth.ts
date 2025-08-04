@@ -326,12 +326,14 @@ export async function signInWithTelegram(telegramUser: TelegramUser): Promise<Us
 }
 
 export async function signOut(): Promise<void> {
-  logger.debug('signOut called')
+  logger.info('🚪 signOut: Starting signOut process...')
 
   // Clear localStorage tokens first
+  logger.debug('🚪 signOut: Clearing localStorage tokens...')
   localStorage.removeItem("sb-access-token");
   localStorage.removeItem("sb-refresh-token");
   localStorage.removeItem("telegram-login-complete");
+  localStorage.removeItem("logout-in-progress"); // Clear logout flag
 
   // PRODUCTION BYPASS: Skip supabase.auth.signOut in production
   const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production' || window.location.hostname !== 'localhost'
@@ -351,16 +353,26 @@ export async function signOut(): Promise<void> {
   }
 
   // Development: Use proper Supabase signOut
+  logger.debug('🚪 signOut: Calling supabase.auth.signOut() in development...')
   const { error } = await supabase.auth.signOut();
   if (error) {
-    logger.error('SignOut error:', error);
+    logger.error('🚪 signOut: SignOut error:', error);
     throw new Error("Failed to sign out");
   }
+  logger.debug('🚪 signOut: supabase.auth.signOut() completed successfully')
 
   // Clear all our custom localStorage items
   localStorage.removeItem("sb-user");
   localStorage.removeItem("sb-access-token");
   localStorage.removeItem("sb-refresh-token");
+
+  // Also clear any Supabase-managed localStorage items
+  const keys = Object.keys(localStorage);
+  keys.forEach(key => {
+    if (key.startsWith('supabase.') || key.startsWith('sb-')) {
+      localStorage.removeItem(key);
+    }
+  });
 
   logger.debug('signOut completed successfully')
 }

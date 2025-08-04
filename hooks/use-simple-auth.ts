@@ -40,6 +40,7 @@ function resetAuth() {
         localStorage.removeItem('fake-user-session')
         localStorage.removeItem('auth-reload-pending') // Clear reload state too
         localStorage.removeItem('telegram-login-complete') // Clear login completion flag
+        localStorage.removeItem('logout-in-progress') // Clear logout flag
     }
 
     globalUser = null
@@ -56,7 +57,7 @@ export function emergencyAuthReset() {
     if (typeof window !== 'undefined') {
         const keys = Object.keys(localStorage)
         keys.forEach(key => {
-            if (key.startsWith('sb-') || key.includes('auth') || key.includes('telegram')) {
+            if (key.startsWith('sb-') || key.includes('auth') || key.includes('telegram') || key.includes('logout')) {
                 localStorage.removeItem(key)
             }
         })
@@ -64,9 +65,7 @@ export function emergencyAuthReset() {
 
     // Force page reload
     window.location.reload()
-}
-
-export function useSimpleAuth() {
+} export function useSimpleAuth() {
     const [user, setUser] = useState<User | null>(globalUser)
     const [loading, setLoading] = useState(globalLoading)
     const hasInitialized = useRef(false)
@@ -311,15 +310,29 @@ export function useSimpleAuth() {
     }
 
     const logout = async () => {
+        logger.info('🚪 LOGOUT: Starting logout process...')
         try {
+            // Set a flag to prevent page visibility from interfering
+            localStorage.setItem('logout-in-progress', 'true')
+            logger.debug('🚪 LOGOUT: Set logout flag')
+
+            logger.debug('🚪 LOGOUT: Calling signOut()...')
             await signOut()
+            logger.debug('🚪 LOGOUT: signOut() completed')
+
+            logger.debug('🚪 LOGOUT: Calling resetAuth()...')
             resetAuth()
+            logger.debug('🚪 LOGOUT: resetAuth() completed')
+
             // Force reload to ensure all state is cleared and UI updates
             if (typeof window !== 'undefined') {
+                logger.debug('🚪 LOGOUT: Triggering page reload...')
                 window.location.reload()
             }
         } catch (error) {
-            console.error('Logout failed:', error)
+            // Clear the flag if logout fails
+            localStorage.removeItem('logout-in-progress')
+            logger.error('🚪 LOGOUT: Logout failed:', error)
             throw error
         }
     }
