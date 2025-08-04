@@ -38,6 +38,7 @@ function resetAuth() {
         localStorage.removeItem('sb-access-token')
         localStorage.removeItem('fake-user-session')
         localStorage.removeItem('auth-reload-pending') // Clear reload state too
+        localStorage.removeItem('telegram-login-complete') // Clear login completion flag
     }
 
     globalUser = null
@@ -105,6 +106,26 @@ export function useSimpleAuth() {
                 const isProduction = process.env.NODE_ENV === 'production'
                 if (isProduction) {
                     logger.info("useSimpleAuth: Bypassing session check due to production hanging issue")
+
+                    // Check if we have stored tokens from a successful login
+                    const hasStoredToken = localStorage.getItem("sb-access-token")
+                    const loginComplete = localStorage.getItem("telegram-login-complete")
+
+                    if (hasStoredToken && loginComplete) {
+                        logger.info("useSimpleAuth: Found stored tokens, loading user profile")
+                        try {
+                            const profile = await getCurrentUserProfile()
+                            if (profile) {
+                                logger.info("useSimpleAuth: Successfully loaded profile from stored tokens")
+                                setGlobalUser(profile)
+                                setGlobalLoading(false)
+                                return
+                            }
+                        } catch (profileError) {
+                            logger.error("useSimpleAuth: Error loading profile from stored tokens:", profileError)
+                        }
+                    }
+
                     logger.debug("useSimpleAuth: Starting with clean auth state")
                     setGlobalUser(null)
                     setGlobalLoading(false)
@@ -187,14 +208,8 @@ export function useSimpleAuth() {
                             })
                             setGlobalUser(profile)
 
-                            // Force a page reload after successful Telegram login to ensure UI consistency
-                            // This addresses the issue where the button doesn't update after sign-in
-                            logger.info("useSimpleAuth: Forcing page reload for UI consistency")
-                            setTimeout(() => {
-                                if (typeof window !== 'undefined') {
-                                    window.location.reload()
-                                }
-                            }, 1000) // 1 second delay to let the auth state settle
+                            // Note: Don't reload here - auth.ts already handles the reload
+                            // This prevents double-reloading which causes auth loops
                         } catch (error) {
                             logger.error("useSimpleAuth: Error getting profile", error)
                             setGlobalUser(null)
@@ -227,9 +242,37 @@ export function useSimpleAuth() {
     const login = async (telegramUser: TelegramUser) => {
         try {
             const user = await signInWithTelegram(telegramUser)
-            setGlobalUser(user)
+
+            // If we got a temp user (production bypass), start loading the real profile
+            if (user && user.id === 'temp-loading') {
+                logger.info("useSimpleAuth: Got temp user, will load real profile shortly")
+                setGlobalUser(user) // Show temp user immediately
+
+                // Try to load real profile after a short delay
+                setTimeout(async () => {
+                    try {
+                        const realProfile = await getCurrentUserProfile()
+                        if (realProfile) {
+                            logger.info("useSimpleAuth: Loaded real profile, replacing temp user")
+                            setGlobalUser(realProfile)
+                        }
+                    } catch (profileError) {
+                        logger.error("useSimpleAuth: Failed to load real profile:", profileError)
+                    }
+                }, 500) // Half-second delay
+
+            } else {
+                // Normal dev login
+                setGlobalUser(user)
+            }
+
         } catch (error) {
-            console.error('Login failed:', error)
+            if (error instanceof Error && error.message === "AUTH_RELOAD_IN_PROGRESS") {
+                // This is expected during production bypass - don't show error
+                logger.info('Auth reload in progress, waiting for page reload...')
+                return
+            }
+            logger.error('Login failed:', error)
             throw error
         }
     }

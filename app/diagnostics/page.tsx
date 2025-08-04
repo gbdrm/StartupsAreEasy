@@ -393,6 +393,401 @@ export default function DiagnosticsPage() {
     setLoading(false)
   }
 
+  // Debug Telegram Login with step-by-step verification
+  const [debugLoginResults, setDebugLoginResults] = useState<DiagnosticResult[]>([])
+  const [debugLoginLoading, setDebugLoginLoading] = useState(false)
+
+  const runDebugTelegramLogin = async () => {
+    setDebugLoginLoading(true)
+    setDebugLoginResults([])
+
+    const results: DiagnosticResult[] = []
+
+    try {
+      // Step 1: Environment Check
+      results.push({
+        name: "Environment Detection",
+        status: 'success',
+        message: "Checking production environment detection",
+        details: {
+          NODE_ENV: process.env.NODE_ENV,
+          VERCEL_ENV: process.env.VERCEL_ENV,
+          hostname: window.location.hostname,
+          isProduction: process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production' || window.location.hostname !== 'localhost'
+        }
+      })
+
+      // Step 2: Create mock Telegram user
+      const mockTelegramUser = {
+        id: 999999999, // Mock ID
+        first_name: "Debug",
+        last_name: "Test",
+        username: "debug_test",
+        auth_date: Math.floor(Date.now() / 1000),
+        hash: "mock_hash_for_testing"
+      }
+
+      results.push({
+        name: "Mock Telegram User",
+        status: 'success',
+        message: "Created mock Telegram user for testing",
+        details: mockTelegramUser
+      })
+
+      // Step 3: Test Backend Login Endpoint
+      try {
+        const loginResponse = await fetch('/supabase/functions/telegram', {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(mockTelegramUser),
+        })
+
+        if (loginResponse.ok) {
+          const tokenData = await loginResponse.json()
+          results.push({
+            name: "Backend Login Endpoint",
+            status: 'success',
+            message: "Backend login endpoint is working",
+            details: {
+              status: loginResponse.status,
+              hasAccessToken: !!tokenData.access_token,
+              hasRefreshToken: !!tokenData.refresh_token,
+              tokenLength: tokenData.access_token?.length
+            }
+          })
+
+          // Step 4: Test Token Storage
+          const originalAccessToken = localStorage.getItem("sb-access-token")
+          const originalRefreshToken = localStorage.getItem("sb-refresh-token")
+
+          localStorage.setItem("sb-access-token", tokenData.access_token)
+          localStorage.setItem("sb-refresh-token", tokenData.refresh_token)
+
+          const storedAccessToken = localStorage.getItem("sb-access-token")
+          const storedRefreshToken = localStorage.getItem("sb-refresh-token")
+
+          results.push({
+            name: "Token Storage",
+            status: storedAccessToken && storedRefreshToken ? 'success' : 'error',
+            message: storedAccessToken && storedRefreshToken ? "Tokens stored successfully in localStorage" : "Failed to store tokens",
+            details: {
+              accessTokenStored: !!storedAccessToken,
+              refreshTokenStored: !!storedRefreshToken,
+              accessTokenLength: storedAccessToken?.length,
+              refreshTokenLength: storedRefreshToken?.length
+            }
+          })
+
+          // Step 5: Test getCurrentUserToken
+          try {
+            const { getCurrentUserToken } = await import('@/lib/auth')
+            const retrievedToken = await getCurrentUserToken()
+
+            results.push({
+              name: "Token Retrieval",
+              status: retrievedToken ? 'success' : 'error',
+              message: retrievedToken ? "getCurrentUserToken() works correctly" : "getCurrentUserToken() failed",
+              details: {
+                hasToken: !!retrievedToken,
+                tokenLength: retrievedToken?.length,
+                tokensMatch: retrievedToken === tokenData.access_token
+              }
+            })
+
+            // Step 6: Test Profile Loading
+            if (retrievedToken) {
+              try {
+                const { getCurrentUserProfile } = await import('@/lib/auth')
+                const profile = await getCurrentUserProfile()
+
+                results.push({
+                  name: "Profile Loading",
+                  status: profile ? 'success' : 'warning',
+                  message: profile ? "Profile loaded successfully" : "No profile found (this is normal for mock user)",
+                  details: profile ? {
+                    id: profile.id,
+                    username: profile.username,
+                    firstName: profile.first_name,
+                    lastName: profile.last_name
+                  } : "No profile data"
+                })
+              } catch (profileError) {
+                results.push({
+                  name: "Profile Loading",
+                  status: 'warning',
+                  message: "Profile loading failed (expected for mock user)",
+                  details: {
+                    error: profileError instanceof Error ? profileError.message : String(profileError)
+                  }
+                })
+              }
+            }
+
+            // Step 7: Test Database Query
+            if (retrievedToken) {
+              try {
+                const testResponse = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/posts?limit=1`, {
+                  headers: {
+                    'Authorization': `Bearer ${retrievedToken}`,
+                    'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+                    'Content-Type': 'application/json'
+                  }
+                })
+
+                results.push({
+                  name: "Database Query Test",
+                  status: testResponse.ok ? 'success' : 'error',
+                  message: testResponse.ok ? "Database queries work with token" : `Database query failed: ${testResponse.status}`,
+                  details: {
+                    status: testResponse.status,
+                    statusText: testResponse.statusText,
+                    url: testResponse.url
+                  }
+                })
+              } catch (dbError) {
+                results.push({
+                  name: "Database Query Test",
+                  status: 'error',
+                  message: "Database query threw error",
+                  details: {
+                    error: dbError instanceof Error ? dbError.message : String(dbError)
+                  }
+                })
+              }
+            }
+
+          } catch (tokenError) {
+            results.push({
+              name: "Token Retrieval",
+              status: 'error',
+              message: "getCurrentUserToken() threw error",
+              details: {
+                error: tokenError instanceof Error ? tokenError.message : String(tokenError)
+              }
+            })
+          }
+
+          // Cleanup: Restore original tokens
+          if (originalAccessToken) {
+            localStorage.setItem("sb-access-token", originalAccessToken)
+          } else {
+            localStorage.removeItem("sb-access-token")
+          }
+
+          if (originalRefreshToken) {
+            localStorage.setItem("sb-refresh-token", originalRefreshToken)
+          } else {
+            localStorage.removeItem("sb-refresh-token")
+          }
+
+        } else {
+          const errorText = await loginResponse.text()
+          results.push({
+            name: "Backend Login Endpoint",
+            status: 'error',
+            message: `Backend login failed: ${loginResponse.status}`,
+            details: {
+              status: loginResponse.status,
+              statusText: loginResponse.statusText,
+              errorText: errorText
+            }
+          })
+        }
+      } catch (backendError) {
+        results.push({
+          name: "Backend Login Endpoint",
+          status: 'error',
+          message: "Backend login endpoint threw error",
+          details: {
+            error: backendError instanceof Error ? backendError.message : String(backendError)
+          }
+        })
+      }
+
+      // Step 8: Test Production Bypass Logic
+      const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production' || window.location.hostname !== 'localhost'
+      
+      results.push({
+        name: "Production Bypass Logic",
+        status: 'success',
+        message: `Production bypass ${isProduction ? 'ACTIVE' : 'INACTIVE'}`,
+        details: {
+          isProduction,
+          bypassActive: isProduction,
+          environment: {
+            NODE_ENV: process.env.NODE_ENV,
+            VERCEL_ENV: process.env.VERCEL_ENV,
+            hostname: window.location.hostname
+          }
+        }
+      })
+
+      // Step 9: Test Auth Hook Integration
+      try {
+        const loginCompleteFlag = localStorage.getItem("telegram-login-complete")
+        const authReloadFlag = localStorage.getItem("auth-reload-pending")
+
+        results.push({
+          name: "Auth Hook State",
+          status: 'success',
+          message: "Auth hook state flags checked",
+          details: {
+            loginComplete: !!loginCompleteFlag,
+            reloadPending: !!authReloadFlag,
+            currentUser: currentUser ? {
+              id: currentUser.id,
+              username: currentUser.username,
+              name: currentUser.name
+            } : null
+          }
+        })
+      } catch (authError) {
+        results.push({
+          name: "Auth Hook State",
+          status: 'error',
+          message: "Auth hook state check failed",
+          details: {
+            error: authError instanceof Error ? authError.message : String(authError)
+          }
+        })
+      }
+
+    } catch (overallError) {
+      results.push({
+        name: "Debug Login Process",
+        status: 'error',
+        message: "Overall debug login process failed",
+        details: {
+          error: overallError instanceof Error ? overallError.message : String(overallError)
+        }
+      })
+    }
+
+    setDebugLoginResults(results)
+    setDebugLoginLoading(false)
+  }
+
+  // Quick Auth State Test
+  const [authStateResults, setAuthStateResults] = useState<DiagnosticResult[]>([])
+  const [authStateLoading, setAuthStateLoading] = useState(false)
+
+  const testCurrentAuthState = async () => {
+    setAuthStateLoading(true)
+    setAuthStateResults([])
+
+    const results: DiagnosticResult[] = []
+
+    try {
+      // Check localStorage tokens
+      const accessToken = localStorage.getItem("sb-access-token")
+      const refreshToken = localStorage.getItem("sb-refresh-token")
+      const loginComplete = localStorage.getItem("telegram-login-complete")
+      const authReloadPending = localStorage.getItem("auth-reload-pending")
+
+      results.push({
+        name: "LocalStorage State",
+        status: 'success',
+        message: "Current localStorage auth state",
+        details: {
+          hasAccessToken: !!accessToken,
+          hasRefreshToken: !!refreshToken,
+          accessTokenLength: accessToken?.length,
+          refreshTokenLength: refreshToken?.length,
+          loginComplete: !!loginComplete,
+          authReloadPending: !!authReloadPending
+        }
+      })
+
+      // Check current user from hook
+      results.push({
+        name: "Auth Hook State",
+        status: currentUser ? 'success' : 'warning',
+        message: currentUser ? "User is authenticated in hook" : "No user in auth hook",
+        details: currentUser ? {
+          id: currentUser.id,
+          username: currentUser.username,
+          name: currentUser.name,
+          firstName: currentUser.first_name,
+          lastName: currentUser.last_name
+        } : "No user data"
+      })
+
+      // Test getCurrentUserToken
+      if (accessToken) {
+        try {
+          const { getCurrentUserToken } = await import('@/lib/auth')
+          const retrievedToken = await getCurrentUserToken()
+
+          results.push({
+            name: "Token Retrieval Test",
+            status: retrievedToken ? 'success' : 'error',
+            message: retrievedToken ? "getCurrentUserToken() working" : "getCurrentUserToken() failed",
+            details: {
+              hasToken: !!retrievedToken,
+              tokenLength: retrievedToken?.length,
+              tokensMatch: retrievedToken === accessToken
+            }
+          })
+        } catch (tokenError) {
+          results.push({
+            name: "Token Retrieval Test",
+            status: 'error',
+            message: "getCurrentUserToken() threw error",
+            details: {
+              error: tokenError instanceof Error ? tokenError.message : String(tokenError)
+            }
+          })
+        }
+      }
+
+      // Test database access
+      if (accessToken) {
+        try {
+          const testResponse = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/profiles?limit=1`, {
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+              'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+              'Content-Type': 'application/json'
+            }
+          })
+
+          results.push({
+            name: "Database Access Test",
+            status: testResponse.ok ? 'success' : 'error',
+            message: testResponse.ok ? "Database access working" : `Database access failed: ${testResponse.status}`,
+            details: {
+              status: testResponse.status,
+              statusText: testResponse.statusText,
+              url: testResponse.url
+            }
+          })
+        } catch (dbError) {
+          results.push({
+            name: "Database Access Test",
+            status: 'error',
+            message: "Database access threw error",
+            details: {
+              error: dbError instanceof Error ? dbError.message : String(dbError)
+            }
+          })
+        }
+      }
+
+    } catch (overallError) {
+      results.push({
+        name: "Auth State Test",
+        status: 'error',
+        message: "Auth state test failed",
+        details: {
+          error: overallError instanceof Error ? overallError.message : String(overallError)
+        }
+      })
+    }
+
+    setAuthStateResults(results)
+    setAuthStateLoading(false)
+  }
+
   const getStatusIcon = (status: DiagnosticResult['status']) => {
     switch (status) {
       case 'success':
@@ -457,6 +852,151 @@ export default function DiagnosticsPage() {
               )}
             </Button>
           </div>
+
+          {/* Debug Telegram Login Section */}
+          <Card className="border-blue-200 bg-blue-50/50">
+            <CardHeader>
+              <CardTitle className="text-blue-800">🔧 Debug Telegram Login</CardTitle>
+              <p className="text-sm text-blue-600">
+                Step-by-step verification of Telegram login process with mock data
+              </p>
+            </CardHeader>
+            <CardContent>
+              <div className="flex justify-center mb-4">
+                <Button 
+                  onClick={runDebugTelegramLogin} 
+                  disabled={debugLoginLoading}
+                  variant="outline"
+                  className="border-blue-300 text-blue-700 hover:bg-blue-100"
+                >
+                  {debugLoginLoading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Running Debug Login...
+                    </>
+                  ) : (
+                    <>
+                      <Users className="h-4 w-4 mr-2" />
+                      Debug Telegram Login
+                    </>
+                  )}
+                </Button>
+              </div>
+
+              {debugLoginResults.length > 0 && (
+                <>
+                  {/* Debug Summary */}
+                  <div className="grid grid-cols-3 gap-4 mb-6">
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-green-600">{debugLoginResults.filter(d => d.status === 'success').length}</div>
+                      <div className="text-sm text-muted-foreground">Passed</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-yellow-600">{debugLoginResults.filter(d => d.status === 'warning').length}</div>
+                      <div className="text-sm text-muted-foreground">Warnings</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-red-600">{debugLoginResults.filter(d => d.status === 'error').length}</div>
+                      <div className="text-sm text-muted-foreground">Failed</div>
+                    </div>
+                  </div>
+
+                  {/* Debug Results */}
+                  <div className="grid gap-4">
+                    {debugLoginResults.map((result, index) => (
+                      <Card key={index} className="border-l-4 border-l-blue-500">
+                        <CardHeader className="pb-2">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center space-x-2">
+                              {getStatusIcon(result.status)}
+                              <h4 className="font-medium text-sm">Step {index + 1}: {result.name}</h4>
+                              {getStatusBadge(result.status)}
+                            </div>
+                          </div>
+                        </CardHeader>
+                        <CardContent className="pt-0">
+                          <p className="text-sm text-muted-foreground mb-2">{result.message}</p>
+                          {result.details && (
+                            <details className="text-xs">
+                              <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
+                                Show step details
+                              </summary>
+                              <pre className="mt-2 p-2 bg-muted rounded text-xs overflow-auto">
+                                {JSON.stringify(result.details, null, 2)}
+                              </pre>
+                            </details>
+                          )}
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Current Auth State Test */}
+          <Card className="border-green-200 bg-green-50/50">
+            <CardHeader>
+              <CardTitle className="text-green-800">🔍 Current Auth State</CardTitle>
+              <p className="text-sm text-green-600">
+                Test your current authentication state and token validity
+              </p>
+            </CardHeader>
+            <CardContent>
+              <div className="flex justify-center mb-4">
+                <Button 
+                  onClick={testCurrentAuthState} 
+                  disabled={authStateLoading}
+                  variant="outline"
+                  className="border-green-300 text-green-700 hover:bg-green-100"
+                >
+                  {authStateLoading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Testing Auth State...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle className="h-4 w-4 mr-2" />
+                      Test Current Auth
+                    </>
+                  )}
+                </Button>
+              </div>
+
+              {authStateResults.length > 0 && (
+                <div className="grid gap-4">
+                  {authStateResults.map((result, index) => (
+                    <Card key={index} className="border-l-4 border-l-green-500">
+                      <CardHeader className="pb-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-2">
+                            {getStatusIcon(result.status)}
+                            <h4 className="font-medium text-sm">{result.name}</h4>
+                            {getStatusBadge(result.status)}
+                          </div>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="pt-0">
+                        <p className="text-sm text-muted-foreground mb-2">{result.message}</p>
+                        {result.details && (
+                          <details className="text-xs">
+                            <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
+                              Show auth details
+                            </summary>
+                            <pre className="mt-2 p-2 bg-muted rounded text-xs overflow-auto">
+                              {JSON.stringify(result.details, null, 2)}
+                            </pre>
+                          </details>
+                        )}
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
           {diagnostics.length > 0 && (
             <>

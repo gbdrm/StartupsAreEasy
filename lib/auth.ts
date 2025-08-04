@@ -57,23 +57,33 @@ export async function signInWithTelegram(telegramUser: TelegramUser): Promise<Us
       localStorage.setItem("sb-access-token", access_token);
       localStorage.setItem("sb-refresh-token", refresh_token);
 
-      logger.info('🚨 PRODUCTION BYPASS: Tokens stored, forcing page reload')
+      logger.info('🚨 PRODUCTION BYPASS: Tokens stored, skipping setSession (causes hanging)')
 
-      // Don't return any user object - this prevents ANY database calls
-      // Force immediate page reload and let onAuthStateChange handle everything
+      // Store tokens for getCurrentUserToken() to find
+      localStorage.setItem("sb-access-token", access_token);
+      localStorage.setItem("sb-refresh-token", refresh_token);
 
-      // Mark that we're in a reload state so components know to wait
-      localStorage.setItem("auth-reload-pending", "true")
+      // Mark that we completed login successfully (prevents reload loops)
+      localStorage.setItem("telegram-login-complete", "true")
 
-      // Force immediate page reload - no user object returned
-      if (typeof window !== 'undefined') {
-        logger.info('🚨 PRODUCTION BYPASS: Page reloading immediately...')
-        window.location.reload()
+      // Return a minimal user that will get replaced by onAuthStateChange
+      // when the auth hook detects the stored tokens
+      const tempUser: User = {
+        id: 'temp-loading', // Safe ID that won't cause UUID errors
+        name: telegramUser.first_name || 'Loading...',
+        username: telegramUser.username || 'loading',
+        avatar: '',
+        telegram_id: telegramUser.id,
+        first_name: telegramUser.first_name || 'Loading',
+        last_name: telegramUser.last_name || '',
+        bio: undefined,
+        location: undefined,
+        website: undefined,
+        joined_at: new Date().toISOString()
       }
 
-      // This code should never be reached due to reload, but just in case:
-      // Throw a special error that the auth hook will handle gracefully
-      throw new Error("AUTH_RELOAD_IN_PROGRESS")
+      logger.info('🚨 PRODUCTION BYPASS: Returning temp user, auth hook will load real profile')
+      return tempUser
 
     } catch (error) {
       logger.error('🚨 PRODUCTION BYPASS ERROR:', error)
