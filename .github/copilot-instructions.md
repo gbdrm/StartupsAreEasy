@@ -1,5 +1,31 @@
 # AI Coding Agent Instructions for StartupsAreEasy
 
+## ⚠️ CRITICAL SECURITY GUIDELINES - OPEN SOURCE PROJECT
+
+**This project is open source and publicly visible.** NEVER include sensitive information in any file:
+
+### ❌ NEVER Include in Code/Documentation:
+- API keys, tokens, passwords, secrets
+- Real database URLs, project IDs, or domain names
+- Service role keys or private credentials
+- Production environment variables with real values
+- User data, emails, or private information
+- Telegram bot tokens or Supabase project URLs
+
+### ✅ ALWAYS Use Instead:
+- Environment variables referenced as `process.env.VARIABLE_NAME`
+- Placeholder values: `YOUR_API_KEY`, `your-project-id`, `your-domain.com`
+- Generic examples in documentation
+- Template values in code comments
+
+### 🔍 Before Creating/Editing Files:
+- Replace any real URLs with placeholder patterns
+- Use environment variable references, not hardcoded values
+- Check that examples use generic domains/IDs
+- Ensure no tokens or secrets are visible
+
+**Remember: Once committed, sensitive data is permanent in git history even if later removed.**
+
 ## Architecture Overview
 This is a Next.js 15 social platform with a unique **direct REST API architecture** instead 12. **Auth Timeout Issues**: If app gets stuck on "Getting session...", user sessions may be stale after long inactivity - use `emergencyAuthReset()` for stuck states. Extended timeout to 15 seconds for production reliability.
 13. **Production Telegram Issues**: Telegram authentication may show wrong email or fail to update UI. Added comprehensive debugging and force page reload after successful sign-in to ensure UI consistency.

@@ -42,3 +42,5 @@ Run the SQL scripts in order in your Supabase SQL editor:
 - The development credentials are only for local testing
 - In production, use proper Telegram authentication
 - All sensitive data should be in environment variables, never hardcoded
+
+**⚠️ This is an open source project** - See [security guidelines](../.github/copilot-instructions.md#critical-security-guidelines---open-source-project) for handling sensitive information.
