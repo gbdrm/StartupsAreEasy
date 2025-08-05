@@ -1,7 +1,10 @@
+/// <reference types="https://deno.land/std@0.208.0/types.d.ts" />
+
 // Enhanced Telegram Bot for Authentication
 // Includes security tracking and better error handling per ChatGPT feedback
 
-import { Bot } from "https://deno.land/x/grammy@v1.18.1/mod.ts";
+import { Bot, Context, BotError } from "https://deno.land/x/grammy@v1.18.1/mod.ts";
+import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
 
 const botToken = Deno.env.get("BOT_TOKEN");
 const confirmUrl = Deno.env.get("CONFIRM_URL"); // Your Supabase Edge Function URL
@@ -18,7 +21,7 @@ const userAttempts = new Map();
 const MAX_ATTEMPTS = 5;
 const RATE_WINDOW = 60000; // 1 minute
 
-bot.command("start", async (ctx) => {
+bot.command("start", async (ctx: Context) => {
     const payload = ctx.match?.trim();
     const user = ctx.from;
 
@@ -130,7 +133,7 @@ bot.command("start", async (ctx) => {
 });
 
 // Help command
-bot.command("help", async (ctx) => {
+bot.command("help", async (ctx: Context) => {
     await ctx.reply(
         "🤖 *StartupsAreEasy Authentication Bot*\n\n" +
         "This bot helps you sign in to StartupsAreEasy\\.\n\n" +
@@ -145,7 +148,7 @@ bot.command("help", async (ctx) => {
 });
 
 // Handle unknown commands
-bot.on("message", async (ctx) => {
+bot.on("message", async (ctx: Context) => {
     if (ctx.message.text && !ctx.message.text.startsWith("/")) {
         await ctx.reply(
             "🤔 I don't understand that message\\.\n\n" +
@@ -156,7 +159,7 @@ bot.on("message", async (ctx) => {
 });
 
 // Error handling
-bot.catch((err) => {
+bot.catch((err: BotError<Context>) => {
     console.error("Bot error:", err);
 });
 
@@ -170,5 +173,33 @@ setInterval(() => {
     }
 }, 60000); // Clean up every minute
 
-console.log("🤖 StartupsAreEasy authentication bot started");
-bot.start();
+// Wrap the bot initialization and webhook server logic in an async function
+(async () => {
+    // Initialize the bot
+    await bot.init();
+
+    // Start a custom webhook server
+    serve(async (req: Request) => {
+        const url = new URL(req.url);
+
+        // Verify the secret token
+        const secretToken = req.headers.get("x-telegram-bot-api-secret-token");
+        const expectedSecret = Deno.env.get("TG_SECRET_TOKEN");
+
+        if (!expectedSecret || secretToken !== expectedSecret) {
+            console.warn("🚨 Unauthorized request - secret token mismatch");
+            return new Response("Unauthorized", { status: 401 });
+        }
+
+        // Pass the request to the bot
+        try {
+            await bot.handleUpdate(await req.json());
+            return new Response("OK", { status: 200 });
+        } catch (err) {
+            console.error("Error handling update:", err);
+            return new Response("Internal Server Error", { status: 500 });
+        }
+    });
+})();
+
+console.log("🤖 StartupsAreEasy authentication bot started with custom webhook server");

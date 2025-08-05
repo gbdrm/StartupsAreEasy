@@ -24,6 +24,10 @@ interface TelegramAuthRequest {
 }
 
 serve(async (req) => {
+    // Log the start of the request
+    console.log(`Incoming request: ${req.method} ${req.url}`);
+    console.log(`Headers: ${JSON.stringify([...req.headers])}`);
+
     // CORS headers
     const corsHeaders = {
         'Access-Control-Allow-Origin': '*',
