@@ -33,7 +33,7 @@ export function useDataLoader() {
         } finally {
             setPostsLoading(false)
         }
-    }, [user?.id, postsLoading])
+    }, [user?.id]) // Remove postsLoading from dependencies to prevent infinite loop
 
     // Load posts once when component mounts
     useEffect(() => {

@@ -15,22 +15,18 @@ export type TelegramUser = {
 export async function signOut(): Promise<void> {
   logger.info('🚪 signOut: Starting signOut process...')
 
-  // Clear localStorage tokens first
+  // Use storage manager for consistent cleanup
   logger.debug('🚪 signOut: Clearing localStorage tokens...')
-  localStorage.removeItem("sb-access-token");
-  localStorage.removeItem("sb-refresh-token");
-  localStorage.removeItem("telegram-login-complete");
-  localStorage.removeItem("logout-in-progress"); // Clear logout flag
+  const { clearAuthStorage, setStorageItem } = await import('./storage-utils')
+  setStorageItem('logout-in-progress', 'true')
 
   // PRODUCTION BYPASS: Skip supabase.auth.signOut in production
   const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production' || window.location.hostname !== 'localhost'
 
   if (isProduction) {
     logger.info('🚨 PRODUCTION BYPASS: Skipping supabase.auth.signOut()')
-    // Clear all our custom localStorage items
-    localStorage.removeItem("sb-user");
-    localStorage.removeItem("sb-access-token");
-    localStorage.removeItem("sb-refresh-token");
+    // Clear all auth storage using storage manager
+    clearAuthStorage()
 
     // Force page reload to clear state
     setTimeout(() => {
@@ -43,18 +39,8 @@ export async function signOut(): Promise<void> {
   // Apply same bypass as getSession - Supabase auth calls are unreliable
   logger.info('🚨 BYPASS: Skipping supabase.auth.signOut() due to hanging issues (both prod and dev)')
 
-  // Clear all our custom localStorage items
-  localStorage.removeItem("sb-user");
-  localStorage.removeItem("sb-access-token");
-  localStorage.removeItem("sb-refresh-token");
-
-  // Also clear any Supabase-managed localStorage items
-  const keys = Object.keys(localStorage);
-  keys.forEach(key => {
-    if (key.startsWith('supabase.') || key.startsWith('sb-')) {
-      localStorage.removeItem(key);
-    }
-  });
+  // Clear all auth storage using storage manager
+  clearAuthStorage()
 
   // Since we're bypassing supabase.auth.signOut(), manually trigger auth state reset
   // by dispatching a storage event that the auth system can listen to
@@ -184,14 +170,14 @@ export async function getCurrentUser(): Promise<User | null> {
   }
 }
 
-export async function refreshAuthSession(): Promise<void> {
+export async function refreshAuthSession(): Promise<boolean> {
   logger.debug('refreshAuthSession called');
 
   const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production' || window.location.hostname !== 'localhost'
 
   if (isProduction) {
     logger.info('🚨 PRODUCTION BYPASS: Skipping session refresh')
-    return;
+    return false;
   }
 
   // Development: Use proper Supabase session refresh
@@ -199,12 +185,13 @@ export async function refreshAuthSession(): Promise<void> {
     const { data, error } = await supabase.auth.refreshSession();
     if (error) {
       logger.error('Session refresh failed:', error);
-      // Don't throw - let the app handle auth state naturally
-      return;
+      return false; // Return false to indicate failure
     }
     logger.debug('Session refreshed successfully');
+    return true; // Return true to indicate success
   } catch (error) {
     logger.error('refreshAuthSession error:', error);
+    return false;
   }
 }
 
@@ -223,21 +210,35 @@ export async function handleAuthError(error: any): Promise<boolean> {
 
     try {
       // Try to refresh the session first
-      await refreshAuthSession();
-
-      // If that doesn't work, force a page reload
-      setTimeout(() => {
-        window.location.reload();
-      }, 1000);
+      const refreshSucceeded = await refreshAuthSession();
+      
+      if (!refreshSucceeded) {
+        // Refresh failed, ask user before reloading
+        const userConfirmed = confirm(
+          'Your session has expired. The page needs to reload to re-authenticate. Continue?'
+        );
+        
+        if (userConfirmed) {
+          window.location.reload();
+        } else {
+          logger.info('User declined page reload for auth recovery');
+          return false; // User declined, don't handle the error
+        }
+      }
 
       return true; // Indicate we handled the error
     } catch (refreshError) {
       logger.error('Auth recovery failed:', refreshError);
-      // Force reload as last resort
-      setTimeout(() => {
+      
+      // Ask user before forcing reload as last resort
+      const userConfirmed = confirm(
+        'Authentication recovery failed. The page needs to reload. Continue?'
+      );
+      
+      if (userConfirmed) {
         window.location.reload();
-      }, 1000);
-      return true;
+      }
+      return userConfirmed;
     }
   }
 

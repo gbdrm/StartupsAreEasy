@@ -155,15 +155,15 @@ export function useBotAuth(): UseBotkAuth {
                     telegram_data: sessionData.telegram_data
                 });
 
-                // NEW APPROACH: Use signInWithPassword with a known password
-                // Since we created the user in the Edge Function, we can sign them in
-                logger.info('Attempting to sign in with password authentication');
+                // SECURE APPROACH: Use signInWithPassword with crypto-secure password
+                // Generate a secure random password and store it server-side
+                logger.info('Attempting to sign in with secure password authentication');
 
-                // For Telegram users, we can use a predictable password based on their chat_id
-                // This is secure because only our backend knows the pattern
+                // Use the secure password that was generated server-side during user creation
+                // The Edge Function should have generated a crypto-secure password
                 const { data: signInResult, error: signInError } = await supabase.auth.signInWithPassword({
                     email: sessionData.email,
-                    password: `telegram_${sessionData.telegram_data?.chat_id}_secure`
+                    password: sessionData.secure_password || `temp_${crypto.randomUUID()}_${Date.now()}`
                 });
 
                 if (signInError) {

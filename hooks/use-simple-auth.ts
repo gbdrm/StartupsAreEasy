@@ -6,12 +6,14 @@ import { getCurrentUser, signOut } from '@/lib/auth'
 import { logger } from '@/lib/logger'
 import type { User } from '@/lib/types'
 
-// Global flag to prevent multiple initializations
+// Global state with proper cleanup tracking
 let isAuthInitialized = false
 let authSubscription: any = null
 let globalUser: User | null = null
 let globalLoading = true
 let subscribers: Array<(user: User | null, loading: boolean) => void> = []
+let cleanupCallbacks: Array<() => void> = []
+let initializationPromise: Promise<void> | null = null
 
 // Simple pub-sub for auth state
 function notifySubscribers() {
@@ -32,13 +34,10 @@ function setGlobalLoading(loading: boolean) {
 function resetAuth() {
     logger.debug("useSimpleAuth: Resetting auth state")
 
-    // Clear any localStorage items
+    // Use storage manager for consistent cleanup
     if (typeof window !== 'undefined') {
-        localStorage.removeItem('sb-access-token')
-        localStorage.removeItem('fake-user-session')
-        localStorage.removeItem('auth-reload-pending') // Clear reload state too
-        localStorage.removeItem('telegram-login-complete') // Clear login completion flag
-        localStorage.removeItem('logout-in-progress') // Clear logout flag
+        const { clearAuthStorage } = require('@/lib/storage-utils')
+        clearAuthStorage()
     }
 
     globalUser = null
@@ -77,17 +76,35 @@ export function emergencyAuthReset() {
 
         subscribers.push(callback)
 
-        return () => {
+        const cleanup = () => {
             const index = subscribers.indexOf(callback)
             if (index > -1) {
                 subscribers.splice(index, 1)
             }
         }
+
+        cleanupCallbacks.push(cleanup)
+
+        return cleanup
     }, [])
 
     useEffect(() => {
-        // Only initialize once globally
-        if (isAuthInitialized || hasInitialized.current) {
+        // Only initialize once globally, handle race conditions
+        if (hasInitialized.current) {
+            return
+        }
+
+        if (initializationPromise) {
+            // Another component is already initializing, wait for it
+            initializationPromise.then(() => {
+                // Initialization complete, we can proceed
+                hasInitialized.current = true
+            })
+            return
+        }
+
+        if (isAuthInitialized) {
+            hasInitialized.current = true
             return
         }
 
@@ -95,8 +112,8 @@ export function emergencyAuthReset() {
         isAuthInitialized = true
         hasInitialized.current = true
 
-        // Get initial session with timeout
-        const initAuth = async () => {
+        // Create initialization promise to handle race conditions
+        initializationPromise = (async () => {
             try {
                 // Check if we're in the middle of an auth reload
                 if (typeof window !== 'undefined' && localStorage.getItem("auth-reload-pending")) {
@@ -221,9 +238,12 @@ export function emergencyAuthReset() {
                 logger.debug("useSimpleAuth: Setting loading to false")
                 setGlobalLoading(false)
             }
-        }
+        })()
 
-        initAuth()
+        // Wait for initialization to complete
+        initializationPromise.finally(() => {
+            initializationPromise = null
+        })
 
         // Failsafe: Ensure loading is set to false after maximum timeout
         const failsafeTimeout = setTimeout(() => {
@@ -294,8 +314,24 @@ export function emergencyAuthReset() {
             clearTimeout(failsafeTimeout)
             // Remove manual signout listener
             window.removeEventListener('manual-signout', handleManualSignout)
-            // Don't unsubscribe on individual component unmount
-            // Only when the entire app unmounts
+            
+            // Clean up subscription when last component unmounts
+            if (subscribers.length <= 1 && authSubscription) {
+                logger.debug("useSimpleAuth: Last subscriber unmounting, cleaning up auth subscription")
+                authSubscription.unsubscribe()
+                authSubscription = null
+                isAuthInitialized = false
+                
+                // Run all cleanup callbacks
+                cleanupCallbacks.forEach(cleanup => {
+                    try {
+                        cleanup()
+                    } catch (error) {
+                        logger.warn("Error during cleanup:", error)
+                    }
+                })
+                cleanupCallbacks = []
+            }
         }
     }, [])
 

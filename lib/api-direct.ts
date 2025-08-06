@@ -2,6 +2,47 @@
 // These functions use fetch() directly instead of the Supabase JS client
 
 import type { Post, Comment, User, Startup, StartupStage } from "./types"
+
+// Database response types for better type safety
+interface DbProfile {
+    id: string;
+    first_name?: string;
+    last_name?: string;
+    username?: string;
+    avatar_url?: string;
+}
+
+interface DbPost {
+    id: string;
+    user_id: string;
+    type: string;
+    content: string;
+    link_url?: string;
+    image_url?: string;
+    created_at: string;
+    startup_id?: string;
+    likes_count?: number;
+    comments_count?: number;
+    liked_by_user?: boolean;
+    first_name?: string;
+    last_name?: string;
+    username?: string;
+    avatar_url?: string;
+}
+
+interface DbComment {
+    id: string;
+    post_id: string;
+    user_id: string;
+    content: string;
+    created_at: string;
+    profiles?: DbProfile;
+}
+
+interface DbStartup extends Omit<Startup, 'created_at' | 'updated_at'> {
+    created_at: string;
+    updated_at: string;
+}
 import { logger } from './logger'
 import { isAuthError, handleApiError } from './auth-utils'
 import { getCurrentUserToken } from "./auth"
@@ -9,10 +50,66 @@ import { getCurrentUserToken } from "./auth"
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
+// Request deduplication and rate limiting
+const requestCache = new Map<string, Promise<any>>()
+const rateLimitMap = new Map<string, number>()
+const RATE_LIMIT_WINDOW = 1000 // 1 second
+const MAX_REQUESTS_PER_WINDOW = 10
+
 const headers = {
     'apikey': supabaseKey,
     'Authorization': `Bearer ${supabaseKey}`,
     'Content-Type': 'application/json'
+}
+
+// Rate limiting check
+function checkRateLimit(key: string): boolean {
+    const now = Date.now()
+    const requests = rateLimitMap.get(key) || 0
+    
+    if (requests >= MAX_REQUESTS_PER_WINDOW) {
+        logger.warn(`Rate limit exceeded for ${key}`)
+        return false
+    }
+    
+    rateLimitMap.set(key, requests + 1)
+    
+    // Clean up old entries
+    setTimeout(() => {
+        const current = rateLimitMap.get(key) || 0
+        if (current > 0) {
+            rateLimitMap.set(key, current - 1)
+        }
+    }, RATE_LIMIT_WINDOW)
+    
+    return true
+}
+
+// Request deduplication
+async function dedupedFetch(url: string, options: RequestInit = {}): Promise<Response> {
+    const cacheKey = `${options.method || 'GET'}:${url}:${JSON.stringify(options.body || {})}`
+    
+    if (requestCache.has(cacheKey)) {
+        logger.debug(`Deduplicating request: ${cacheKey}`)
+        return requestCache.get(cacheKey)!
+    }
+    
+    const rateLimitKey = `${options.method || 'GET'}:${new URL(url).pathname}`
+    if (!checkRateLimit(rateLimitKey)) {
+        throw new Error('Rate limit exceeded')
+    }
+    
+    const promise = fetch(url, options)
+    requestCache.set(cacheKey, promise)
+    
+    // Clean up cache after request completes
+    promise.finally(() => {
+        setTimeout(() => {
+            requestCache.delete(cacheKey)
+        }, 5000) // Cache for 5 seconds
+    })
+    
+    return promise
 }
 
 // Get auth headers with user token
@@ -37,7 +134,7 @@ async function getPostsWithDetailsInternal(currentUserId?: string, filterByUserI
             filterByUserId
         })
 
-        const response = await fetch(url, {
+        const response = await dedupedFetch(url, {
             method: 'POST',
             headers: {
                 ...headers,
@@ -78,7 +175,7 @@ async function getPostsWithDetailsInternal(currentUserId?: string, filterByUserI
         }
 
         // Transform the response to match our Post type
-        return posts.map((post: any) => ({
+        return posts.map((post: DbPost) => ({
             id: post.id,
             user: {
                 id: post.user_id,
@@ -131,7 +228,7 @@ export async function getBuildersDirect(): Promise<User[]> {
         const profiles = await response.json()
         console.log(`[${new Date().toISOString()}] getBuildersDirect: Loaded ${profiles.length} builders`)
 
-        return profiles.map((profile: any) => ({
+        return profiles.map((profile: DbProfile) => ({
             id: profile.id,
             name: `${profile.first_name} ${profile.last_name || ""}`.trim(),
             username: profile.username,
@@ -231,7 +328,7 @@ export async function createStartupDirect(startup: {
             throw new Error("Startup name must contain at least one alphanumeric character")
         }
 
-        const insertData: any = {
+        const insertData: Partial<DbStartup> = {
             name: startup.name,
             slug: baseSlug,
             description: startup.description,
@@ -505,7 +602,7 @@ export async function getCommentsDirect(postId: string): Promise<Comment[]> {
         console.log(`[${new Date().toISOString()}] getCommentsDirect: Loaded ${comments.length} comments`)
 
         // Return comments with proper user information
-        return comments.map((comment: any) => ({
+        return comments.map((comment: DbComment) => ({
             id: comment.id,
             post_id: comment.post_id,
             user: {
@@ -544,7 +641,7 @@ export async function getBulkCommentsDirect(postIds: string[]): Promise<Comment[
         console.log(`[${new Date().toISOString()}] getBulkCommentsDirect: Loaded ${comments.length} total comments`)
 
         // Return comments with proper user information
-        return comments.map((comment: any) => ({
+        return comments.map((comment: DbComment) => ({
             id: comment.id,
             post_id: comment.post_id,
             user: {
