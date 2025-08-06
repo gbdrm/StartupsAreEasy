@@ -30,9 +30,12 @@ export function TelegramLogin({ botName, onAuth }: TelegramLoginProps) {
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
+    console.debug("Initializing TelegramLogin component with botName:", botName)
+
     // Create the callback function
     window.TelegramLoginWidget = {
       dataOnauth: (user: TelegramUser) => {
+        console.debug("Telegram user authenticated:", user)
         onAuth(user)
       },
     }
@@ -48,21 +51,27 @@ export function TelegramLogin({ botName, onAuth }: TelegramLoginProps) {
 
     // Hide loading when script loads
     script.onload = () => {
+      console.debug("Telegram widget script loaded successfully.")
       setTimeout(() => setIsLoading(false), 500) // Small delay to ensure widget renders
     }
 
-    script.onerror = () => {
+    script.onerror = (error) => {
+      console.error("Failed to load Telegram widget script:", error)
       setIsLoading(false) // Hide loading even on error
     }
 
     const container = document.getElementById("telegram-login-container")
     if (container) {
+      console.debug("Appending Telegram widget script to container.")
       container.appendChild(script)
+    } else {
+      console.error("Telegram login container not found.")
     }
 
     return () => {
       // Cleanup
       if (container && script.parentNode) {
+        console.debug("Cleaning up Telegram widget script.")
         container.removeChild(script)
       }
       delete (window as any).TelegramLoginWidget
