@@ -8,14 +8,14 @@ import { AuthDialog } from "@/components/auth-dialog"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Separator } from "@/components/ui/separator"
 import { Loader2 } from "lucide-react"
-import { useAuth } from "@/components/auth-context"
+import { useSimpleAuth } from "@/hooks/use-simple-auth"
 import { usePostsWithOptimisticUpdates } from "@/hooks/use-posts-optimistic"
 import { useComments } from "@/hooks/use-comments"
 import { createPostFromFormDirect } from "@/lib/api-direct"
 import type { PostFormData, Comment as PostComment } from "@/lib/types"
 
 export default function HomePage() {
-  const { user, loading: authLoading, login } = useAuth()
+  const { user, loading: authLoading, login } = useSimpleAuth()
   const {
     posts,
     loading: postsLoading,

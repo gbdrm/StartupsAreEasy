@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { getCurrentUser, signInWithTelegram, signOut } from '@/lib/auth'
 import { logger } from '@/lib/logger'
-import { usePageVisibility } from '@/hooks/use-page-visibility'
 import type { TelegramUser } from '@/lib/auth'
 import type { User } from '@/lib/types'
 
@@ -69,7 +68,6 @@ export function emergencyAuthReset() {
     const [user, setUser] = useState<User | null>(globalUser)
     const [loading, setLoading] = useState(globalLoading)
     const hasInitialized = useRef(false)
-    const isVisible = usePageVisibility()
 
     // Subscribe to global auth state changes
     useEffect(() => {
@@ -162,7 +160,7 @@ export function emergencyAuthReset() {
                         })
                         return await Promise.race([quickPromise, quickTimeout])
                     } catch (quickError) {
-                        logger.warn("useSimpleAuth: Quick session check failed, checking stored tokens...")
+                        logger.debug("useSimpleAuth: Quick session check failed, checking stored tokens...")
 
                         // Immediate fallback: Check if we have valid stored tokens
                         const storedToken = localStorage.getItem("sb-access-token")
@@ -198,7 +196,7 @@ export function emergencyAuthReset() {
                     }
                     sessionResult = result
                 } catch (timeoutError) {
-                    logger.error("useSimpleAuth: All session methods failed", timeoutError)
+                    logger.debug("useSimpleAuth: Session check timed out, proceeding with no session")
                     setGlobalUser(null)
                     setGlobalLoading(false)
                     return

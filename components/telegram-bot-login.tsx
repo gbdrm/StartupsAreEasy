@@ -5,13 +5,28 @@
 
 import { useState, useEffect } from 'react';
 import { useBotAuth } from '@/hooks/use-bot-auth';
+import { useSimpleAuth } from '@/hooks/use-simple-auth';
 import { Button } from '@/components/ui/button';
-import { Loader2, MessageCircle, Clock, AlertCircle, X } from 'lucide-react';
+import { Loader2, MessageCircle, Clock, AlertCircle, X, CheckCircle } from 'lucide-react';
 import { logger } from '@/lib/logger';
 
 export function TelegramBotLogin() {
   const { authState, loginWithTelegramBot, cancelLogin } = useBotAuth();
+  const { user } = useSimpleAuth(); // Check global auth state
   const [timeElapsed, setTimeElapsed] = useState(0);
+  const [showSuccess, setShowSuccess] = useState(false);
+  
+  // Show success state briefly when user signs in
+  useEffect(() => {
+    if (user && (authState.isLoading || authState.isPolling)) {
+      logger.info("Authentication completed successfully");
+      setShowSuccess(true);
+      // Reset success state after a brief moment
+      setTimeout(() => {
+        setShowSuccess(false);
+      }, 2000);
+    }
+  }, [user, authState.isLoading, authState.isPolling]);
   
   // Timer for showing elapsed time during polling (ChatGPT suggestion for visual indicators)
   useEffect(() => {
@@ -64,6 +79,20 @@ export function TelegramBotLogin() {
   };
 
   // Show different states based on auth progress
+  
+  // Success state - briefly shown when authentication completes
+  if (showSuccess || user) {
+    return (
+      <div className="flex flex-col items-center space-y-4 p-6 border rounded-lg bg-green-50">
+        <CheckCircle className="h-8 w-8 text-green-600" />
+        <div className="text-center">
+          <p className="text-sm font-medium text-green-800">Authentication Successful!</p>
+          <p className="text-xs text-green-600 mt-1">Welcome back</p>
+        </div>
+      </div>
+    );
+  }
+
   if (authState.isLoading && !authState.isPolling) {
     return (
       <div className="flex flex-col items-center space-y-4 p-6 border rounded-lg bg-blue-50">

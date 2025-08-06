@@ -32,13 +32,16 @@ export async function GET(request: NextRequest) {
         // Check if token exists and get session data
         const { data: tokenData, error } = await supabase
             .from('pending_tokens')
-            .select('access_token, refresh_token, used, expires_at, created_at')
+            .select('user_id, email, status, used, expires_at, created_at, telegram_chat_id, telegram_username, telegram_first_name')
             .eq('token', token)
             .single();
+
+        console.log(`Token lookup result:`, { tokenData, error });
 
         if (error) {
             if (error.code === 'PGRST116') {
                 // Token not found - still waiting
+                console.log(`Token ${token} not found - still waiting`);
                 return NextResponse.json(
                     { status: 'pending', message: 'Waiting for authentication' },
                     { status: 200 }
@@ -52,11 +55,14 @@ export async function GET(request: NextRequest) {
         const expiresAt = new Date(tokenData.expires_at);
         const createdAt = new Date(tokenData.created_at);
 
-        // Check both expires_at and max age (10 minutes)
-        const maxAge = 10 * 60 * 1000; // 10 minutes
+        // Check both expires_at and max age (extended to 30 minutes to match Edge Function)
+        const maxAge = 30 * 60 * 1000; // Extended to 30 minutes
         const age = now.getTime() - createdAt.getTime();
 
+        console.log(`Token age check: ${Math.round(age / 1000 / 60)} minutes (max: ${maxAge / 1000 / 60} minutes)`);
+
         if (now > expiresAt || age > maxAge) {
+            console.log(`Token expired: now=${now.toISOString()}, expiresAt=${expiresAt.toISOString()}, age=${Math.round(age / 1000 / 60)}min`);
             // Clean up expired token
             await supabase
                 .from('pending_tokens')
@@ -77,8 +83,10 @@ export async function GET(request: NextRequest) {
             );
         }
 
-        // If access_token exists, auth is complete
-        if (tokenData.access_token) {
+        // Check if authentication is complete (status = 'complete')
+        if (tokenData.status === 'complete') {
+            console.log(`Auth complete for token ${token}, marking as used`);
+
             // Mark token as used
             await supabase
                 .from('pending_tokens')
@@ -87,12 +95,18 @@ export async function GET(request: NextRequest) {
 
             return NextResponse.json({
                 status: 'complete',
-                access_token: tokenData.access_token,
-                refresh_token: tokenData.refresh_token
+                email: tokenData.email,
+                user_id: tokenData.user_id,
+                telegram_data: {
+                    chat_id: tokenData.telegram_chat_id,
+                    username: tokenData.telegram_username,
+                    first_name: tokenData.telegram_first_name
+                }
             });
         }
 
         // Still waiting for authentication
+        console.log(`Token ${token} exists but status is '${tokenData.status}' - still pending`);
         return NextResponse.json(
             { status: 'pending', message: 'Waiting for authentication' },
             { status: 200 }

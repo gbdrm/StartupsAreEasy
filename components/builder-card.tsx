@@ -6,6 +6,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { getBuilderStats } from "@/lib/builders"
 import type { User } from "@/lib/types"
+import { logger } from "@/lib/logger"
 
 interface BuilderCardProps {
   builder: User
@@ -22,7 +23,7 @@ export function BuilderCard({ builder, onClick }: BuilderCardProps) {
         const builderStats = await getBuilderStats(builder.id)
         setStats(builderStats)
       } catch (error) {
-        console.error("Error loading builder stats:", error)
+        logger.error("Error loading builder stats", error)
       } finally {
         setLoading(false)
       }

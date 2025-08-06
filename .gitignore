@@ -18,6 +18,26 @@ yarn-error.log*
 
 # env files
 .env*
+.env.local
+.env.development
+.env.production
+
+# Security - Never commit these patterns
+**/secret*
+**/secrets*
+**/*secret*
+**/*secrets*
+**/private*
+**/*private*
+
+# API keys and tokens (common patterns)
+**/*key*.txt
+**/*token*.txt
+**/*auth*.txt
+
+/supabase/
+/docs/
+/scripts/
 
 # vercel
 .vercel

@@ -13,7 +13,8 @@ import { Heart, MessageCircle, ExternalLink } from "lucide-react"
 import { POST_TYPES, type Post, type Comment, type User } from "@/lib/types"
 import { formatDistanceToNow } from "date-fns"
 import { UserLink } from "./user-link"
-import { useAuth } from "@/components/auth-context"
+import { useSimpleAuth } from "@/hooks/use-simple-auth"
+import { logger } from "@/lib/logger"
 
 interface PostCardProps {
   post: Post
@@ -24,7 +25,7 @@ interface PostCardProps {
 }
 
 export function PostCard({ post, comments, onLike, onComment, clickable = true }: PostCardProps) {
-  const { user } = useAuth()
+  const { user } = useSimpleAuth()
   const [commentContent, setCommentContent] = useState("")
   const [isCommenting, setIsCommenting] = useState(false)
   const [showComments, setShowComments] = useState(false)
@@ -188,12 +189,12 @@ export function PostCard({ post, comments, onLike, onComment, clickable = true }
               variant="ghost"
               size="sm"
               onClick={() => {
-                console.log('💖 Like button clicked for post:', post.id, 'user exists:', !!user)
+                logger.debug('Like button clicked', { postId: post.id, userExists: !!user })
                 if (user) {
-                  console.log('💖 Calling onLike function...')
+                  logger.debug('Calling onLike function')
                   onLike(post.id)
                 } else {
-                  console.log('❌ No user, cannot like')
+                  logger.debug('No user, cannot like')
                 }
               }}
               disabled={!user}

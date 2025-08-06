@@ -4,8 +4,9 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { EnhancedPostForm } from "./enhanced-post-form"
-import { useAuth } from "@/components/auth-context"
+import { useSimpleAuth } from "@/hooks/use-simple-auth"
 import type { PostFormData, Startup, PostType } from "@/lib/types"
+import { logger } from "@/lib/logger"
 
 interface CollapsiblePostFormProps {
   onSubmit: (data: PostFormData) => Promise<void>
@@ -26,7 +27,7 @@ export function CollapsiblePostForm({
   error,
   onErrorClear
 }: CollapsiblePostFormProps) {
-  const { user } = useAuth()
+  const { user } = useSimpleAuth()
   const [isExpanded, setIsExpanded] = useState(false)
 
   const handleTextBoxClick = () => {
@@ -55,7 +56,7 @@ export function CollapsiblePostForm({
       setIsExpanded(false) // Only close on success
     } catch (error) {
       // Don't close the form on error - let the parent handle error display
-      console.error("Form submission error:", error)
+      logger.error("Form submission error", error)
     }
   }
 

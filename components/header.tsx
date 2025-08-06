@@ -7,7 +7,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { Button } from "@/components/ui/button"
 import { HelpCircle, Menu } from "lucide-react"
-import { useAuth } from "@/components/auth-context"
+import { useSimpleAuth } from "@/hooks/use-simple-auth"
 import { logger } from "@/lib/logger"
 
 // Simple VisuallyHidden component for accessibility
@@ -18,7 +18,7 @@ const VisuallyHidden = ({ children }: { children: React.ReactNode }) => (
 )
 
 export function Header() {
-  const { user, login, logout } = useAuth()
+  const { user } = useSimpleAuth()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   // Debug logging - only shows in development

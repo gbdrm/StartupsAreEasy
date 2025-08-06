@@ -9,86 +9,36 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
 import { LogOut, User as UserIcon } from "lucide-react"
-import { useAuth } from "@/components/auth-context"
-import { TelegramLogin } from "./telegram-login"
-import { useState } from "react"
+import { useSimpleAuth } from "@/hooks/use-simple-auth"
+import { AuthDialog } from "./auth-dialog"
+import { useState, useEffect } from "react"
 import Link from "next/link"
-import { HAS_FAKE_LOGIN } from "@/lib/constants"
 import { logger } from "@/lib/logger"
 
-interface TelegramUser {
-  id: number
-  first_name: string
-  last_name?: string
-  username?: string
-  photo_url?: string
-  auth_date: number
-  hash: string
-}
-
 export function AuthButton() {
-  const { user, login, logout } = useAuth()
+  const { user, logout } = useSimpleAuth()
   const [showLoginDialog, setShowLoginDialog] = useState(false)
+
+  // Auto-close dialog when user signs in successfully
+  useEffect(() => {
+    if (user && showLoginDialog) {
+      logger.info("User authenticated - closing login dialog")
+      setShowLoginDialog(false)
+    }
+  }, [user, showLoginDialog])
 
   // Debug logging - only shows in development
   logger.debug("AuthButton: user state", user)
 
-  const handleTelegramAuth = (telegramUser: TelegramUser) => {
-    login(telegramUser)
-    setShowLoginDialog(false)
-  }
-
   if (!user) {
     return (
-      <Dialog open={showLoginDialog} onOpenChange={setShowLoginDialog}>
-        <DialogTrigger asChild>
-          <Button
-            className={HAS_FAKE_LOGIN ? "bg-yellow-500 hover:bg-yellow-600 text-black" : "bg-[#0088cc] hover:bg-[#0077b3]"}
-          >
-            {HAS_FAKE_LOGIN ? "Sign in" : "Sign in"}
-          </Button>
-        </DialogTrigger>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Sign in</DialogTitle>
-            <DialogDescription>Sign in to your account to continue.</DialogDescription>
-          </DialogHeader>
-          <div className="flex justify-center py-4">
-            {HAS_FAKE_LOGIN ? (
-              <button
-                className="bg-yellow-500 hover:bg-yellow-600 text-black font-semibold px-4 py-2 rounded"
-                onClick={() => {
-                  handleTelegramAuth({
-                    id: 0,
-                    first_name: "Fake",
-                    last_name: "User",
-                    username: "fakeuser",
-                    photo_url: "",
-                    auth_date: Date.now(),
-                    hash: "fakehash"
-                  });
-                }}
-              >
-                Sign in as Fake User
-              </button>
-            ) : (
-              <TelegramLogin
-                botName="startups_are_easy_bot"
-                onAuth={handleTelegramAuth}
-              />
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
+      <>
+        <Button onClick={() => setShowLoginDialog(true)}>
+          Sign in
+        </Button>
+        <AuthDialog open={showLoginDialog} onOpenChange={setShowLoginDialog} />
+      </>
     )
   }
 

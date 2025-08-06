@@ -11,7 +11,7 @@ interface LogConfig {
 
 const config: LogConfig = {
     enabled: process.env.NODE_ENV === 'development',
-    level: 'info',
+    level: 'debug', // Back to debug for full development logging
     timestamp: true
 }
 

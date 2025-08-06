@@ -32,7 +32,10 @@ async function getPostsWithDetailsInternal(currentUserId?: string, filterByUserI
             user_id_param: currentUserId || null
         }
 
-        logger.debug("getPostsWithDetailsInternal: Request body", { requestBody, filterByUserId })
+        logger.debug("getPostsWithDetailsInternal: Making API request", {
+            currentUserId: currentUserId || 'anonymous',
+            filterByUserId
+        })
 
         const response = await fetch(url, {
             method: 'POST',
@@ -45,7 +48,7 @@ async function getPostsWithDetailsInternal(currentUserId?: string, filterByUserI
 
         if (!response.ok) {
             const errorText = await response.text()
-            logger.error("getPostsWithDetailsInternal: Error", { status: response.status, error: errorText })
+            logger.error("getPostsWithDetailsInternal: API error", { status: response.status, error: errorText })
             throw new Error(`HTTP ${response.status}: ${errorText}`)
         }
 
@@ -56,9 +59,7 @@ async function getPostsWithDetailsInternal(currentUserId?: string, filterByUserI
             posts = posts.filter((post: any) => post.user_id === filterByUserId)
         }
 
-        logger.debug("getPostsWithDetailsInternal: Loaded posts", { total: posts.length, filterByUserId })
-
-        // Get unique startup IDs to fetch startup details
+        logger.debug("getPostsWithDetailsInternal: Posts loaded", { total: posts.length, filterByUserId })        // Get unique startup IDs to fetch startup details
         const startupIds = [...new Set(posts.map((post: any) => post.startup_id).filter(Boolean))]
         let startupsMap = new Map()
 
@@ -104,10 +105,12 @@ async function getPostsWithDetailsInternal(currentUserId?: string, filterByUserI
 // Posts API
 export async function getPostsDirect(userId?: string): Promise<Post[]> {
     try {
-        logger.debug("getPostsDirect: Starting", { userId: userId || 'anonymous' })
-        return await getPostsWithDetailsInternal(userId)
+        logger.debug("getPostsDirect: Starting request", { userId: userId || 'anonymous' })
+        const result = await getPostsWithDetailsInternal(userId)
+        logger.debug("getPostsDirect: Request completed", { resultCount: result.length })
+        return result
     } catch (error) {
-        logger.error("Error fetching posts:", error)
+        logger.error("getPostsDirect: Request failed", error)
         throw error
     }
 }

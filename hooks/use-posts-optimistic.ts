@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef } from 'react'
 import { getPostsDirect } from '@/lib/api-direct'
 import type { Post } from '@/lib/types'
+import { logger } from '@/lib/logger'
 
 export function usePostsWithOptimisticUpdates(userId?: string) {
     const [posts, setPosts] = useState<Post[]>([])
@@ -9,33 +10,41 @@ export function usePostsWithOptimisticUpdates(userId?: string) {
 
     const loadPosts = useCallback(async () => {
         if (loading) {
-            console.log(`[${new Date().toISOString()}] usePostsWithOptimisticUpdates: Skipping load - already loading`)
+            logger.debug('usePostsWithOptimisticUpdates: Skipping load - already loading')
             return
         }
 
-        console.log(`[${new Date().toISOString()}] usePostsWithOptimisticUpdates: Loading posts for user: ${userId || 'anonymous'}`)
+        logger.info('usePostsWithOptimisticUpdates: Starting to load posts', { userId: userId || 'anonymous' })
 
         try {
             setLoading(true)
 
+            logger.info('usePostsWithOptimisticUpdates: Calling getPostsDirect...')
             const postsData = await getPostsDirect(userId)
-            setPosts(postsData)
 
-            console.log(`[${new Date().toISOString()}] usePostsWithOptimisticUpdates: Loaded ${postsData.length} posts, user: ${userId || 'anonymous'}`)
+            logger.info('usePostsWithOptimisticUpdates: API call completed, setting posts', {
+                count: postsData.length,
+                userId: userId || 'anonymous'
+            })
+            setPosts(postsData)
 
             // Log like status for debugging
             const likedPosts = postsData.filter(p => p.liked_by_user)
             if (likedPosts.length > 0) {
-                console.log(`[${new Date().toISOString()}] usePostsWithOptimisticUpdates: Found ${likedPosts.length} liked posts:`, likedPosts.map(p => p.id))
+                logger.debug('usePostsWithOptimisticUpdates: Found liked posts', {
+                    count: likedPosts.length,
+                    postIds: likedPosts.map(p => p.id)
+                })
             }
 
             hasLoaded.current = true
+            logger.info('usePostsWithOptimisticUpdates: Posts loaded successfully')
         } catch (error) {
-            console.error(`[${new Date().toISOString()}] usePostsWithOptimisticUpdates: Error loading posts:`, error)
+            logger.error('usePostsWithOptimisticUpdates: Error loading posts', error)
             hasLoaded.current = false // Allow retry
             throw error
         } finally {
-            console.log(`[${new Date().toISOString()}] usePostsWithOptimisticUpdates: Setting loading to false`)
+            logger.info('usePostsWithOptimisticUpdates: Setting loading to false')
             setLoading(false)
         }
     }, [userId]) // Remove loading from dependencies to prevent infinite loop
@@ -47,7 +56,7 @@ export function usePostsWithOptimisticUpdates(userId?: string) {
 
     // Optimistic like update
     const updatePostLikeOptimistically = useCallback((postId: string, liked: boolean, likesCount: number) => {
-        console.log(`🎯 Optimistically updating post ${postId}: liked=${liked}, count=${likesCount}`)
+        logger.debug('Optimistically updating post like', { postId, liked, likesCount })
 
         setPosts(prevPosts =>
             prevPosts.map(post =>
@@ -64,7 +73,7 @@ export function usePostsWithOptimisticUpdates(userId?: string) {
 
     // Optimistic comment update
     const updatePostCommentsOptimistically = useCallback((postId: string, commentsCount: number) => {
-        console.log(`💬 Optimistically updating post ${postId} comments: count=${commentsCount}`)
+        logger.debug('Optimistically updating post comments', { postId, commentsCount })
 
         setPosts(prevPosts =>
             prevPosts.map(post =>
@@ -77,7 +86,7 @@ export function usePostsWithOptimisticUpdates(userId?: string) {
 
     // Add new post optimistically
     const addPostOptimistically = useCallback((newPost: Post) => {
-        console.log(`✨ Optimistically adding new post:`, newPost.id)
+        logger.debug('Optimistically adding new post', { postId: newPost.id })
 
         setPosts(prevPosts => [newPost, ...prevPosts])
     }, [])

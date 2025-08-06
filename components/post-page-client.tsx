@@ -5,6 +5,7 @@ import { PostCard } from "@/components/post-card"
 import { toggleLikeDirect, createCommentDirect } from "@/lib/api-direct"
 import { getCurrentUserToken } from "@/lib/auth"
 import type { Post, Comment, User } from "@/lib/types"
+import { logger } from "@/lib/logger"
 
 interface PostPageClientProps {
   post: Post
@@ -18,14 +19,13 @@ export function PostPageClient({ post, user, initialComments }: PostPageClientPr
 
   // Debug logging
   useEffect(() => {
-    console.log('PostPageClient - user:', user)
-    console.log('PostPageClient - post:', post)
+    logger.debug('PostPageClient mounted', { userId: user?.id, postId: post.id })
   }, [user, post])
 
   const handleLike = async (postId: string) => {
-    console.log('handleLike called with user:', user)
+    logger.debug('handleLike called', { userId: user?.id })
     if (!user) {
-      console.log('No user, returning early')
+      logger.debug('No user, returning early')
       return
     }
 
@@ -33,7 +33,7 @@ export function PostPageClient({ post, user, initialComments }: PostPageClientPr
       // Get current user token for authentication
       const token = await getCurrentUserToken()
       if (!token) {
-        console.error("No authentication token available")
+        logger.error("No authentication token available")
         return
       }
 
@@ -47,7 +47,7 @@ export function PostPageClient({ post, user, initialComments }: PostPageClientPr
         likes_count: result.likesCount
       }))
     } catch (error) {
-      console.error("Error toggling like:", error)
+      logger.error("Error toggling like", error)
     }
   }
 
@@ -58,7 +58,7 @@ export function PostPageClient({ post, user, initialComments }: PostPageClientPr
       // Get current user token for authentication
       const token = await getCurrentUserToken()
       if (!token) {
-        console.error("No authentication token available")
+        logger.error("No authentication token available")
         return false
       }
 
@@ -79,7 +79,7 @@ export function PostPageClient({ post, user, initialComments }: PostPageClientPr
 
       return true
     } catch (error) {
-      console.error("Error creating comment:", error)
+      logger.error("Error creating comment", error)
       return false
     }
   }

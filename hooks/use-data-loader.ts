@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { getPostsDirect } from '@/lib/api-direct'
 import { useSimpleAuth } from '@/hooks/use-simple-auth'
 import type { Post, Startup } from '@/lib/types'
+import { logger } from '@/lib/logger'
 
 export function useDataLoader() {
     const { user } = useSimpleAuth()
@@ -15,7 +16,7 @@ export function useDataLoader() {
     const loadPosts = useCallback(async () => {
         if (postsLoading || hasLoaded.current) return
 
-        console.log(`[${new Date().toISOString()}] useDataLoader: Loading posts...`)
+        logger.debug('useDataLoader: Loading posts')
 
         try {
             setPostsLoading(true)
@@ -24,9 +25,9 @@ export function useDataLoader() {
             const postsData = await getPostsDirect(user?.id)
             setPosts(postsData)
 
-            console.log(`[${new Date().toISOString()}] useDataLoader: Loaded ${postsData.length} posts`)
+            logger.debug('useDataLoader: Loaded posts', { count: postsData.length })
         } catch (error) {
-            console.error(`[${new Date().toISOString()}] useDataLoader: Error loading posts:`, error)
+            logger.error('useDataLoader: Error loading posts', error)
             hasLoaded.current = false // Allow retry
             throw error
         } finally {

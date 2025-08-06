@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Quick Auth Test</title>
+</head>
+
+<body>
+    <h1>Telegram Auth Test</h1>
+    <button onclick="testToken()">Test Token Creation</button>
+    <button onclick="testAuth()">Test Full Auth</button>
+    <div id="output"></div>
+
+    <script>
+        async function testToken() {
+            const token = `login_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+            try {
+                const response = await fetch('/api/create-login-token', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ token })
+                });
+
+                const data = await response.json();
+
+                document.getElementById('output').innerHTML = `
+                    <h3>Token Creation Result:</h3>
+                    <p>Status: ${response.status}</p>
+                    <p>Token: ${token}</p>
+                    <pre>${JSON.stringify(data, null, 2)}</pre>
+                `;
+
+                // Now test checking the token
+                const checkResponse = await fetch(`/api/check-login?token=${token}`);
+                const checkData = await checkResponse.json();
+
+                document.getElementById('output').innerHTML += `
+                    <h3>Token Check Result:</h3>
+                    <p>Status: ${checkResponse.status}</p>
+                    <pre>${JSON.stringify(checkData, null, 2)}</pre>
+                `;
+
+            } catch (error) {
+                document.getElementById('output').innerHTML = `<p>Error: ${error.message}</p>`;
+            }
+        }
+
+        async function testAuth() {
+            // This will open the Telegram bot
+            const token = `login_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+            const botUrl = `https://t.me/startups_are_easy_bot?start=${token}`;
+
+            document.getElementById('output').innerHTML = `
+                <h3>Authentication Test:</h3>
+                <p>Token: ${token}</p>
+                <p><a href="${botUrl}" target="_blank">Click here to open Telegram bot</a></p>
+                <p>Or open this URL: ${botUrl}</p>
+            `;
+
+            // Pre-register the token
+            try {
+                await fetch('/api/create-login-token', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ token })
+                });
+
+                // Start polling
+                document.getElementById('output').innerHTML += `<p>Polling for authentication...</p>`;
+                pollForAuth(token);
+
+            } catch (error) {
+                document.getElementById('output').innerHTML += `<p>Error: ${error.message}</p>`;
+            }
+        }
+
+        async function pollForAuth(token) {
+            let attempts = 0;
+            const poll = async () => {
+                attempts++;
+                try {
+                    const response = await fetch(`/api/check-login?token=${token}`);
+                    const data = await response.json();
+
+                    document.getElementById('output').innerHTML += `<p>Poll ${attempts}: ${data.status}</p>`;
+
+                    if (data.status === 'complete') {
+                        document.getElementById('output').innerHTML += `
+                            <h3>SUCCESS!</h3>
+                            <pre>${JSON.stringify(data, null, 2)}</pre>
+                        `;
+                        return;
+                    }
+
+                    if (attempts < 10) {
+                        setTimeout(poll, 2000);
+                    } else {
+                        document.getElementById('output').innerHTML += `<p>Stopped polling after 10 attempts</p>`;
+                    }
+
+                } catch (error) {
+                    document.getElementById('output').innerHTML += `<p>Poll error: ${error.message}</p>`;
+                }
+            };
+
+            poll();
+        }
+    </script>
+</body>
+
+</html>
