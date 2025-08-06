@@ -36,8 +36,9 @@
   ],
   "exclude": [
     "node_modules",
+    "backend/**/*",
+    "supabase/functions/**/*",
     "components/ui/calendar.tsx",
-    "components/ui/chart.tsx",
-    "supabase/functions/telegram.ts"
+    "components/ui/chart.tsx"
   ]
 }
