@@ -35,9 +35,11 @@ yarn-error.log*
 **/*token*.txt
 **/*auth*.txt
 
+# Sensitive configuration and documentation
 /supabase/
 /docs/
 /scripts/
+.github/copilot-instructions.md
 
 # vercel
 .vercel
