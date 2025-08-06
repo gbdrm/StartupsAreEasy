@@ -15,7 +15,7 @@ import { createPostFromFormDirect } from "@/lib/api-direct"
 import type { PostFormData, Comment as PostComment } from "@/lib/types"
 
 export default function HomePage() {
-  const { user, loading: authLoading, login } = useSimpleAuth()
+  const { user, loading: authLoading, logout } = useSimpleAuth()
   const {
     posts,
     loading: postsLoading,

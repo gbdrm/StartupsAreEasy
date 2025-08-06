@@ -7,7 +7,7 @@ import { ExternalLink, MessageCircle, Github } from "lucide-react"
 import { useSimpleAuth } from "@/hooks/use-simple-auth"
 
 export default function AboutPage() {
-  const { user, login, logout } = useSimpleAuth()
+  const { user, logout } = useSimpleAuth()
 
   return (
     <div className="min-h-screen bg-background">

@@ -4,12 +4,9 @@ import { createContext, useContext } from "react"
 import { useSimpleAuth } from "@/hooks/use-simple-auth"
 import { logger } from "@/lib/logger"
 import type { User } from "@/lib/types"
-import type { TelegramUser } from "@/lib/auth"
-
 interface AuthContextType {
   user: User | null
   loading: boolean
-  login: (telegramUser: TelegramUser) => Promise<void>
   logout: () => Promise<void>
 }
 

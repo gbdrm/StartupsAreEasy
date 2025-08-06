@@ -2,9 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import { getCurrentUser, signInWithTelegram, signOut } from '@/lib/auth'
+import { getCurrentUser, signOut } from '@/lib/auth'
 import { logger } from '@/lib/logger'
-import type { TelegramUser } from '@/lib/auth'
 import type { User } from '@/lib/types'
 
 // Global flag to prevent multiple initializations
@@ -300,21 +299,6 @@ export function emergencyAuthReset() {
         }
     }, [])
 
-    const login = async (telegramUser: TelegramUser) => {
-        try {
-            const user = await signInWithTelegram(telegramUser)
-            setGlobalUser(user)
-
-        } catch (error) {
-            if (error instanceof Error && error.message === "AUTH_RELOAD_IN_PROGRESS") {
-                // This is expected during production bypass - don't show error
-                logger.info('Auth reload in progress, waiting for page reload...')
-                return
-            }
-            logger.error('Login failed:', error)
-            throw error
-        }
-    }
 
     const logout = async () => {
         logger.info('🚪 LOGOUT: Starting logout process...')
@@ -347,7 +331,6 @@ export function emergencyAuthReset() {
     return {
         user,
         loading,
-        login,
         logout
     }
 }

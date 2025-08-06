@@ -16,7 +16,7 @@ interface StartupClientWrapperProps {
 }
 
 export function StartupClientWrapper({ startup, relatedPosts }: StartupClientWrapperProps) {
-  const { user, login, logout } = useSimpleAuth()
+  const { user, logout } = useSimpleAuth()
   const router = useRouter()
   const [posts, setPosts] = useState(relatedPosts)
   

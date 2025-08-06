@@ -16,7 +16,7 @@ import { useComments } from "@/hooks/use-comments"
 import { logger } from "@/lib/logger"
 
 export default function IdeasPage() {
-  const { user: currentUser, login: handleLogin, logout: handleLogout, loading: authLoading } = useSimpleAuth()
+  const { user: currentUser, logout: handleLogout, loading: authLoading } = useSimpleAuth()
   const [posts, setPosts] = useState<Post[]>([])
   const { comments, loadComments, handleComment, handleLike } = useComments(currentUser, () => setPosts([...posts]))
   const [userStartups, setUserStartups] = useState<Startup[]>([])

@@ -13,7 +13,7 @@ import { useRouter } from "next/navigation"
 import type { User } from "@/lib/types"
 
 export default function BuildersPage() {
-  const { user, login, logout } = useSimpleAuth()
+  const { user, logout } = useSimpleAuth()
   const [builders, setBuilders] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)

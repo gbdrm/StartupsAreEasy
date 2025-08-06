@@ -28,7 +28,7 @@ interface StartupFormData {
 }
 
 export default function StartupsPage() {
-  const { user, login, logout } = useSimpleAuth()
+  const { user, logout } = useSimpleAuth()
   const router = useRouter()
   const [startups, setStartups] = useState<Startup[]>([])
   const [loading, setLoading] = useState(true)
