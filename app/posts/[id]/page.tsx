@@ -32,8 +32,7 @@ export default async function PostPage({ params, searchParams }: PostPageProps) 
         initialComments={comments}
       />
     )
-  } catch (error) {
-    console.error("Error loading post:", error)
+  } catch {
     notFound()
   }
 }
@@ -74,7 +73,7 @@ export async function generateMetadata({ params }: PostPageProps) {
         description,
       }
     }
-  } catch (error) {
+  } catch {
     return {
       title: "Post not found"
     }

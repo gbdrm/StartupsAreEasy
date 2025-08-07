@@ -51,7 +51,7 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
 // Request deduplication and rate limiting
-const requestCache = new Map<string, Promise<any>>()
+const requestCache = new Map<string, Promise<Response>>()
 const rateLimitMap = new Map<string, number>()
 const RATE_LIMIT_WINDOW = 1000 // 1 second
 const MAX_REQUESTS_PER_WINDOW = 10
@@ -129,7 +129,7 @@ async function getPostsWithDetailsInternal(currentUserId?: string, filterByUserI
             user_id_param: currentUserId || null
         }
 
-        logger.debug("getPostsWithDetailsInternal: Making API request", {
+        logger.debug('API', "getPostsWithDetailsInternal: Making API request", {
             currentUserId: currentUserId || 'anonymous',
             filterByUserId
         })
@@ -145,7 +145,7 @@ async function getPostsWithDetailsInternal(currentUserId?: string, filterByUserI
 
         if (!response.ok) {
             const errorText = await response.clone().text()
-            logger.error("getPostsWithDetailsInternal: API error", { status: response.status, error: errorText })
+            logger.error('API', "getPostsWithDetailsInternal: API error", { status: response.status, error: errorText })
             throw new Error(`HTTP ${response.status}: ${errorText}`)
         }
 
@@ -153,24 +153,24 @@ async function getPostsWithDetailsInternal(currentUserId?: string, filterByUserI
 
         // Filter by specific user if requested
         if (filterByUserId) {
-            posts = posts.filter((post: any) => post.user_id === filterByUserId)
+            posts = posts.filter((post: DbPost) => post.user_id === filterByUserId)
         }
 
-        logger.debug("getPostsWithDetailsInternal: Posts loaded", { total: posts.length, filterByUserId })        // Get unique startup IDs to fetch startup details
-        const startupIds = [...new Set(posts.map((post: any) => post.startup_id).filter(Boolean))]
+        logger.debug('API', "getPostsWithDetailsInternal: Posts loaded", { total: posts.length, filterByUserId })        // Get unique startup IDs to fetch startup details
+        const startupIds = [...new Set(posts.map((post: DbPost) => post.startup_id).filter(Boolean))]
         let startupsMap = new Map()
 
         if (startupIds.length > 0) {
-            logger.debug("getPostsWithDetailsInternal: Fetching startup details", { count: startupIds.length })
+            logger.debug('API', "getPostsWithDetailsInternal: Fetching startup details", { count: startupIds.length })
             const startupsUrl = `${supabaseUrl}/rest/v1/startups?id=in.(${startupIds.join(',')})&select=id,name,description,slug,stage,industry,target_market`
             const startupsResponse = await fetch(startupsUrl, { headers })
 
             if (startupsResponse.ok) {
                 const startups = await startupsResponse.json()
-                startupsMap = new Map(startups.map((s: any) => [s.id, s]))
-                logger.debug("getPostsWithDetailsInternal: Loaded startup details", { count: startups.length })
+                startupsMap = new Map(startups.map((s: DbStartup) => [s.id, s]))
+                logger.debug('API', "getPostsWithDetailsInternal: Loaded startup details", { count: startups.length })
             } else {
-                logger.warn("getPostsWithDetailsInternal: Failed to fetch startups", { status: startupsResponse.status })
+                logger.warn('API', "getPostsWithDetailsInternal: Failed to fetch startups", { status: startupsResponse.status })
             }
         }
 
@@ -194,7 +194,7 @@ async function getPostsWithDetailsInternal(currentUserId?: string, filterByUserI
             startup: post.startup_id ? startupsMap.get(post.startup_id) || null : null,
         })) as Post[]
     } catch (error) {
-        logger.error("Error in getPostsWithDetailsInternal:", error)
+        logger.error('API', "Error in getPostsWithDetailsInternal:", error)
         throw error
     }
 }
@@ -202,12 +202,12 @@ async function getPostsWithDetailsInternal(currentUserId?: string, filterByUserI
 // Posts API
 export async function getPostsDirect(userId?: string): Promise<Post[]> {
     try {
-        logger.debug("getPostsDirect: Starting request", { userId: userId || 'anonymous' })
+        logger.debug('API', "getPostsDirect: Starting request", { userId: userId || 'anonymous' })
         const result = await getPostsWithDetailsInternal(userId)
-        logger.debug("getPostsDirect: Request completed", { resultCount: result.length })
+        logger.debug('API', "getPostsDirect: Request completed", { resultCount: result.length })
         return result
     } catch (error) {
-        logger.error("getPostsDirect: Request failed", error)
+        logger.error('API', "getPostsDirect: Request failed", error)
         throw error
     }
 }
@@ -279,14 +279,14 @@ export async function checkStartupNameAvailable(name: string): Promise<boolean> 
         const response = await fetch(url, { headers })
 
         if (!response.ok) {
-            logger.warn("Error checking startup name availability", { status: response.status })
+            logger.warn('API', "Error checking startup name availability", { status: response.status })
             return true // Assume available if we can't check
         }
 
         const data = await response.json()
         return data.length === 0
     } catch (error) {
-        logger.error("Error checking startup name availability:", error)
+        logger.error('API', "Error checking startup name availability:", error)
         return true // Assume available if we can't check
     }
 }
@@ -310,7 +310,7 @@ export async function createStartupDirect(startup: {
     is_public?: boolean
 }, token?: string): Promise<Startup> {
     try {
-        logger.info("Creating startup", { name: startup.name, userId: startup.userId })
+        logger.info('API', "Creating startup", { name: startup.name, userId: startup.userId })
 
         // Check if name is available first
         const isAvailable = await checkStartupNameAvailable(startup.name)
@@ -336,7 +336,7 @@ export async function createStartupDirect(startup: {
             logo_url: startup.logo_url,
             industry: startup.industry,
             stage: startup.stage || "idea",
-            founded_date: startup.founded_date && startup.founded_date.trim() !== '' ? startup.founded_date : null,
+            founded_date: startup.founded_date && startup.founded_date.trim() !== '' ? startup.founded_date : undefined,
             location: startup.location,
             team_size: startup.team_size,
             funding_raised: startup.funding_raised,
@@ -364,7 +364,7 @@ export async function createStartupDirect(startup: {
 
         if (!response.ok) {
             const errorText = await response.text()
-            logger.error("Error creating startup:", { status: response.status, error: errorText })
+            logger.error('API', "Error creating startup:", { status: response.status, error: errorText })
 
             // Handle specific error types with user-friendly messages
             if (errorText.includes('Authentication token required') || errorText.includes('JWT')) {
@@ -395,7 +395,7 @@ export async function createStartupDirect(startup: {
         logger.info('API', 'Startup created successfully')
         return result[0] || result
     } catch (error) {
-        logger.error("Error creating startup:", error)
+        logger.error('API', "Error creating startup:", error)
         throw error
     }
 }
@@ -420,9 +420,9 @@ export async function updateStartupStageDirect(startupId: string, stage: Startup
             throw new Error(`HTTP ${response.status}: ${await response.text()}`)
         }
 
-        logger.debug("Startup stage updated", { startupId, stage })
+        logger.debug('API', "Startup stage updated", { startupId, stage })
     } catch (error) {
-        logger.error("Error updating startup stage:", error)
+        logger.error('API', "Error updating startup stage:", error)
         throw error
     }
 }
@@ -437,7 +437,7 @@ export async function createPostDirect(data: {
     startup_id?: string
 }, token?: string): Promise<Post> {
     try {
-        logger.debug("createPostDirect: Creating post", { type: data.type, userId: data.user_id, hasToken: !!token })
+        logger.debug('API', "createPostDirect: Creating post", { type: data.type, userId: data.user_id, hasToken: !!token })
 
         const url = `${supabaseUrl}/rest/v1/posts`
         const requestHeaders = {
@@ -451,18 +451,18 @@ export async function createPostDirect(data: {
             body: JSON.stringify(data)
         })
 
-        logger.debug("createPostDirect: Response received", { status: response.status })
+        logger.debug('API', "createPostDirect: Response received", { status: response.status })
         console.log(`[${new Date().toISOString()}] createPostDirect: Response headers:`, Object.fromEntries(response.headers.entries()))
 
         if (!response.ok) {
             const errorText = await response.text()
-            logger.error("createPostDirect: Error response", { status: response.status, error: errorText })
+            logger.error('API', "createPostDirect: Error response", { status: response.status, error: errorText })
             throw new Error(`HTTP ${response.status}: ${errorText}`)
         }
 
         // Check if response has content before parsing JSON
         const responseText = await response.text()
-        logger.debug("createPostDirect: Raw response", { length: responseText.length })
+        logger.debug('API', "createPostDirect: Raw response", { length: responseText.length })
 
         if (!responseText || responseText.trim() === '') {
             logger.debug('API', 'createPostDirect: Empty response but success status - post created')
@@ -491,11 +491,11 @@ export async function createPostDirect(data: {
         try {
             result = JSON.parse(responseText)
         } catch (parseError) {
-            logger.error("createPostDirect: JSON parse error", { error: parseError, response: responseText.substring(0, 200) })
+            logger.error('API', "createPostDirect: JSON parse error", { error: parseError, response: responseText.substring(0, 200) })
             throw new Error(`Invalid JSON response: ${responseText}`)
         }
 
-        logger.info("createPostDirect: Post created successfully", { id: result[0]?.id || result.id })
+        logger.info('API', "createPostDirect: Post created successfully", { id: result[0]?.id || result.id })
 
         // Return simplified post structure
         const post = result[0] || result
@@ -509,15 +509,15 @@ export async function createPostDirect(data: {
             },
             type: post.type,
             content: post.content,
-            link: post.link,
-            image: post.image,
+            link: post.link_url,
+            image: post.image_url,
             created_at: post.created_at,
             likes_count: 0,
             comments_count: 0,
             liked_by_user: false,
         } as Post
     } catch (error) {
-        logger.error("Error creating post:", error)
+        logger.error('API', "Error creating post:", error)
         throw error
     }
 }
@@ -560,11 +560,11 @@ export async function createPostFromFormDirect(formData: {
             // Only use custom content if provided, otherwise leave empty
             postContent = formData.content || ""
 
-            logger.debug("Created startup for idea post", { startupId, name: formData.startup_name })
+            logger.debug('API', "Created startup for idea post", { startupId, name: formData.startup_name })
         }        // For launch posts using existing startup, update startup stage
         if (formData.type === "launch" && formData.existing_startup_id) {
             await updateStartupStageDirect(formData.existing_startup_id, "launched", userToken)
-            logger.debug("Updated startup stage to launched", { startupId: formData.existing_startup_id })
+            logger.debug('API', "Updated startup stage to launched", { startupId: formData.existing_startup_id })
         }
 
         // Create the post
@@ -577,9 +577,9 @@ export async function createPostFromFormDirect(formData: {
         }
 
         await createPostDirect(postData, userToken)
-        logger.info("Post created successfully", { type: formData.type, hasStartup: !!startupId })
+        logger.info('API', "Post created successfully", { type: formData.type, hasStartup: !!startupId })
     } catch (error) {
-        logger.error("Error creating post from form:", error)
+        logger.error('API', "Error creating post from form:", error)
         throw error
     }
 }
@@ -705,7 +705,7 @@ export async function getPostsByTypeDirect(type: string): Promise<Post[]> {
         console.log(`[${new Date().toISOString()}] getPostsByTypeDirect: Loaded ${posts.length} posts of type ${type}`)
 
         // Return simplified posts structure
-        return posts.map((post: any) => ({
+        return posts.map((post: DbPost) => ({
             id: post.id,
             user: {
                 id: post.user_id,
@@ -715,8 +715,8 @@ export async function getPostsByTypeDirect(type: string): Promise<Post[]> {
             },
             type: post.type,
             content: post.content,
-            link: post.link,
-            image: post.image,
+            link: post.link_url,
+            image: post.image_url,
             created_at: post.created_at,
             likes_count: 0, // Simplified for now
             comments_count: 0,
@@ -731,7 +731,7 @@ export async function getPostsByTypeDirect(type: string): Promise<Post[]> {
 // Get single post by ID with full details (same as other post functions)
 export async function getPostByIdDirect(id: string, currentUserId?: string): Promise<Post | null> {
     try {
-        logger.debug("getPostByIdDirect: Starting", { id, currentUserId })
+        logger.debug('API', "getPostByIdDirect: Starting", { id, currentUserId })
 
         // Use the same internal function to get consistent data
         const allPosts = await getPostsWithDetailsInternal(currentUserId)
@@ -739,10 +739,10 @@ export async function getPostByIdDirect(id: string, currentUserId?: string): Pro
         // Find the specific post by ID
         const post = allPosts.find(p => p.id === id)
 
-        logger.debug("getPostByIdDirect: Found post", { found: !!post })
+        logger.debug('API', "getPostByIdDirect: Found post", { found: !!post })
         return post || null
     } catch (error) {
-        logger.error("Error fetching post by ID:", error)
+        logger.error('API', "Error fetching post by ID:", error)
         throw error
     }
 }
@@ -902,7 +902,7 @@ export async function getPostsByUserDirect(userId: string, currentUserId?: strin
         logger.api("getPostsByUserDirect: Starting", "GET", { userId, currentUserId })
         return await getPostsWithDetailsInternal(currentUserId, userId)
     } catch (error) {
-        logger.error("Error fetching posts by user:", error)
+        logger.error('API', "Error fetching posts by user:", error)
         throw error
     }
 }

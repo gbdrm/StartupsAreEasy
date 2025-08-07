@@ -121,7 +121,7 @@ export async function getCurrentUser(): Promise<User | null> {
           const user = JSON.parse(cachedUser);
           logger.debug('AUTH', 'PRODUCTION BYPASS: Returning cached user')
           return user;
-        } catch (e) {
+        } catch {
           logger.debug('AUTH', 'PRODUCTION BYPASS: Failed to parse cached user')
         }
       }
@@ -182,7 +182,7 @@ export async function refreshAuthSession(): Promise<boolean> {
 
   // Development: Use proper Supabase session refresh
   try {
-    const { data, error } = await supabase.auth.refreshSession();
+    const { error } = await supabase.auth.refreshSession();
     if (error) {
       logger.error('AUTH', 'Session refresh failed', error);
       return false; // Return false to indicate failure
@@ -195,16 +195,19 @@ export async function refreshAuthSession(): Promise<boolean> {
   }
 }
 
-export async function handleAuthError(error: any): Promise<boolean> {
+export async function handleAuthError(error: unknown): Promise<boolean> {
   logger.debug('AUTH', 'handleAuthError called', { error });
 
   // Check if this is an auth-related error
+  const errorObj = error as Record<string, unknown>;
+  const errorMessage = error instanceof Error ? error.message : String(error);
+  
   if (
-    error?.status === 403 ||
-    error?.message?.includes('JWT') ||
-    error?.message?.includes('token') ||
-    error?.message?.includes('unauthorized') ||
-    error?.message?.includes('Unauthorized')
+    errorObj?.status === 403 ||
+    errorMessage?.includes('JWT') ||
+    errorMessage?.includes('token') ||
+    errorMessage?.includes('unauthorized') ||
+    errorMessage?.includes('Unauthorized')
   ) {
     logger.info('AUTH', 'Auth error detected, attempting recovery');
 

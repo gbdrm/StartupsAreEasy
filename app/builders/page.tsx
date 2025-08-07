@@ -7,13 +7,11 @@ import { AuthDialog } from "@/components/auth-dialog"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Separator } from "@/components/ui/separator"
 import { Loader2 } from "lucide-react"
-import { useSimpleAuth } from "@/hooks/use-simple-auth"
 import { getBuildersDirect } from "@/lib/api-direct"  
 import { useRouter } from "next/navigation"
 import type { User } from "@/lib/types"
 
 export default function BuildersPage() {
-  const { user, logout } = useSimpleAuth()
   const [builders, setBuilders] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)

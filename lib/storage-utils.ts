@@ -36,7 +36,10 @@ export class StorageManager {
     }
 
     private handleStorageEvent(event: StorageEvent) {
-        if (!event.key || this.suppressNextEvent.has(event.key)) {
+        if (!event.key) {
+            return
+        }
+        if (this.suppressNextEvent.has(event.key)) {
             this.suppressNextEvent.delete(event.key)
             return
         }

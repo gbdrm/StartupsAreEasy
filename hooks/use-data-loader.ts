@@ -16,7 +16,7 @@ export function useDataLoader() {
     const loadPosts = useCallback(async () => {
         if (postsLoading || hasLoaded.current) return
 
-        logger.debug('useDataLoader: Loading posts')
+        logger.debug('API', 'useDataLoader: Loading posts')
 
         try {
             setPostsLoading(true)
@@ -27,7 +27,7 @@ export function useDataLoader() {
 
             logger.debug('API', 'useDataLoader: Loaded posts', { count: postsData.length })
         } catch (error) {
-            logger.error('useDataLoader: Error loading posts', error)
+            logger.error('API', 'useDataLoader: Error loading posts', error)
             hasLoaded.current = false // Allow retry
             throw error
         } finally {

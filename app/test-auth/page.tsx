@@ -5,7 +5,7 @@ import { useBotAuth } from '@/hooks/use-bot-auth';
 
 export default function TestAuthPage() {
     const { authState, loginWithTelegramBot, cancelLogin } = useBotAuth();
-    const [debugInfo, setDebugInfo] = useState<any>(null);
+    const [debugInfo, setDebugInfo] = useState<Record<string, unknown> | null>(null);
 
     const handleTestLogin = async () => {
         try {

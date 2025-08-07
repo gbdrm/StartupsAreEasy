@@ -4,13 +4,11 @@ import type React from "react"
 
 import { useState, memo } from "react"
 import { useRouter } from "next/navigation"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { Separator } from "@/components/ui/separator"
 import { Heart, MessageCircle, ExternalLink } from "lucide-react"
-import { POST_TYPES, type Post, type Comment, type User } from "@/lib/types"
+import { POST_TYPES, type Post, type Comment } from "@/lib/types"
 import { formatDistanceToNow } from "date-fns"
 import { UserLink } from "./user-link"
 import { useSimpleAuth } from "@/hooks/use-simple-auth"
@@ -27,7 +25,6 @@ interface PostCardProps {
 function PostCardComponent({ post, comments, onLike, onComment, clickable = true }: PostCardProps) {
   const { user } = useSimpleAuth()
   const [commentContent, setCommentContent] = useState("")
-  const [isCommenting, setIsCommenting] = useState(false)
   const [showComments, setShowComments] = useState(false)
   const router = useRouter()
 
@@ -35,10 +32,8 @@ function PostCardComponent({ post, comments, onLike, onComment, clickable = true
     e.preventDefault()
     if (!commentContent.trim() || !user) return
 
-    setIsCommenting(true)
     await onComment(post.id, commentContent.trim())
     setCommentContent("")
-    setIsCommenting(false)
   }
 
   const handleCardClick = (e: React.MouseEvent) => {
@@ -249,7 +244,7 @@ function PostCardComponent({ post, comments, onLike, onComment, clickable = true
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' && !e.shiftKey) {
                         e.preventDefault()
-                        handleComment(e as any)
+                        handleComment(e as React.FormEvent)
                       }
                     }}
                   />

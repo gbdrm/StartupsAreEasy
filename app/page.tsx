@@ -28,8 +28,7 @@ export default function HomePage() {
     loadPosts,
     refreshPosts,
     updatePostLikeOptimistically,
-    updatePostCommentsOptimistically,
-    addPostOptimistically
+    updatePostCommentsOptimistically
   } = usePostsWithOptimisticUpdates(user?.id)
 
   const { comments, loadComments, handleComment, handleLike } = useComments(
@@ -91,7 +90,7 @@ export default function HomePage() {
     }
 
     loadInitialData()
-  }, [authLoading, postsLoading, loadPosts, stagingState])
+  }, [authLoading, postsLoading, loadPosts, stagingState, posts.length])
 
   // Separate effect to load comments when posts are available
   useEffect(() => {
@@ -111,7 +110,7 @@ export default function HomePage() {
       
       loadCommentsForPosts()
     }
-  }, [posts.length, loadComments, stagingState])
+  }, [posts.length, posts, loadComments, stagingState])
 
   // Load user startups when user changes
   useEffect(() => {

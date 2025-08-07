@@ -22,7 +22,7 @@ export function usePostsWithOptimisticUpdates(userId?: string) {
         
         // Check if there's already a request in progress
         if (requestState.current?.loading) {
-            logger.debug('usePostsWithOptimisticUpdates: Request already in progress, aborting previous')
+            logger.debug('API', 'usePostsWithOptimisticUpdates: Request already in progress, aborting previous')
             requestState.current.abortController?.abort()
         }
 
@@ -39,12 +39,12 @@ export function usePostsWithOptimisticUpdates(userId?: string) {
         try {
             setLoading(true)
 
-            logger.info('usePostsWithOptimisticUpdates: Calling getPostsDirect...')
+            logger.info('API', 'usePostsWithOptimisticUpdates: Calling getPostsDirect...')
             const postsData = await getPostsDirect(userId)
 
             // Check if this request is still the latest one
             if (requestState.current?.timestamp !== currentTimestamp) {
-                logger.debug('usePostsWithOptimisticUpdates: Request outdated, ignoring results')
+                logger.debug('API', 'usePostsWithOptimisticUpdates: Request outdated, ignoring results')
                 return
             }
 
@@ -75,21 +75,21 @@ export function usePostsWithOptimisticUpdates(userId?: string) {
             }
 
             hasLoaded.current = true
-            logger.info('usePostsWithOptimisticUpdates: Posts loaded successfully')
+            logger.info('API', 'usePostsWithOptimisticUpdates: Posts loaded successfully')
         } catch (error) {
             // Ignore aborted requests
             if (abortController.signal.aborted) {
-                logger.debug('usePostsWithOptimisticUpdates: Request was aborted')
+                logger.debug('API', 'usePostsWithOptimisticUpdates: Request was aborted')
                 return
             }
             
-            logger.error('usePostsWithOptimisticUpdates: Error loading posts', error)
+            logger.error('API', 'usePostsWithOptimisticUpdates: Error loading posts', error)
             hasLoaded.current = false // Allow retry
             throw error
         } finally {
             // Only update loading state if this is still the current request
             if (requestState.current?.timestamp === currentTimestamp) {
-                logger.info('usePostsWithOptimisticUpdates: Setting loading to false')
+                logger.info('API', 'usePostsWithOptimisticUpdates: Setting loading to false')
                 setLoading(false)
                 requestState.current = null
             }

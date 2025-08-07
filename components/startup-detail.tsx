@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { ExternalLink, Calendar, MapPin, Users, DollarSign, Target, Clock } from "lucide-react"
+import { ExternalLink, Calendar, MapPin, Users, Target, Clock } from "lucide-react"
 import { STARTUP_STAGES, type Startup } from "@/lib/types"
 import { formatDistanceToNow } from "date-fns"
 

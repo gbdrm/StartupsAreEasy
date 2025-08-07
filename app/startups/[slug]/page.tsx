@@ -43,8 +43,8 @@ export default async function StartupPage({ params }: StartupPageProps) {
         relatedPosts={startupPosts}
       />
     )
-  } catch (error) {
-    console.error("Error loading startup page:", error)
+  } catch {
+    console.error("Error loading startup page")
     notFound()
   }
 }
@@ -79,7 +79,7 @@ export async function generateMetadata({ params }: StartupPageProps) {
         description,
       }
     }
-  } catch (error) {
+  } catch {
     return {
       title: "Startup not found"
     }

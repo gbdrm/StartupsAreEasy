@@ -7,7 +7,6 @@ import { StartupDetail } from "@/components/startup-detail"
 import { PostCard } from "@/components/post-card"
 import { useSimpleAuth } from "@/hooks/use-simple-auth"
 import { useComments } from "@/hooks/use-comments"
-import { Separator } from "@/components/ui/separator"
 import type { Startup, Post } from "@/lib/types"
 
 interface StartupClientWrapperProps {
@@ -16,7 +15,7 @@ interface StartupClientWrapperProps {
 }
 
 export function StartupClientWrapper({ startup, relatedPosts }: StartupClientWrapperProps) {
-  const { user, logout } = useSimpleAuth()
+  const { user } = useSimpleAuth()
   const router = useRouter()
   const [posts, setPosts] = useState(relatedPosts)
   
@@ -68,7 +67,7 @@ export function StartupClientWrapper({ startup, relatedPosts }: StartupClientWra
       const postIds = posts.map(post => post.id)
       loadComments(postIds)
     }
-  }, [posts])
+  }, [posts, loadComments])
 
   const handleBackClick = () => {
     // Use browser back if available, otherwise navigate to home

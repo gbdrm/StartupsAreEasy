@@ -2,8 +2,50 @@ import { supabase } from "./supabase"
 import { logger } from "./logger"
 import type { Post, Comment, PostType } from "./types"
 
+// Database response types for better type safety
+interface DbProfile {
+    id: string;
+    first_name?: string;
+    last_name?: string;
+    username?: string;
+    avatar_url?: string;
+}
+
+interface DbPost {
+    id: string;
+    user_id: string;
+    type: string;
+    content: string;
+    link?: string;
+    link_url?: string;
+    image?: string;
+    image_url?: string;
+    created_at: string;
+    startup_id?: string;
+    likes_count?: number;
+    comments_count?: number;
+    liked_by_user?: boolean;
+    first_name?: string;
+    last_name?: string;
+    username?: string;
+    avatar_url?: string;
+    startup?: unknown;
+    startup_name?: string;
+    startup_description?: string;
+    startup_stage?: string;
+}
+
+interface DbComment {
+    id: string;
+    post_id: string;
+    user_id: string;
+    content: string;
+    created_at: string;
+    profiles?: DbProfile;
+}
+
 // Simple REST API version for posts to avoid auth conflicts
-export async function getPostsSimple(userId?: string): Promise<Post[]> {
+export async function getPostsSimple(): Promise<Post[]> {
   try {
     logger.debug('API', 'getPostsSimple: Starting direct REST API call...')
 
@@ -29,7 +71,7 @@ export async function getPostsSimple(userId?: string): Promise<Post[]> {
     logger.debug('API', 'getPostsSimple: Loaded posts', { count: posts.length })
 
     // For now, return simplified posts without complex joins
-    return posts.map((post: any) => ({
+    return posts.map((post: DbPost) => ({
       id: post.id,
       user: {
         id: post.user_id,
@@ -67,7 +109,7 @@ export async function getPosts(userId?: string) {
       throw error
     }
 
-    return data.map((post: any) => ({
+    return data.map((post: DbPost) => ({
       id: post.id,
       user: {
         id: post.user_id,
@@ -124,7 +166,7 @@ async function getPostsBasic(userId?: string) {
 
   // Get likes and comments counts separately
   const postsWithCounts = await Promise.all(
-    posts.map(async (post: any) => {
+    posts.map(async (post: DbPost) => {
       const profile = profileMap.get(post.user_id)
 
       const [likesResult, commentsResult, userLikeResult] = await Promise.all([
@@ -245,15 +287,15 @@ export async function getComments(postId: string) {
     // Create a map for quick profile lookup
     const profileMap = new Map(profiles.map(profile => [profile.id, profile]))
 
-    return comments.map((comment: any) => {
-      const profile = profileMap.get(comment.user_id)
+    return comments.map((comment: Record<string, unknown>) => {
+      const profile = profileMap.get(comment.user_id as string)
       return {
-        id: comment.id,
+        id: comment.id as string,
         post_id: postId,
-        content: comment.content,
-        created_at: comment.created_at,
+        content: comment.content as string,
+        created_at: comment.created_at as string,
         user: {
-          id: comment.user_id,
+          id: comment.user_id as string,
           name: profile ? `${profile.first_name} ${profile.last_name || ""}`.trim() : "Unknown User",
           username: profile?.username || "unknown",
           avatar: profile?.avatar_url,
@@ -307,7 +349,7 @@ export async function getPostById(postId: string, userId?: string): Promise<Post
     }
 
     // Find the specific post by ID
-    const postData = data.find((post: any) => post.id === postId)
+    const postData = data.find((post: DbPost) => post.id === postId)
 
     if (!postData) {
       return null
@@ -419,15 +461,15 @@ export async function getPostsByType(postType: PostType, userId?: string) {
     if (error) {
       // If the function doesn't exist, fall back to basic query
       if (error.message.includes("function") && error.message.includes("does not exist")) {
-        return await getPostsByTypeBasic(postType, userId)
+        return await getPostsByTypeBasic(postType)
       }
       throw error
     }
 
     // Filter by post type
-    const filteredData = data.filter((post: any) => post.type === postType)
+    const filteredData = data.filter((post: DbPost) => post.type === postType)
 
-    return filteredData.map((post: any) => ({
+    return filteredData.map((post: DbPost) => ({
       id: post.id,
       user: {
         id: post.user_id,
@@ -453,12 +495,12 @@ export async function getPostsByType(postType: PostType, userId?: string) {
   } catch (error) {
     logger.error('API', 'Error fetching posts by type', error)
     // Fall back to basic query if RPC fails
-    return await getPostsByTypeBasic(postType, userId)
+    return await getPostsByTypeBasic(postType)
   }
 }
 
 // Fallback function for basic posts query filtered by type
-async function getPostsByTypeBasic(postType: PostType, userId?: string) {
+async function getPostsByTypeBasic(postType: PostType) {
   const { data: posts, error } = await supabase
     .from("posts")
     .select(`

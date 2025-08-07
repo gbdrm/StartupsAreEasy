@@ -4,7 +4,6 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Header } from "@/components/header"
 import { StartupCard } from "@/components/startup-card"
-import { StartupDetailDialog } from "@/components/startup-detail-dialog"
 import { CollapsibleStartupForm } from "@/components/collapsible-startup-form"
 import { AuthDialog } from "@/components/auth-dialog"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -28,15 +27,13 @@ interface StartupFormData {
 }
 
 export default function StartupsPage() {
-  const { user, logout } = useSimpleAuth()
+  const { user } = useSimpleAuth()
   const router = useRouter()
   const [startups, setStartups] = useState<Startup[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isCreatingStartup, setIsCreatingStartup] = useState(false)
   const [showLoginDialog, setShowLoginDialog] = useState(false)
-  const [selectedStartup, setSelectedStartup] = useState<Startup | null>(null)
-  const [showDetailDialog, setShowDetailDialog] = useState(false)
 
   useEffect(() => {
     loadStartups()
@@ -98,10 +95,6 @@ export default function StartupsPage() {
     router.push(`/startups/${startup.slug}`)
   }
 
-  const handleStartupDetail = (startup: Startup) => {
-    setSelectedStartup(startup)
-    setShowDetailDialog(true)
-  }
 
   if (loading && startups.length === 0) {
     return (
@@ -170,11 +163,6 @@ export default function StartupsPage() {
             onOpenChange={setShowLoginDialog}
           />
 
-          <StartupDetailDialog
-            startup={selectedStartup}
-            open={showDetailDialog}
-            onOpenChange={setShowDetailDialog}
-          />
         </div>
       </main>
     </div>

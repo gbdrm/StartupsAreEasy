@@ -1,11 +1,11 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { CollapsiblePostForm } from "@/components/collapsible-post-form"
 import { PostCard } from "@/components/post-card"
 import { Header } from "@/components/header"
 import { AuthDialog } from "@/components/auth-dialog"
-import type { Post, Comment, PostFormData, Startup } from "@/lib/types"
+import type { Post, PostFormData, Startup } from "@/lib/types"
 import { Separator } from "@/components/ui/separator"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Loader2 } from "lucide-react"
@@ -16,7 +16,7 @@ import { useComments } from "@/hooks/use-comments"
 import { logger } from "@/lib/logger"
 
 export default function IdeasPage() {
-  const { user: currentUser, logout: handleLogout, loading: authLoading } = useSimpleAuth()
+  const { user: currentUser, loading: authLoading } = useSimpleAuth()
   const [posts, setPosts] = useState<Post[]>([])
   const { comments, loadComments, handleComment, handleLike } = useComments(currentUser, () => setPosts([...posts]))
   const [userStartups, setUserStartups] = useState<Startup[]>([])
@@ -51,48 +51,27 @@ export default function IdeasPage() {
 
     return () => clearTimeout(emergencyTimeout)
   }, [authLoading, loading, posts.length])
-
-  // Load posts and user startups
-  useEffect(() => {
-    console.log(`[${new Date().toISOString()}] Ideas page effect triggered: loadPosts()`)
-    loadPosts()
-  }, []) // Remove currentUser dependency to prevent unnecessary re-fetches
-
-  // Load user startups separately when user changes
-  useEffect(() => {
-    if (currentUser) {
-      console.log(`[${new Date().toISOString()}] Ideas page effect triggered: loadUserStartups() for user:`, currentUser.name)
-      loadUserStartups()
-    }
-  }, [currentUser])
-
-  const loadPosts = async () => {
+  
+  const loadPosts = useCallback(async () => {
     const startTime = Date.now()
     console.log(`[${new Date().toISOString()}] Starting loadPosts() for ideas`)
-    
     try {
       setLoading(true)
       setError(null)
-      
       console.log(`[${new Date().toISOString()}] Calling getPostsByType('idea') with userId:`, currentUser?.id || 'null')
-      
       // Add timeout protection - if getPostsByType takes longer than 10 seconds, bail out
-      const timeoutPromise = new Promise((_, reject) => 
+      const timeoutPromise = new Promise((_, reject) =>
         setTimeout(() => reject(new Error('Posts loading timeout after 10 seconds')), 10000)
       )
-      
       const postsData = await Promise.race([
         getPostsByTypeDirect("idea"),
         timeoutPromise
       ]) as Post[]
-      
       console.log(`[${new Date().toISOString()}] getPostsByType('idea') returned ${postsData.length} posts`)
       setPosts(postsData)
-
       // Load comments using the shared hook
       const postIds = postsData.map(post => post.id)
       console.log(`[${new Date().toISOString()}] Loading comments for ${postIds.length} idea posts`)
-      
       try {
         await loadComments(postIds)
         console.log(`[${new Date().toISOString()}] Comments loaded successfully for ideas`)
@@ -100,10 +79,8 @@ export default function IdeasPage() {
         console.error(`[${new Date().toISOString()}] Error loading comments for ideas (non-fatal):`, commentError)
         // Don't fail the whole operation if comments fail
       }
-      
     } catch (err) {
       console.error(`[${new Date().toISOString()}] Error loading idea posts:`, err)
-      
       if (err instanceof Error && err.message.includes('timeout')) {
         setError("Loading is taking longer than expected. Please check your connection and try again.")
       } else {
@@ -114,9 +91,9 @@ export default function IdeasPage() {
       console.log(`[${new Date().toISOString()}] loadPosts() for ideas completed in ${endTime - startTime}ms`)
       setLoading(false)
     }
-  }
+  }, [currentUser?.id, loadComments])
 
-  const loadUserStartups = async () => {
+  const loadUserStartups = useCallback(async () => {
     if (!currentUser) return
     try {
       const startups = await getUserStartups(currentUser.id)
@@ -124,7 +101,21 @@ export default function IdeasPage() {
     } catch (err) {
       logger.error('API', 'Error loading user startups for ideas page', err)
     }
-  }
+  }, [currentUser])
+
+  // Load posts and user startups
+  useEffect(() => {
+    console.log(`[${new Date().toISOString()}] Ideas page effect triggered: loadPosts()`)
+    loadPosts()
+  }, [loadPosts])
+
+  // Load user startups separately when user changes
+  useEffect(() => {
+    if (currentUser) {
+      console.log(`[${new Date().toISOString()}] Ideas page effect triggered: loadUserStartups() for user:`, currentUser.name)
+      loadUserStartups()
+    }
+  }, [currentUser, loadUserStartups])
 
   const handleCreatePost = async (data: PostFormData) => {
     if (!currentUser) return

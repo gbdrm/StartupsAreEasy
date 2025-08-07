@@ -27,6 +27,14 @@ export function TelegramBotLogin() {
       }, 2000);
     }
   }, [user, authState.isLoading, authState.isPolling]);
+
+  // Reset states when authentication is no longer active
+  useEffect(() => {
+    if (!authState.isLoading && !authState.isPolling && !authState.error) {
+      setTimeElapsed(0);
+      setShowSuccess(false);
+    }
+  }, [authState.isLoading, authState.isPolling, authState.error]);
   
   // Timer for showing elapsed time during polling (ChatGPT suggestion for visual indicators)
   useEffect(() => {

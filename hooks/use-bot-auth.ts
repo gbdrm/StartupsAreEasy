@@ -88,7 +88,12 @@ export function useBotAuth(): UseBotkAuth {
         try {
             return await poll();
         } finally {
-            setAuthState(prev => ({ ...prev, isPolling: false }));
+            // Ensure polling state is always reset
+            setAuthState(prev => ({ 
+                ...prev, 
+                isPolling: false,
+                isLoading: false 
+            }));
         }
     }, []);
 
@@ -164,12 +169,12 @@ export function useBotAuth(): UseBotkAuth {
                 logger.debug('BOT-AUTH', 'Auth data received', {
                     email: !!sessionData.email,
                     user_id: !!sessionData.user_id, 
-                    secure_password: !!sessionData.secure_password
+                    has_telegram_data: !!sessionData.telegram_data
                 });
 
                 // Use the secure password that was generated server-side during user creation
                 // Fall back by fetching from user metadata if not in pending_tokens
-                let password = sessionData.secure_password;
+                let password: string | undefined;
                 if (!password) {
                     logger.warn('BOT-AUTH', 'No secure password in pending_tokens, fetching from user metadata');
                     
@@ -224,6 +229,13 @@ export function useBotAuth(): UseBotkAuth {
                     });
                 }
 
+                // Reset auth state before cleanup and reload
+                setAuthState({
+                    isLoading: false,
+                    error: null,
+                    isPolling: false
+                });
+
                 // Clean up localStorage
                 localStorage.removeItem('pending_login_token');
                 localStorage.removeItem('login_started_at');
@@ -231,7 +243,9 @@ export function useBotAuth(): UseBotkAuth {
                 logger.info('BOT-AUTH', 'Authentication completed successfully');
 
                 // Trigger page reload for auth state consistency (per instructions)
-                window.location.reload();
+                setTimeout(() => {
+                    window.location.reload();
+                }, 100); // Small delay to allow state update
 
                 } catch (pollError) {
                     logger.error('BOT-AUTH', 'Polling failed', pollError);

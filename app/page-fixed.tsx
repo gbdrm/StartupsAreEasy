@@ -15,15 +15,14 @@ import { createPostFromFormDirect } from "@/lib/api-direct"
 import type { PostFormData, Comment as PostComment } from "@/lib/types"
 
 export default function HomePage() {
-  const { user, loading: authLoading, logout } = useSimpleAuth()
+  const { user, loading: authLoading } = useSimpleAuth()
   const {
     posts,
     loading: postsLoading,
     loadPosts,
     refreshPosts,
     updatePostLikeOptimistically,
-    updatePostCommentsOptimistically,
-    addPostOptimistically
+    updatePostCommentsOptimistically
   } = usePostsWithOptimisticUpdates(user?.id)
 
   const { comments, loadComments, handleComment, handleLike } = useComments(

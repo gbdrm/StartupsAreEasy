@@ -11,7 +11,7 @@ interface DiagnosticResult {
     name: string
     status: 'success' | 'warning' | 'error'
     message: string
-    details?: any
+    details?: Record<string, unknown>
     count?: number
 }
 
@@ -33,12 +33,12 @@ export async function GET(request: NextRequest) {
                 message: 'Successfully connected to database',
                 count: data?.length || 0
             })
-        } catch (err: any) {
+        } catch (err: unknown) {
             results.push({
                 name: 'Database Connection',
                 status: 'error',
-                message: `Database connection failed: ${err.message}`,
-                details: err
+                message: `Database connection failed: ${err instanceof Error ? err.message : String(err)}`,
+                details: err as Record<string, unknown>
             })
         }
 
@@ -59,12 +59,12 @@ export async function GET(request: NextRequest) {
                     message: `Table exists and is accessible`,
                     count: count || 0
                 })
-            } catch (err: any) {
+            } catch (err: unknown) {
                 results.push({
                     name: `${table.charAt(0).toUpperCase() + table.slice(1)} Table`,
                     status: 'error',
-                    message: `Table error: ${err.message}`,
-                    details: err
+                    message: `Table error: ${err instanceof Error ? err.message : String(err)}`,
+                    details: err as Record<string, unknown>
                 })
             }
         }
@@ -85,14 +85,14 @@ export async function GET(request: NextRequest) {
                 name: 'Foreign Key Relationships',
                 status: 'success',
                 message: 'Foreign key relationships are working',
-                details: data
+                details: data as unknown as Record<string, unknown>
             })
-        } catch (err: any) {
+        } catch (err: unknown) {
             results.push({
                 name: 'Foreign Key Relationships',
                 status: 'error',
-                message: `Foreign key error: ${err.message}`,
-                details: err
+                message: `Foreign key error: ${err instanceof Error ? err.message : String(err)}`,
+                details: err as Record<string, unknown>
             })
         }
 
@@ -109,12 +109,12 @@ export async function GET(request: NextRequest) {
                     message: 'Auth users table is accessible',
                     count: data.users.length
                 })
-            } catch (err: any) {
+            } catch (err: unknown) {
                 results.push({
                     name: 'Auth Users Table',
                     status: 'error',
-                    message: `Auth users error: ${err.message}`,
-                    details: err
+                    message: `Auth users error: ${err instanceof Error ? err.message : String(err)}`,
+                    details: err as Record<string, unknown>
                 })
             }
         } else {
@@ -149,12 +149,12 @@ export async function GET(request: NextRequest) {
                     note: 'Insert test skipped to avoid null id constraint violations'
                 }
             })
-        } catch (err: any) {
+        } catch (err: unknown) {
             results.push({
                 name: 'RLS Policies',
                 status: 'error',
-                message: `RLS policy check failed: ${err.message}`,
-                details: err
+                message: `RLS policy check failed: ${err instanceof Error ? err.message : String(err)}`,
+                details: err as Record<string, unknown>
             })
         }        // Test 6: Check environment variables
         const requiredEnvVars = [
@@ -196,14 +196,14 @@ export async function GET(request: NextRequest) {
                 name: 'Database Functions',
                 status: 'success',
                 message: 'Database functions are working',
-                details: { functionResult: data?.length || 0 }
+                details: { functionResult: data?.length || 0 } as Record<string, unknown>
             })
-        } catch (err: any) {
+        } catch (err: unknown) {
             results.push({
                 name: 'Database Functions',
                 status: 'error',
-                message: `Database function error: ${err.message}`,
-                details: err
+                message: `Database function error: ${err instanceof Error ? err.message : String(err)}`,
+                details: err as Record<string, unknown>
             })
         }
 
@@ -221,10 +221,10 @@ export async function GET(request: NextRequest) {
             timestamp: new Date().toISOString()
         })
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         return NextResponse.json({
             success: false,
-            error: error.message,
+            error: error instanceof Error ? error.message : String(error),
             timestamp: new Date().toISOString()
         }, { status: 500 })
     }

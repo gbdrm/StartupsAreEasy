@@ -223,7 +223,7 @@ export function emergencyAuthReset() {
                 if (session?.user) {
                     logger.info('AUTH', 'Found existing session for user', { userId: session.user.id })
                     const profile = await getCurrentUser()
-                    logger.debug("useSimpleAuth: Got profile", {
+                    logger.debug('AUTH', "useSimpleAuth: Got profile", {
                         profile: profile ? `${profile.first_name} ${profile.last_name} (@${profile.username})` : 'null'
                     })
                     setGlobalUser(profile)
@@ -274,7 +274,7 @@ export function emergencyAuthReset() {
                             }
 
                             const profile = await getCurrentUser()
-                            logger.debug("useSimpleAuth: Got profile after sign in", {
+                            logger.debug('AUTH', "useSimpleAuth: Got profile after sign in", {
                                 profile: profile ? `${profile.first_name} ${profile.last_name} (@${profile.username})` : 'null'
                             })
                             setGlobalUser(profile)

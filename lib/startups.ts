@@ -1,8 +1,8 @@
 import { supabase } from "./supabase"
 import { logger } from "./logger"
-import type { Startup, StartupStage, User } from "./types"
+import type { Startup, StartupStage } from "./types"
 
-export async function getStartups(userId?: string): Promise<Startup[]> {
+export async function getStartups(): Promise<Startup[]> {
     logger.info('API', 'getStartups: Starting database query...')
 
     try {

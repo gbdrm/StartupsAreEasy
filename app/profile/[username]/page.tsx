@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { Header } from "@/components/header"
 import { PostCard } from "@/components/post-card"
@@ -30,14 +30,7 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  // Load profile user and their posts
-  useEffect(() => {
-    if (username) {
-      loadProfile()
-    }
-  }, [username, currentUser?.id]) // Reload when user changes to get correct like status
-
-  const loadProfile = async () => {
+  const loadProfile = useCallback(async () => {
     try {
       setLoading(true)
       setError(null)
@@ -80,7 +73,14 @@ export default function ProfilePage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [username, currentUser?.id])
+
+  // Load profile user and their posts
+  useEffect(() => {
+    if (username) {
+      loadProfile()
+    }
+  }, [username, currentUser?.id, loadProfile]) // Reload when user changes to get correct like status
 
   const handleLike = async (postId: string) => {
     if (!currentUser) return

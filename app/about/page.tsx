@@ -4,10 +4,7 @@ import { Header } from "@/components/header"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { ExternalLink, MessageCircle, Github } from "lucide-react"
-import { useSimpleAuth } from "@/hooks/use-simple-auth"
-
 export default function AboutPage() {
-  const { user, logout } = useSimpleAuth()
 
   return (
     <div className="min-h-screen bg-background">

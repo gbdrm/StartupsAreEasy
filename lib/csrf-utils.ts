@@ -35,7 +35,7 @@ class CSRFManager {
         
         if (storedToken && expiry && Date.now() < parseInt(expiry)) {
             this.token = storedToken
-            logger.debug('CSRF: Using existing valid token')
+            logger.debug('SYSTEM', 'CSRF: Using existing valid token')
         } else {
             this.generateNewToken()
         }
@@ -53,7 +53,7 @@ class CSRFManager {
         localStorage.setItem(this.TOKEN_KEY, this.token)
         localStorage.setItem(this.TOKEN_EXPIRY, expiry.toString())
         
-        logger.debug('CSRF: Generated new token')
+        logger.debug('SYSTEM', 'CSRF: Generated new token')
     }
 
     getToken(): string {
@@ -153,7 +153,7 @@ export async function fetchWithCSRF(url: string, options: RequestInit = {}): Pro
     if (response.status === 403) {
         const errorText = await response.text()
         if (errorText.includes('CSRF') || errorText.includes('csrf')) {
-            logger.warn('CSRF token mismatch, refreshing token')
+            logger.warn('SYSTEM', 'CSRF token mismatch, refreshing token')
             refreshCSRFToken()
             
             // Retry with new token
