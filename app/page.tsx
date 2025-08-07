@@ -79,13 +79,7 @@ export default function HomePage() {
           if (posts.length === 0 && !postsLoading) {
             logger.info('📱 Loading initial posts')
             await loadPosts()
-          }
-
-          if (posts.length > 0) {
-            stagingState.setStage('loading-comments')
-            const postIds = posts.map(p => p.id)
-            logger.info('💬 Loading comments for posts', { count: postIds.length })
-            await loadComments(postIds)
+            return // Let the next effect handle comment loading
           }
 
           stagingState.setStage('complete')
@@ -97,7 +91,27 @@ export default function HomePage() {
     }
 
     loadInitialData()
-  }, [authLoading, posts.length, postsLoading, loadPosts, loadComments, stagingState])
+  }, [authLoading, postsLoading, loadPosts, stagingState])
+
+  // Separate effect to load comments when posts are available
+  useEffect(() => {
+    if (posts.length > 0 && stagingState.stage === 'loading-posts') {
+      async function loadCommentsForPosts() {
+        try {
+          stagingState.setStage('loading-comments')
+          const postIds = posts.map(p => p.id)
+          logger.info('💬 Loading comments for posts', { count: postIds.length })
+          await loadComments(postIds)
+          stagingState.setStage('complete')
+        } catch (error) {
+          logger.error('Failed to load comments', error)
+          stagingState.setError(error instanceof Error ? error.message : 'Failed to load comments')
+        }
+      }
+      
+      loadCommentsForPosts()
+    }
+  }, [posts.length, loadComments, stagingState])
 
   // Load user startups when user changes
   useEffect(() => {

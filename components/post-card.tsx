@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, memo } from "react"
 import { useRouter } from "next/navigation"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
@@ -24,7 +24,7 @@ interface PostCardProps {
   clickable?: boolean // New prop to make post clickable
 }
 
-export function PostCard({ post, comments, onLike, onComment, clickable = true }: PostCardProps) {
+function PostCardComponent({ post, comments, onLike, onComment, clickable = true }: PostCardProps) {
   const { user } = useSimpleAuth()
   const [commentContent, setCommentContent] = useState("")
   const [isCommenting, setIsCommenting] = useState(false)
@@ -262,3 +262,16 @@ export function PostCard({ post, comments, onLike, onComment, clickable = true }
     </Card>
   )
 }
+
+// Memoize the PostCard component for better performance
+export const PostCard = memo(PostCardComponent, (prevProps, nextProps) => {
+  // Custom comparison function to optimize re-renders
+  return (
+    prevProps.post.id === nextProps.post.id &&
+    prevProps.post.likes_count === nextProps.post.likes_count &&
+    prevProps.post.comments_count === nextProps.post.comments_count &&
+    prevProps.post.liked_by_user === nextProps.post.liked_by_user &&
+    prevProps.comments.length === nextProps.comments.length &&
+    prevProps.clickable === nextProps.clickable
+  )
+})

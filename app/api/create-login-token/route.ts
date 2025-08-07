@@ -15,8 +15,11 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // Validate token format
-        if (!token.startsWith('login_') || token.length < 20) {
+        // Validate token format - expect base64url format (48 chars) or legacy login_ format
+        const isNewFormat = /^[A-Za-z0-9_-]{48}$/.test(token);
+        const isLegacyFormat = token.startsWith('login_') && token.length >= 20;
+        
+        if (!isNewFormat && !isLegacyFormat) {
             return NextResponse.json(
                 { error: 'Invalid token format' },
                 { status: 400 }

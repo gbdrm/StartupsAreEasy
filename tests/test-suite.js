@@ -1,8 +1,10 @@
 // Test suite for StartupsAreEasy functionality
-// Run with: npm run test:api
+// Run with: npm run test
 
 const fs = require('fs');
 const path = require('path');
+const { runCryptoTests } = require('./crypto-utils.test.js');
+const { runApiSecurityTests } = require('./api-security.test.js');
 
 // Load environment variables from .env.local
 const envPath = path.join(process.cwd(), '.env.local');
@@ -201,6 +203,18 @@ const testEnvironment = test('Environment Variables', async () => {
 // Main test runner
 async function runTests() {
     console.log('🚀 Starting StartupsAreEasy Test Suite\n')
+    
+    // Run crypto and security tests first
+    console.log('🔐 Running Security & Crypto Tests...')
+    const cryptoSuccess = await runCryptoTests()
+    const securitySuccess = await runApiSecurityTests()
+    
+    if (!cryptoSuccess || !securitySuccess) {
+        console.log('❌ Security tests failed - aborting integration tests')
+        process.exit(1)
+    }
+    
+    console.log('\n🌐 Running Integration Tests...')
     
     const tests = [
         testEnvironment,

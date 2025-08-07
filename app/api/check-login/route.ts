@@ -16,8 +16,11 @@ export async function GET(request: NextRequest) {
             );
         }
 
-        // Validate token format
-        if (!token.startsWith('login_') || token.length < 20) {
+        // Validate token format - expect base64url format (48 chars) or legacy login_ format
+        const isNewFormat = /^[A-Za-z0-9_-]{48}$/.test(token);
+        const isLegacyFormat = token.startsWith('login_') && token.length >= 20;
+        
+        if (!isNewFormat && !isLegacyFormat) {
             return NextResponse.json(
                 { error: 'Invalid token format' },
                 { status: 400 }
@@ -32,7 +35,7 @@ export async function GET(request: NextRequest) {
         // Check if token exists and get session data
         const { data: tokenData, error } = await supabase
             .from('pending_tokens')
-            .select('user_id, email, status, used, expires_at, created_at, telegram_chat_id, telegram_username, telegram_first_name')
+            .select('user_id, email, status, used, expires_at, created_at, telegram_chat_id, telegram_username, telegram_first_name, secure_password')
             .eq('token', token)
             .single();
 
@@ -97,6 +100,7 @@ export async function GET(request: NextRequest) {
                 status: 'complete',
                 email: tokenData.email,
                 user_id: tokenData.user_id,
+                secure_password: tokenData.secure_password || null, // Backward compatibility
                 telegram_data: {
                     chat_id: tokenData.telegram_chat_id,
                     username: tokenData.telegram_username,

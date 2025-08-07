@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import { memo } from "react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { AVATAR_SIZES } from "@/lib/constants"
 import type { User } from "@/lib/types"
@@ -14,7 +15,7 @@ interface UserLinkProps {
   className?: string
 }
 
-export function UserLink({ 
+function UserLinkComponent({ 
   user, 
   showAvatar = false, 
   showName = false, 
@@ -41,3 +42,18 @@ export function UserLink({
     </Link>
   )
 }
+
+// Memoize the UserLink component
+export const UserLink = memo(UserLinkComponent, (prevProps, nextProps) => {
+  return (
+    prevProps.user.id === nextProps.user.id &&
+    prevProps.user.name === nextProps.user.name &&
+    prevProps.user.username === nextProps.user.username &&
+    prevProps.user.avatar === nextProps.user.avatar &&
+    prevProps.showAvatar === nextProps.showAvatar &&
+    prevProps.showName === nextProps.showName &&
+    prevProps.showUsername === nextProps.showUsername &&
+    prevProps.avatarSize === nextProps.avatarSize &&
+    prevProps.className === nextProps.className
+  )
+})

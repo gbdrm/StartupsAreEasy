@@ -7,7 +7,7 @@ import { useState, useEffect } from 'react';
 import { useBotAuth } from '@/hooks/use-bot-auth';
 import { useSimpleAuth } from '@/hooks/use-simple-auth';
 import { Button } from '@/components/ui/button';
-import { Loader2, MessageCircle, Clock, AlertCircle, X, CheckCircle } from 'lucide-react';
+import { Loader2, MessageCircle, Clock, AlertCircle, X, CheckCircle, Copy } from 'lucide-react';
 import { logger } from '@/lib/logger';
 
 export function TelegramBotLogin() {
@@ -63,6 +63,10 @@ export function TelegramBotLogin() {
     }
   }, []);
 
+  const [telegramUrl, setTelegramUrl] = useState<string>('');
+  const [loginToken, setLoginToken] = useState<string>('');
+  const [copied, setCopied] = useState(false);
+
   const handleLogin = async () => {
     try {
       await loginWithTelegramBot();
@@ -71,11 +75,35 @@ export function TelegramBotLogin() {
     }
   };
 
+  // Store the telegram URL and token for fallback UI
+  useEffect(() => {
+    const storedToken = localStorage.getItem('pending_login_token');
+    if (storedToken) {
+      setLoginToken(storedToken);
+      const botUsername = 'startups_are_easy_bot';
+      const encodedToken = encodeURIComponent(storedToken);
+      setTelegramUrl(`https://t.me/${botUsername}?start=${encodedToken}`);
+    }
+  }, [authState.isPolling]);
+
   // Format time for display
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  // Copy command to clipboard
+  const copyCommand = async () => {
+    if (loginToken) {
+      try {
+        await navigator.clipboard.writeText(`/start ${loginToken}`);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      } catch (err) {
+        logger.error('Failed to copy command:', err);
+      }
+    }
   };
 
   // Show different states based on auth progress
@@ -123,12 +151,55 @@ export function TelegramBotLogin() {
           </div>
         </div>
         
-        <div className="text-center space-y-1">
-          <p className="text-xs text-green-700">
-            Please confirm the login in your Telegram app
+        <div className="text-center space-y-2">
+          <p className="text-xs text-green-700 font-medium">
+            📱 Complete login in Telegram:
           </p>
-          <p className="text-xs text-green-600">
-            This will timeout in {formatTime(300 - timeElapsed)} minutes
+          
+          <div className="bg-green-100 p-3 rounded-lg space-y-2">
+            <p className="text-xs text-green-800 font-medium">
+              Method 1: Click this link
+            </p>
+            {telegramUrl && (
+              <a 
+                href={telegramUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-block bg-blue-500 text-white px-3 py-2 rounded text-xs hover:bg-blue-600 transition-colors"
+              >
+                🚀 Open Telegram Bot
+              </a>
+            )}
+            <p className="text-xs text-green-600">
+              Then tap the blue "START" button
+            </p>
+          </div>
+
+          <div className="bg-green-50 p-3 rounded text-xs text-green-700">
+            <p className="font-medium mb-2">Method 2: Manual steps</p>
+            <div className="space-y-1">
+              <p>1. Open Telegram app</p>
+              <p>2. Search: <code className="bg-gray-200 px-1 rounded">@startups_are_easy_bot</code></p>
+              <div className="flex items-center gap-2">
+                <span>3. Send this command:</span>
+                <Button
+                  onClick={copyCommand}
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 px-2 bg-gray-200 hover:bg-gray-300"
+                >
+                  <Copy className="h-3 w-3 mr-1" />
+                  {copied ? '✓ Copied' : 'Copy'}
+                </Button>
+              </div>
+              <code className="block bg-gray-200 p-1 rounded text-xs break-all">
+                /start {loginToken}
+              </code>
+            </div>
+          </div>
+          
+          <p className="text-xs text-green-500 mt-2">
+            ⏱️ Timeout in {formatTime(300 - timeElapsed)}
           </p>
         </div>
         
@@ -179,8 +250,9 @@ export function TelegramBotLogin() {
       </Button>
       
       <div className="text-center text-xs text-gray-600 max-w-xs">
-        <p>Click to open Telegram and confirm your login</p>
-        <p className="mt-1">Make sure you have Telegram installed</p>
+        <p className="font-medium">📱 Click to open Telegram</p>
+        <p className="mt-1">Then tap the blue "START" button in the chat</p>
+        <p className="mt-1 text-gray-500">Make sure you have Telegram installed</p>
       </div>
     </div>
   );

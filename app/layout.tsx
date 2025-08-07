@@ -3,6 +3,7 @@ import { GeistSans } from 'geist/font/sans'
 import { GeistMono } from 'geist/font/mono'
 import './globals.css'
 import { AuthProvider } from "@/components/auth-context"
+import { ErrorBoundary } from "@/components/error-boundary"
 // Import auth utilities to make them available globally
 import '@/lib/auth-utils'
 
@@ -29,9 +30,11 @@ html {
         `}</style>
       </head>
       <body>
-        <AuthProvider>
-          {children}
-        </AuthProvider>
+        <ErrorBoundary>
+          <AuthProvider>
+            {children}
+          </AuthProvider>
+        </ErrorBoundary>
       </body>
     </html>
   )

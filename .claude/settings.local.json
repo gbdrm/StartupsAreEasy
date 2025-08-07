@@ -9,7 +9,12 @@
       "Bash(npm run build:*)",
       "Bash(npm test)",
       "Bash(rm:*)",
-      "Bash(cp:*)"
+      "Bash(cp:*)",
+      "Bash(node:*)",
+      "Bash(supabase functions deploy:*)",
+      "Bash(pnpm dev:*)",
+      "Bash(mkdir:*)",
+      "Bash(mv:*)"
     ],
     "deny": []
   }

@@ -199,9 +199,7 @@ export default function ProfilePage() {
             <div className="flex items-start gap-6">
               <Avatar className="h-24 w-24">
                 <AvatarImage src={profileUser.avatar || undefined} alt={profileUser.name} />
-                <AvatarFallback className="text-lg">
-                  {profileUser.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
-                </AvatarFallback>
+                <AvatarFallback name={profileUser.name} userId={profileUser.id} className="text-lg" />
               </Avatar>
               <div className="flex-1">
                 <h1 className="text-2xl font-bold">{profileUser.name}</h1>

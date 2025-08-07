@@ -144,7 +144,7 @@ async function getPostsWithDetailsInternal(currentUserId?: string, filterByUserI
         })
 
         if (!response.ok) {
-            const errorText = await response.text()
+            const errorText = await response.clone().text()
             logger.error("getPostsWithDetailsInternal: API error", { status: response.status, error: errorText })
             throw new Error(`HTTP ${response.status}: ${errorText}`)
         }

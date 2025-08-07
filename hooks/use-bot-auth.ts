@@ -4,6 +4,7 @@
 import { useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
+import { generateSecureLoginToken } from '@/lib/crypto-utils';
 
 interface AuthState {
     isLoading: boolean;
@@ -47,10 +48,15 @@ export function useBotAuth(): UseBotkAuth {
                 });
 
                 if (data.status === 'complete' && data.email) {
-                    logger.info('Bot auth completed successfully');
+                    logger.info('Bot auth completed successfully', {
+                        email: data.email,
+                        user_id: data.user_id,
+                        hasSecurePassword: !!data.secure_password
+                    });
                     return {
                         email: data.email,
                         user_id: data.user_id,
+                        secure_password: data.secure_password,
                         telegram_data: data.telegram_data
                     };
                 }
@@ -95,8 +101,8 @@ export function useBotAuth(): UseBotkAuth {
                 isPolling: false
             });
 
-            // Generate secure login token (ChatGPT suggestion for format)
-            const loginToken = `login_${crypto.randomUUID()}_${Date.now()}`;
+            // Generate cryptographically secure login token
+            const loginToken = generateSecureLoginToken();
 
             logger.info('Starting Telegram bot authentication', { loginToken });
 
@@ -125,17 +131,24 @@ export function useBotAuth(): UseBotkAuth {
             localStorage.setItem('pending_login_token', loginToken);
             localStorage.setItem('login_started_at', Date.now().toString());
 
-            // Open Telegram bot with login token
+            // Open Telegram bot with login token (properly encoded)
             const botUsername = 'startups_are_easy_bot'; // Your bot username
-            const telegramUrl = `https://t.me/${botUsername}?start=${loginToken}`;
+            const encodedToken = encodeURIComponent(loginToken);
+            const telegramUrl = `https://t.me/${botUsername}?start=${encodedToken}`;
 
-            logger.debug('Opening Telegram bot', { telegramUrl });
+            logger.debug('Opening Telegram bot', { telegramUrl, originalToken: loginToken, encodedToken });
 
-            // Open in new tab/window
+            // Try to open in new tab/window
             const popup = window.open(telegramUrl, '_blank');
 
             if (!popup) {
-                throw new Error('Please allow popups and try again');
+                // Popup was blocked, but continue with polling
+                // The UI will show manual instructions
+                logger.warn('Popup blocked, user will need to use manual method');
+                logger.info('Continuing with polling - UI will show fallback options');
+            } else {
+                // Popup opened successfully
+                logger.info('Telegram bot opened in new window/tab');
             }
 
             // Start polling for authentication completion
@@ -146,70 +159,94 @@ export function useBotAuth(): UseBotkAuth {
                     throw new Error('Authentication failed - no session data received');
                 }
 
-                logger.info('Authentication confirmed by bot - establishing session');
+                logger.auth.start('Telegram bot', { user_id: sessionData.user_id });
 
-                // Debug: Log the auth data we received
-                logger.debug('Received auth data:', {
-                    email: sessionData.email,
-                    user_id: sessionData.user_id,
-                    telegram_data: sessionData.telegram_data
+                // Debug: Log the auth data we received (simplified)
+                logger.debug('BOT-AUTH', 'Auth data received', {
+                    email: !!sessionData.email,
+                    user_id: !!sessionData.user_id, 
+                    secure_password: !!sessionData.secure_password
                 });
 
-                // SECURE APPROACH: Use signInWithPassword with crypto-secure password
-                // Generate a secure random password and store it server-side
-                logger.info('Attempting to sign in with secure password authentication');
-
                 // Use the secure password that was generated server-side during user creation
-                // The Edge Function should have generated a crypto-secure password
+                // Fall back by fetching from user metadata if not in pending_tokens
+                let password = sessionData.secure_password;
+                if (!password) {
+                    logger.warn('BOT-AUTH', 'No secure password in pending_tokens, fetching from user metadata');
+                    
+                    // Try to get the password from user metadata via API route
+                    try {
+                        const passwordResponse = await fetch('/api/get-user-password', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ user_id: sessionData.user_id })
+                        });
+                        
+                        if (passwordResponse.ok) {
+                            const passwordData = await passwordResponse.json();
+                            password = passwordData.secure_password;
+                            if (password) {
+                                logger.info('BOT-AUTH', 'Retrieved secure password from user metadata');
+                            } else {
+                                logger.warn('BOT-AUTH', 'No secure password in user metadata - using legacy fallback');
+                                password = `telegram_${sessionData.user_id}_secure`;
+                            }
+                        } else {
+                            logger.error('BOT-AUTH', 'Failed to fetch password from API');
+                            password = `telegram_${sessionData.user_id}_secure`;
+                        }
+                    } catch (metaError) {
+                        logger.error('BOT-AUTH', 'Failed to fetch user password', metaError);
+                        password = `telegram_${sessionData.user_id}_secure`;
+                    }
+                }
+
+                logger.debug('BOT-AUTH', 'Attempting password sign-in', {
+                    email: sessionData.email,
+                    passwordLength: password.length,
+                    passwordType: password.startsWith('telegram_') ? 'legacy' : 'secure'
+                });
+                
                 const { data: signInResult, error: signInError } = await supabase.auth.signInWithPassword({
                     email: sessionData.email,
-                    password: sessionData.secure_password || `temp_${crypto.randomUUID()}_${Date.now()}`
+                    password: password
                 });
 
                 if (signInError) {
-                    logger.error('Password sign-in failed:', signInError);
-
-                    // Fallback: Try to trigger a magic link that the user can actually use
-                    logger.info('Trying magic link fallback');
-
-                    const { error: magicLinkError } = await supabase.auth.signInWithOtp({
-                        email: sessionData.email
+                    logger.auth.failed('Telegram password', signInError, { 
+                        email: sessionData.email,
+                        passwordLength: password.length
                     });
-
-                    if (magicLinkError) {
-                        logger.error('Magic link fallback also failed:', magicLinkError);
-                        throw new Error(`Authentication failed: ${signInError.message}. Magic link fallback also failed: ${magicLinkError.message}`);
-                    } else {
-                        logger.info('Magic link sent - but this requires user to check email');
-                        throw new Error('Please check your email and click the magic link to complete authentication');
-                    }
+                    throw new Error(`Password authentication failed: ${signInError.message}`);
                 } else {
-                    logger.info('Password authentication succeeded!', {
+                    logger.auth.success('Telegram password', {
                         user_id: signInResult.session?.user?.id,
                         email: signInResult.user?.email
                     });
-                }                // Clean up localStorage
+                }
+
+                // Clean up localStorage
                 localStorage.removeItem('pending_login_token');
                 localStorage.removeItem('login_started_at');
 
-                logger.info('Bot authentication completed successfully');
+                logger.info('BOT-AUTH', 'Authentication completed successfully');
 
                 // Trigger page reload for auth state consistency (per instructions)
                 window.location.reload();
 
-            } catch (pollError) {
-                logger.error('Bot authentication polling failed', pollError);
+                } catch (pollError) {
+                    logger.error('BOT-AUTH', 'Polling failed', pollError);
 
-                // Clean up on error
-                localStorage.removeItem('pending_login_token');
-                localStorage.removeItem('login_started_at');
+                    // Clean up on error
+                    localStorage.removeItem('pending_login_token');
+                    localStorage.removeItem('login_started_at');
 
-                throw pollError;
-            }
+                    throw pollError;
+                }
 
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Authentication failed';
-            logger.error('Bot authentication error', error);
+            logger.error('BOT-AUTH', 'Authentication failed', error);
 
             setAuthState({
                 isLoading: false,
