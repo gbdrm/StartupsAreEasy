@@ -11,13 +11,17 @@ interface LogConfig {
     level: LogLevel
     timestamp: boolean
     showFullStacks: boolean
+    throttle: boolean // Throttle repeated messages
+    maxLogEntries: number // Maximum logs to keep in memory
 }
 
 const config: LogConfig = {
     enabled: process.env.NODE_ENV === 'development',
     level: process.env.NODE_ENV === 'production' ? 'warn' : 'debug',
     timestamp: true,
-    showFullStacks: false
+    showFullStacks: false,
+    throttle: true,
+    maxLogEntries: 1000
 }
 
 const logLevels: Record<LogLevel, number> = {
@@ -32,6 +36,50 @@ const levelColors: Record<LogLevel, string> = {
     info: '#3B82F6',
     warn: '#F59E0B',
     error: '#EF4444'
+}
+
+// Throttling and performance monitoring
+const logThrottleMap = new Map<string, { count: number, lastLogged: number }>()
+const performanceTimers = new Map<string, number>()
+
+// Clear throttle map periodically to prevent memory leaks
+if (typeof window !== 'undefined') {
+    setInterval(() => {
+        const now = Date.now()
+        for (const [key, data] of logThrottleMap.entries()) {
+            if (now - data.lastLogged > 60000) { // Clear entries older than 1 minute
+                logThrottleMap.delete(key)
+            }
+        }
+    }, 30000) // Run cleanup every 30 seconds
+}
+
+function shouldThrottle(key: string): boolean {
+    if (!config.throttle) return false
+    
+    const now = Date.now()
+    const throttleData = logThrottleMap.get(key)
+    
+    if (!throttleData) {
+        logThrottleMap.set(key, { count: 1, lastLogged: now })
+        return false
+    }
+    
+    // If same message within 5 seconds, throttle
+    if (now - throttleData.lastLogged < 5000) {
+        throttleData.count++
+        return true
+    }
+    
+    // If we've been throttling, log the count
+    if (throttleData.count > 1) {
+        console.log(`%c[THROTTLED] Previous message repeated ${throttleData.count - 1} times`, 'color: #9CA3AF; font-style: italic')
+    }
+    
+    // Reset throttle data
+    throttleData.count = 1
+    throttleData.lastLogged = now
+    return false
 }
 
 function shouldLog(level: LogLevel): boolean {
@@ -72,6 +120,9 @@ function formatError(error: any): { message: string; stack?: string } {
 export const logger = {
     debug: (tag: LogTag, message: string, context?: any) => {
         if (!shouldLog('debug')) return
+
+        const throttleKey = `debug:${tag}:${message}`
+        if (shouldThrottle(throttleKey)) return
 
         const formatted = formatMessage('debug', tag, message)
         if (context) {
@@ -150,6 +201,25 @@ export const logger = {
         received: (command: string, context?: any) => logger.debug('TELEGRAM', `Bot received: ${command}`, context),
         sent: (message: string, context?: any) => logger.debug('TELEGRAM', `Bot sent: ${message}`, context),
         error: (action: string, error?: any, context?: any) => logger.error('TELEGRAM', `Bot ${action} failed`, error, context),
+    },
+
+    // Performance timing
+    time: (label: string) => {
+        performanceTimers.set(label, Date.now())
+        logger.debug('PERF', `Timer started: ${label}`)
+    },
+
+    timeEnd: (label: string) => {
+        const startTime = performanceTimers.get(label)
+        if (!startTime) {
+            logger.warn('PERF', `Timer not found: ${label}`)
+            return
+        }
+        
+        const duration = Date.now() - startTime
+        performanceTimers.delete(label)
+        logger.debug('PERF', `Timer ended: ${label}`, { duration: `${duration}ms` })
+        return duration
     }
 }
 

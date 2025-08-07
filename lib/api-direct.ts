@@ -66,14 +66,14 @@ const headers = {
 function checkRateLimit(key: string): boolean {
     const now = Date.now()
     const requests = rateLimitMap.get(key) || 0
-    
+
     if (requests >= MAX_REQUESTS_PER_WINDOW) {
         logger.warn('API', `Rate limit exceeded for ${key}`)
         return false
     }
-    
+
     rateLimitMap.set(key, requests + 1)
-    
+
     // Clean up old entries
     setTimeout(() => {
         const current = rateLimitMap.get(key) || 0
@@ -81,35 +81,42 @@ function checkRateLimit(key: string): boolean {
             rateLimitMap.set(key, current - 1)
         }
     }, RATE_LIMIT_WINDOW)
-    
+
     return true
 }
 
-// Request deduplication
+// Request deduplication with response cloning to fix "body stream already read" issue
 async function dedupedFetch(url: string, options: RequestInit = {}): Promise<Response> {
     const cacheKey = `${options.method || 'GET'}:${url}:${JSON.stringify(options.body || {})}`
-    
+
     if (requestCache.has(cacheKey)) {
         logger.debug('API', `Deduplicating request: ${cacheKey}`)
-        return requestCache.get(cacheKey)!
+        const cachedResponse = await requestCache.get(cacheKey)!
+        // Clone the cached response to avoid "body stream already read" errors
+        return cachedResponse.clone()
     }
-    
+
     const rateLimitKey = `${options.method || 'GET'}:${new URL(url).pathname}`
     if (!checkRateLimit(rateLimitKey)) {
         throw new Error('Rate limit exceeded')
     }
-    
+
     const promise = fetch(url, options)
     requestCache.set(cacheKey, promise)
-    
+
     // Clean up cache after request completes
     promise.finally(() => {
         setTimeout(() => {
             requestCache.delete(cacheKey)
         }, 5000) // Cache for 5 seconds
     })
-    
-    return promise
+
+    const response = await promise
+    // Store a cloned version so we can clone it again for consumers
+    const clonedForCache = response.clone()
+    requestCache.set(cacheKey, Promise.resolve(clonedForCache))
+
+    return response
 }
 
 // Get auth headers with user token
@@ -144,12 +151,24 @@ async function getPostsWithDetailsInternal(currentUserId?: string, filterByUserI
         })
 
         if (!response.ok) {
-            const errorText = await response.clone().text()
+            const errorText = await response.text()
             logger.error('API', "getPostsWithDetailsInternal: API error", { status: response.status, error: errorText })
             throw new Error(`HTTP ${response.status}: ${errorText}`)
         }
 
-        let posts = await response.json()
+        const responseText = await response.text()
+        if (!responseText.trim()) {
+            logger.debug('API', "getPostsWithDetailsInternal: Empty response")
+            return []
+        }
+
+        let posts
+        try {
+            posts = JSON.parse(responseText)
+        } catch (parseError) {
+            logger.error('API', "getPostsWithDetailsInternal: JSON parse error", parseError)
+            throw new Error('Invalid JSON response')
+        }
 
         // Filter by specific user if requested
         if (filterByUserId) {

@@ -229,6 +229,40 @@ export function useBotAuth(): UseBotkAuth {
                     });
                 }
 
+                // PRODUCTION FIX: Ensure tokens are stored in localStorage for production bypass
+                if (signInResult.session) {
+                    logger.info('BOT-AUTH', 'Storing session tokens for production compatibility');
+                    
+                    // Store tokens that production bypass expects
+                    if (signInResult.session.access_token) {
+                        localStorage.setItem('sb-access-token', signInResult.session.access_token);
+                        logger.debug('BOT-AUTH', 'Stored access token');
+                    }
+                    
+                    if (signInResult.session.refresh_token) {
+                        localStorage.setItem('sb-refresh-token', signInResult.session.refresh_token);
+                        logger.debug('BOT-AUTH', 'Stored refresh token');
+                    }
+                    
+                    // Store user data for production bypass
+                    if (signInResult.user) {
+                        // Get and store user profile for production bypass
+                        try {
+                            const profile = await getCurrentUser();
+                            if (profile) {
+                                localStorage.setItem('sb-user', JSON.stringify(profile));
+                                logger.debug('BOT-AUTH', 'Stored user profile for production bypass');
+                            }
+                        } catch (profileError) {
+                            logger.warn('BOT-AUTH', 'Failed to fetch profile for storage', profileError);
+                        }
+                    }
+                    
+                    // Mark login as complete for production bypass detection
+                    localStorage.setItem('telegram-login-complete', 'true');
+                    logger.info('BOT-AUTH', 'Marked telegram login as complete');
+                }
+
                 // Reset auth state before cleanup and reload
                 setAuthState({
                     isLoading: false,
@@ -236,16 +270,17 @@ export function useBotAuth(): UseBotkAuth {
                     isPolling: false
                 });
 
-                // Clean up localStorage
+                // Clean up temporary localStorage items
                 localStorage.removeItem('pending_login_token');
                 localStorage.removeItem('login_started_at');
 
-                logger.info('BOT-AUTH', 'Authentication completed successfully');
+                logger.info('BOT-AUTH', 'Authentication completed successfully, triggering reload');
 
                 // Trigger page reload for auth state consistency (per instructions)
+                // Increase delay to allow token storage to complete
                 setTimeout(() => {
                     window.location.reload();
-                }, 100); // Small delay to allow state update
+                }, 300); // Increased delay to allow all storage operations
 
                 } catch (pollError) {
                     logger.error('BOT-AUTH', 'Polling failed', pollError);
