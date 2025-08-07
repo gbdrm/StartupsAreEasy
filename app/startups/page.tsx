@@ -44,7 +44,7 @@ export default function StartupsPage() {
 
   const loadStartups = async () => {
     try {
-      logger.debug("StartupsPage: Starting to load startups...")
+      logger.debug('UI', 'Starting to load startups')
       setLoading(true)
       setError(null)
       
@@ -56,13 +56,13 @@ export default function StartupsPage() {
       const startupsPromise = getStartupsDirect()
       
       const startupsData = await Promise.race([startupsPromise, timeoutPromise]) as Startup[]
-      logger.debug("StartupsPage: Loaded startups", { count: startupsData.length })
+      logger.debug('UI', 'Loaded startups', { count: startupsData.length })
       setStartups(startupsData)
     } catch (err) {
-      logger.error("Error loading startups:", err)
+      logger.error('UI', 'Error loading startups', err)
       setError(`Failed to load startups: ${err instanceof Error ? err.message : 'Unknown error'}`)
     } finally {
-      logger.debug("StartupsPage: Finished loading startups")
+      logger.debug('UI', 'Finished loading startups')
       setLoading(false)
     }
   }
@@ -83,7 +83,7 @@ export default function StartupsPage() {
       setStartups(prev => [startup, ...prev])
       return true // Return success
     } catch (err) {
-      logger.error("Error creating startup:", err)
+      logger.error('UI', 'Error creating startup', err)
       
       // The API now handles all error categorization, so just pass through the message
       const errorMessage = err instanceof Error ? err.message : String(err)

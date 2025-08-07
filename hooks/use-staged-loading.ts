@@ -50,7 +50,7 @@ export function useStagedLoading() {
         const message = customMessage || stageMessages[stage]
         const progress = stageProgress[stage]
 
-        logger.info(`🎬 Loading Stage: ${stage}`, { progress, message })
+        logger.info('UI', `Loading Stage: ${stage}`, { progress, message })
 
         setState({
             stage,
@@ -61,12 +61,12 @@ export function useStagedLoading() {
     }, [])
 
     const setError = useCallback((error: string) => {
-        logger.error('❌ Loading Error', { error })
+        logger.error('UI', 'Loading Error', error)
         setStage('error', `Error: ${error}`, error)
     }, [setStage])
 
     const reset = useCallback(() => {
-        logger.info('🔄 Resetting loading state')
+        logger.info('UI', 'Resetting loading state')
         setStage('idle')
     }, [setStage])
 

@@ -22,7 +22,7 @@ export function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   // Debug logging - only shows in development
-  logger.debug("Header: user state", user)
+  logger.debug('UI', 'Header: user state', user)
 
   const navigationItems = [
     { href: "/", emoji: "🏠", label: "Home" },

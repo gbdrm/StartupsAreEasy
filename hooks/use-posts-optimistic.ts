@@ -34,7 +34,7 @@ export function usePostsWithOptimisticUpdates(userId?: string) {
             timestamp: currentTimestamp
         }
 
-        logger.info('usePostsWithOptimisticUpdates: Starting to load posts', { userId: userId || 'anonymous' })
+        logger.info('API', 'usePostsWithOptimisticUpdates: Starting to load posts', { userId: userId || 'anonymous' })
 
         try {
             setLoading(true)
@@ -48,7 +48,7 @@ export function usePostsWithOptimisticUpdates(userId?: string) {
                 return
             }
 
-            logger.info('usePostsWithOptimisticUpdates: API call completed, setting posts', {
+            logger.info('API', 'usePostsWithOptimisticUpdates: API call completed, setting posts', {
                 count: postsData.length,
                 userId: userId || 'anonymous'
             })
@@ -68,7 +68,7 @@ export function usePostsWithOptimisticUpdates(userId?: string) {
             // Log like status for debugging
             const likedPosts = postsData.filter(p => p.liked_by_user)
             if (likedPosts.length > 0) {
-                logger.debug('usePostsWithOptimisticUpdates: Found liked posts', {
+                logger.debug('API', 'usePostsWithOptimisticUpdates: Found liked posts', {
                     count: likedPosts.length,
                     postIds: likedPosts.map(p => p.id)
                 })
@@ -103,7 +103,7 @@ export function usePostsWithOptimisticUpdates(userId?: string) {
 
     // Optimistic like update with conflict resolution
     const updatePostLikeOptimistically = useCallback((postId: string, liked: boolean, likesCount: number) => {
-        logger.debug('Optimistically updating post like', { postId, liked, likesCount })
+        logger.debug('UI', 'Optimistically updating post like', { postId, liked, likesCount })
 
         const optimisticKey = `like_${postId}`
         optimisticUpdates.current.add(optimisticKey)
@@ -128,7 +128,7 @@ export function usePostsWithOptimisticUpdates(userId?: string) {
 
     // Optimistic comment update
     const updatePostCommentsOptimistically = useCallback((postId: string, commentsCount: number) => {
-        logger.debug('Optimistically updating post comments', { postId, commentsCount })
+        logger.debug('UI', 'Optimistically updating post comments', { postId, commentsCount })
 
         setPosts(prevPosts =>
             prevPosts.map(post =>
@@ -141,7 +141,7 @@ export function usePostsWithOptimisticUpdates(userId?: string) {
 
     // Add new post optimistically
     const addPostOptimistically = useCallback((newPost: Post) => {
-        logger.debug('Optimistically adding new post', { postId: newPost.id })
+        logger.debug('UI', 'Optimistically adding new post', { postId: newPost.id })
 
         setPosts(prevPosts => [newPost, ...prevPosts])
     }, [])

@@ -23,7 +23,7 @@ export function useComments(
             const allComments = await getBulkCommentsDirect(postIds)
             setComments(allComments)
         } catch (error) {
-            logger.error("Error loading comments", error)
+            logger.error('API', 'Error loading comments', error)
             setComments([])
         }
     }, []) // Empty dependency array since it doesn't depend on any props/state
@@ -72,7 +72,7 @@ export function useComments(
 
             return true
         } catch (error) {
-            logger.error("Error creating comment", error)
+            logger.error('API', 'Error creating comment', error)
 
             // Remove temp comment on error  
             setComments(prev => prev.filter(c => !c.id.startsWith('temp-')))
@@ -86,7 +86,7 @@ export function useComments(
                     errorMessage.includes('row-level security policy') ||
                     errorMessage.includes('403')) {
 
-                    logger.info('Auth error detected while commenting, triggering page reload')
+                    logger.info('AUTH', 'Auth error detected while commenting, triggering page reload')
                     window.location.reload()
                     return false
                 }
@@ -97,10 +97,10 @@ export function useComments(
     }, [currentUser, refreshPosts, comments, updatePostCommentsOptimistically])
 
     const handleLike = useCallback(async (postId: string, currentLiked: boolean, currentCount: number) => {
-        logger.debug('handleLike called', { postId, userId: currentUser?.id })
+        logger.debug('UI', 'handleLike called', { postId, userId: currentUser?.id })
 
         if (!currentUser) {
-            logger.debug('No current user, cannot like')
+            logger.debug('UI', 'No current user, cannot like')
             return
         }
 
@@ -108,7 +108,7 @@ export function useComments(
         const newLiked = !currentLiked
         const newCount = newLiked ? currentCount + 1 : currentCount - 1
 
-        logger.debug('Optimistic like update', {
+        logger.debug('UI', 'Optimistic like update', {
             currentLiked,
             newLiked,
             currentCount,
@@ -117,30 +117,30 @@ export function useComments(
         updatePostLikeOptimistically?.(postId, newLiked, newCount)
 
         try {
-            logger.debug('Getting user token for like operation')
+            logger.debug('AUTH', 'Getting user token for like operation')
             const token = await getCurrentUserToken()
-            logger.debug('Token obtained', { hasToken: !!token, tokenLength: token?.length || 0 })
+            logger.debug('AUTH', 'Token obtained', { hasToken: !!token, tokenLength: token?.length || 0 })
 
             if (!token) {
-                logger.error('No user token available, cannot like')
+                logger.error('AUTH', 'No user token available, cannot like')
                 // Revert optimistic update
                 updatePostLikeOptimistically?.(postId, currentLiked, currentCount)
 
                 // Try to refresh the session and get a new token
-                logger.info('Attempting to refresh session')
+                logger.info('AUTH', 'Attempting to refresh session')
                 window.location.reload() // Simple solution: reload to re-authenticate
                 return null
             }
 
             const result = await toggleLikeDirect(postId, currentUser.id, token)
-            logger.debug('toggleLikeDirect result', result)
+            logger.debug('API', 'toggleLikeDirect result', result)
 
             // Update with actual result from server (in case of discrepancy)
             updatePostLikeOptimistically?.(postId, result.liked, result.likesCount)
 
             return result
         } catch (error) {
-            logger.error("Error toggling like", error)
+            logger.error('API', 'Error toggling like', error)
 
             // Revert optimistic update on error
             updatePostLikeOptimistically?.(postId, currentLiked, currentCount)
@@ -154,7 +154,7 @@ export function useComments(
                     errorMessage.includes('row-level security policy') ||
                     errorMessage.includes('403')) {
 
-                    logger.info('Auth error detected, triggering page reload for fresh auth')
+                    logger.info('AUTH', 'Auth error detected, triggering page reload for fresh auth')
                     window.location.reload()
                     return null
                 }

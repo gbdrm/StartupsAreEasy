@@ -41,14 +41,14 @@ export function useBotAuth(): UseBotkAuth {
                 const response = await fetch(`/api/check-login?token=${loginToken}`);
                 const data = await response.json();
 
-                logger.debug('Poll response received', {
+                logger.debug('BOT-AUTH', 'Poll response received', {
                     status: response.status,
                     data,
                     attempt: attempts
                 });
 
                 if (data.status === 'complete' && data.email) {
-                    logger.info('Bot auth completed successfully', {
+                    logger.info('BOT-AUTH', 'Bot auth completed successfully', {
                         email: data.email,
                         user_id: data.user_id,
                         hasSecurePassword: !!data.secure_password
@@ -56,7 +56,6 @@ export function useBotAuth(): UseBotkAuth {
                     return {
                         email: data.email,
                         user_id: data.user_id,
-                        secure_password: data.secure_password,
                         telegram_data: data.telegram_data
                     };
                 }
@@ -66,7 +65,7 @@ export function useBotAuth(): UseBotkAuth {
                 }
 
                 // Still pending - continue polling
-                logger.debug('Authentication still pending, continuing to poll', { attempt: attempts });
+                logger.debug('BOT-AUTH', 'Authentication still pending, continuing to poll', { attempt: attempts });
 
                 // Exponential backoff: 1s, 2s, 4s, then 10s intervals
                 const delay = attempts < 3 ? Math.pow(2, attempts) * 1000 : 10000;
@@ -104,7 +103,7 @@ export function useBotAuth(): UseBotkAuth {
             // Generate cryptographically secure login token
             const loginToken = generateSecureLoginToken();
 
-            logger.info('Starting Telegram bot authentication', { loginToken });
+            logger.info('BOT-AUTH', 'Starting Telegram bot authentication', { loginToken });
 
             // Pre-register token in database to avoid timing issues
             try {
@@ -116,14 +115,14 @@ export function useBotAuth(): UseBotkAuth {
 
                 if (!tokenResponse.ok) {
                     const errorData = await tokenResponse.json();
-                    logger.warn('Failed to pre-register token, continuing anyway', errorData);
+                    logger.warn('BOT-AUTH', 'Failed to pre-register token, continuing anyway', errorData);
                     // Continue with auth flow even if pre-registration fails
                 } else {
                     const tokenData = await tokenResponse.json();
-                    logger.info('Token pre-registered successfully', { expires_at: tokenData.expires_at });
+                    logger.info('BOT-AUTH', 'Token pre-registered successfully', { expires_at: tokenData.expires_at });
                 }
             } catch (error) {
-                logger.warn('Token pre-registration failed, continuing anyway', error);
+                logger.warn('BOT-AUTH', 'Token pre-registration failed, continuing anyway', error);
                 // Continue with auth flow even if pre-registration fails
             }
 
@@ -136,7 +135,7 @@ export function useBotAuth(): UseBotkAuth {
             const encodedToken = encodeURIComponent(loginToken);
             const telegramUrl = `https://t.me/${botUsername}?start=${encodedToken}`;
 
-            logger.debug('Opening Telegram bot', { telegramUrl, originalToken: loginToken, encodedToken });
+            logger.debug('BOT-AUTH', 'Opening Telegram bot', { telegramUrl, originalToken: loginToken, encodedToken });
 
             // Try to open in new tab/window
             const popup = window.open(telegramUrl, '_blank');
@@ -144,11 +143,11 @@ export function useBotAuth(): UseBotkAuth {
             if (!popup) {
                 // Popup was blocked, but continue with polling
                 // The UI will show manual instructions
-                logger.warn('Popup blocked, user will need to use manual method');
-                logger.info('Continuing with polling - UI will show fallback options');
+                logger.warn('BOT-AUTH', 'Popup blocked, user will need to use manual method');
+                logger.info('BOT-AUTH', 'Continuing with polling - UI will show fallback options');
             } else {
                 // Popup opened successfully
-                logger.info('Telegram bot opened in new window/tab');
+                logger.info('BOT-AUTH', 'Telegram bot opened in new window/tab');
             }
 
             // Start polling for authentication completion
@@ -257,7 +256,7 @@ export function useBotAuth(): UseBotkAuth {
     }, [pollForToken]);
 
     const cancelLogin = useCallback(() => {
-        logger.info('Canceling bot authentication');
+        logger.info('BOT-AUTH', 'Canceling bot authentication');
 
         // Clean up localStorage
         localStorage.removeItem('pending_login_token');

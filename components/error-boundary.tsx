@@ -39,9 +39,7 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    logger.error('Error boundary caught an error:', {
-      error: error.message,
-      stack: error.stack,
+    logger.error('UI', 'Error boundary caught an error:', error, {
       componentStack: errorInfo.componentStack
     })
 
@@ -149,9 +147,7 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
 // Hook version for functional components
 export function useErrorHandler() {
   return React.useCallback((error: Error, errorInfo?: React.ErrorInfo) => {
-    logger.error('useErrorHandler called:', {
-      error: error.message,
-      stack: error.stack,
+    logger.error('UI', 'useErrorHandler called:', error, {
       errorInfo
     })
 

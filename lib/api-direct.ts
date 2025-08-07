@@ -68,7 +68,7 @@ function checkRateLimit(key: string): boolean {
     const requests = rateLimitMap.get(key) || 0
     
     if (requests >= MAX_REQUESTS_PER_WINDOW) {
-        logger.warn(`Rate limit exceeded for ${key}`)
+        logger.warn('API', `Rate limit exceeded for ${key}`)
         return false
     }
     
@@ -90,7 +90,7 @@ async function dedupedFetch(url: string, options: RequestInit = {}): Promise<Res
     const cacheKey = `${options.method || 'GET'}:${url}:${JSON.stringify(options.body || {})}`
     
     if (requestCache.has(cacheKey)) {
-        logger.debug(`Deduplicating request: ${cacheKey}`)
+        logger.debug('API', `Deduplicating request: ${cacheKey}`)
         return requestCache.get(cacheKey)!
     }
     
@@ -382,7 +382,7 @@ export async function createStartupDirect(startup: {
         // Handle empty response
         const responseText = await response.text()
         if (!responseText || responseText.trim() === '') {
-            logger.info("Startup created successfully (empty response)")
+            logger.info('API', 'Startup created successfully (empty response)')
             return {
                 ...insertData,
                 id: `temp-${Date.now()}`,
@@ -392,7 +392,7 @@ export async function createStartupDirect(startup: {
         }
 
         const result = JSON.parse(responseText)
-        logger.info("Startup created successfully")
+        logger.info('API', 'Startup created successfully')
         return result[0] || result
     } catch (error) {
         logger.error("Error creating startup:", error)
@@ -465,7 +465,7 @@ export async function createPostDirect(data: {
         logger.debug("createPostDirect: Raw response", { length: responseText.length })
 
         if (!responseText || responseText.trim() === '') {
-            logger.debug("createPostDirect: Empty response but success status - post created")
+            logger.debug('API', 'createPostDirect: Empty response but success status - post created')
             // Post was created successfully but no data returned
             // Return a minimal post object with the data we sent
             return {

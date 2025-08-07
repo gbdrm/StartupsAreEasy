@@ -19,7 +19,7 @@ export function TelegramBotLogin() {
   // Show success state briefly when user signs in
   useEffect(() => {
     if (user && (authState.isLoading || authState.isPolling)) {
-      logger.info("Authentication completed successfully");
+      logger.info('BOT-AUTH', 'Authentication completed successfully');
       setShowSuccess(true);
       // Reset success state after a brief moment
       setTimeout(() => {
@@ -53,10 +53,10 @@ export function TelegramBotLogin() {
       const maxAge = 10 * 60 * 1000; // 10 minutes
       
       if (timeSinceStart < maxAge) {
-        logger.info('Resuming pending bot authentication', { pendingToken });
+        logger.info('BOT-AUTH', 'Resuming pending bot authentication', { pendingToken });
         // Could automatically resume polling here if desired
       } else {
-        logger.info('Cleaning up expired pending authentication');
+        logger.info('BOT-AUTH', 'Cleaning up expired pending authentication');
         localStorage.removeItem('pending_login_token');
         localStorage.removeItem('login_started_at');
       }
@@ -71,7 +71,7 @@ export function TelegramBotLogin() {
     try {
       await loginWithTelegramBot();
     } catch (error) {
-      logger.error('Login button error', error);
+      logger.error('BOT-AUTH', 'Login button error', error);
     }
   };
 
@@ -101,7 +101,7 @@ export function TelegramBotLogin() {
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
       } catch (err) {
-        logger.error('Failed to copy command:', err);
+        logger.error('UI', 'Failed to copy command', err);
       }
     }
   };

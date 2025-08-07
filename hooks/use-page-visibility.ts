@@ -19,40 +19,40 @@ export function usePageVisibility() {
             const wasHidden = !wasVisibleRef.current
             const isNowVisible = !document.hidden
 
-            logger.info(`👁️ [${timestamp}] PAGE VISIBILITY: Change detected - wasHidden: ${wasHidden}, isNowVisible: ${isNowVisible}`)
+            logger.info('UI', `PAGE VISIBILITY: Change detected - wasHidden: ${wasHidden}, isNowVisible: ${isNowVisible}`, { timestamp })
 
             setIsVisible(isNowVisible)
             wasVisibleRef.current = isNowVisible
 
             // If page was hidden and is now visible, check auth token validity
             if (wasHidden && isNowVisible) {
-                logger.info(`�️ [${timestamp}] PAGE VISIBILITY: Page became visible after being hidden - starting auth validation`)
+                logger.info('AUTH', `PAGE VISIBILITY: Page became visible after being hidden - starting auth validation`, { timestamp })
 
                 // Add a small delay to avoid race conditions with logout
-                logger.debug(`👁️ [${timestamp}] PAGE VISIBILITY: Adding 100ms delay...`)
+                logger.debug('AUTH', `PAGE VISIBILITY: Adding 100ms delay...`, { timestamp })
                 await new Promise(resolve => setTimeout(resolve, 100))
 
                 // Check if logout is in progress - skip validation entirely
                 const logoutFlag = localStorage.getItem('logout-in-progress')
-                logger.debug(`👁️ [${timestamp}] PAGE VISIBILITY: Logout flag check: ${logoutFlag}`)
+                logger.debug('AUTH', `PAGE VISIBILITY: Logout flag check: ${logoutFlag}`, { timestamp })
                 if (logoutFlag) {
-                    logger.info(`�️ [${timestamp}] PAGE VISIBILITY: Logout in progress, skipping auth validation`)
+                    logger.info('AUTH', `PAGE VISIBILITY: Logout in progress, skipping auth validation`, { timestamp })
                     return
                 }
 
                 // Check if logout is in progress (common localStorage keys would be missing)
                 const accessToken = localStorage.getItem("sb-access-token")
                 const loginComplete = localStorage.getItem("telegram-login-complete")
-                logger.debug(`👁️ [${timestamp}] PAGE VISIBILITY: Token check - accessToken: ${!!accessToken}, loginComplete: ${!!loginComplete}`)
+                logger.debug('AUTH', `PAGE VISIBILITY: Token check - accessToken: ${!!accessToken}, loginComplete: ${!!loginComplete}`, { timestamp })
 
                 const hasTokens = accessToken || loginComplete
                 if (!hasTokens) {
-                    logger.info(`�️ [${timestamp}] PAGE VISIBILITY: No auth tokens found - likely logged out, skipping validation`)
+                    logger.info('AUTH', `PAGE VISIBILITY: No auth tokens found - likely logged out, skipping validation`, { timestamp })
                     return
                 }
 
                 try {
-                    logger.info(`👁️ [${timestamp}] PAGE VISIBILITY: Starting getCurrentUserToken() call...`)
+                    logger.info('AUTH', `PAGE VISIBILITY: Starting getCurrentUserToken() call...`, { timestamp })
                     const tokenStartTime = Date.now()
 
                     const token = await getCurrentUserToken()
@@ -60,20 +60,20 @@ export function usePageVisibility() {
                     const tokenEndTime = Date.now()
                     const tokenDuration = tokenEndTime - tokenStartTime
 
-                    logger.info(`👁️ [${timestamp}] PAGE VISIBILITY: getCurrentUserToken() completed in ${tokenDuration}ms - hasToken: ${!!token}`)
+                    logger.info('AUTH', `PAGE VISIBILITY: getCurrentUserToken() completed in ${tokenDuration}ms - hasToken: ${!!token}`, { timestamp })
 
                     if (!token) {
-                        logger.warn(`�️ [${timestamp}] PAGE VISIBILITY: No valid token found after tab switch - auth may have expired`)
+                        logger.warn('AUTH', `PAGE VISIBILITY: No valid token found after tab switch - auth may have expired`, { timestamp })
                         // Don't automatically reload here - let components handle it
                     } else {
-                        logger.info(`�️ [${timestamp}] PAGE VISIBILITY: Auth token validated successfully after tab switch`)
+                        logger.info('AUTH', `PAGE VISIBILITY: Auth token validated successfully after tab switch`, { timestamp })
                     }
                 } catch (error) {
-                    logger.error(`�️ [${timestamp}] PAGE VISIBILITY: Error validating auth token after tab switch:`, error)
+                    logger.error('AUTH', `PAGE VISIBILITY: Error validating auth token after tab switch`, error, { timestamp })
                     // Token validation failed - this will trigger auth refresh in components
                 }
             } else {
-                logger.debug(`👁️ [${timestamp}] PAGE VISIBILITY: No auth validation needed - wasHidden: ${wasHidden}, isNowVisible: ${isNowVisible}`)
+                logger.debug('UI', `PAGE VISIBILITY: No auth validation needed - wasHidden: ${wasHidden}, isNowVisible: ${isNowVisible}`, { timestamp })
             }
         }
 

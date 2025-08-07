@@ -19,13 +19,13 @@ export function PostPageClient({ post, user, initialComments }: PostPageClientPr
 
   // Debug logging
   useEffect(() => {
-    logger.debug('PostPageClient mounted', { userId: user?.id, postId: post.id })
+    logger.debug('UI', 'PostPageClient mounted', { userId: user?.id, postId: post.id })
   }, [user, post])
 
   const handleLike = async (postId: string) => {
-    logger.debug('handleLike called', { userId: user?.id })
+    logger.debug('UI', 'handleLike called', { userId: user?.id })
     if (!user) {
-      logger.debug('No user, returning early')
+      logger.debug('UI', 'No user, returning early')
       return
     }
 
@@ -33,7 +33,7 @@ export function PostPageClient({ post, user, initialComments }: PostPageClientPr
       // Get current user token for authentication
       const token = await getCurrentUserToken()
       if (!token) {
-        logger.error("No authentication token available")
+        logger.error('AUTH', 'No authentication token available')
         return
       }
 
@@ -47,7 +47,7 @@ export function PostPageClient({ post, user, initialComments }: PostPageClientPr
         likes_count: result.likesCount
       }))
     } catch (error) {
-      logger.error("Error toggling like", error)
+      logger.error('API', 'Error toggling like', error)
     }
   }
 
@@ -58,7 +58,7 @@ export function PostPageClient({ post, user, initialComments }: PostPageClientPr
       // Get current user token for authentication
       const token = await getCurrentUserToken()
       if (!token) {
-        logger.error("No authentication token available")
+        logger.error('AUTH', 'No authentication token available')
         return false
       }
 
@@ -79,7 +79,7 @@ export function PostPageClient({ post, user, initialComments }: PostPageClientPr
 
       return true
     } catch (error) {
-      logger.error("Error creating comment", error)
+      logger.error('API', 'Error creating comment', error)
       return false
     }
   }

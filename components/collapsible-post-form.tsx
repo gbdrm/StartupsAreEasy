@@ -56,7 +56,7 @@ export function CollapsiblePostForm({
       setIsExpanded(false) // Only close on success
     } catch (error) {
       // Don't close the form on error - let the parent handle error display
-      logger.error("Form submission error", error)
+      logger.error('UI', 'Form submission error', error)
     }
   }
 

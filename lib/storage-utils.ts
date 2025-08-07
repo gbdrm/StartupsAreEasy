@@ -91,7 +91,10 @@ export class StorageManager {
         if (!this.listeners.has(key)) {
             this.listeners.set(key, new Set())
         }
-        this.listeners.get(key)!.add(callback)
+        const listeners = this.listeners.get(key)
+        if (listeners) {
+            listeners.add(callback)
+        }
 
         // Return cleanup function
         return () => {
@@ -144,6 +147,6 @@ const storage = StorageManager.getInstance()
 export const setStorageItem = (key: string, value: string) => storage.setItem(key, value)
 export const getStorageItem = (key: string) => storage.getItem(key)
 export const removeStorageItem = (key: string) => storage.removeItem(key)
-export const addStorageListener = (key: string, callback: (value: string | null) => void) => 
+export const addStorageListener = (key: string, callback: (value: string | null) => void) =>
     storage.addListener(key, callback)
 export const clearAuthStorage = () => storage.clearAuthStorage()

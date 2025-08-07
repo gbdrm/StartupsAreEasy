@@ -23,13 +23,13 @@ export function AuthButton() {
   // Auto-close dialog when user signs in successfully
   useEffect(() => {
     if (user && showLoginDialog) {
-      logger.info("User authenticated - closing login dialog")
+      logger.info('AUTH', 'User authenticated - closing login dialog')
       setShowLoginDialog(false)
     }
   }, [user, showLoginDialog])
 
   // Debug logging - only shows in development
-  logger.debug("AuthButton: user state", user)
+  logger.debug('UI', 'AuthButton: user state', user)
 
   if (!user) {
     return (

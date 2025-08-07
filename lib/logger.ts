@@ -4,7 +4,7 @@
  */
 
 type LogLevel = 'debug' | 'info' | 'warn' | 'error'
-type LogTag = 'BOT-AUTH' | 'AUTH' | 'API' | 'DB' | 'TELEGRAM' | 'UI' | 'SYSTEM'
+type LogTag = 'APP' | 'BOT-AUTH' | 'AUTH' | 'API' | 'DB' | 'TELEGRAM' | 'UI' | 'SYSTEM' | string
 
 interface LogConfig {
     enabled: boolean
@@ -22,7 +22,7 @@ const config: LogConfig = {
 
 const logLevels: Record<LogLevel, number> = {
     debug: 0,
-    info: 1, 
+    info: 1,
     warn: 2,
     error: 3
 }
@@ -47,32 +47,32 @@ function formatMessage(level: LogLevel, tag: LogTag, message: string): string {
 
 function formatError(error: any): { message: string; stack?: string } {
     if (!error) return { message: '' }
-    
+
     if (typeof error === 'string') {
         return { message: error }
     }
-    
+
     if (error instanceof Error) {
-        const stack = config.showFullStacks 
-            ? error.stack 
+        const stack = config.showFullStacks
+            ? error.stack
             : error.stack?.split('\n')
                 .filter(line => !line.includes('react-dom') && !line.includes('scheduler') && !line.includes('webpack'))
                 .slice(0, 2)
                 .join('\n')
-            
+
         return {
             message: error.message,
             stack: stack
         }
     }
-    
+
     return { message: String(error) }
 }
 
 export const logger = {
     debug: (tag: LogTag, message: string, context?: any) => {
         if (!shouldLog('debug')) return
-        
+
         const formatted = formatMessage('debug', tag, message)
         if (context) {
             console.groupCollapsed(`%c${formatted}`, `color: ${levelColors.debug}`)
@@ -85,7 +85,7 @@ export const logger = {
 
     info: (tag: LogTag, message: string, context?: any) => {
         if (!shouldLog('info')) return
-        
+
         const formatted = formatMessage('info', tag, message)
         if (context) {
             console.groupCollapsed(`%c${formatted}`, `color: ${levelColors.info}`)
@@ -98,7 +98,7 @@ export const logger = {
 
     warn: (tag: LogTag, message: string, context?: any) => {
         if (!shouldLog('warn')) return
-        
+
         const formatted = formatMessage('warn', tag, message)
         if (context) {
             console.groupCollapsed(`%c⚠️ ${formatted}`, `color: ${levelColors.warn}; font-weight: bold`)
@@ -111,21 +111,21 @@ export const logger = {
 
     error: (tag: LogTag, message: string, error?: any, context?: any) => {
         if (!shouldLog('error')) return
-        
+
         const formatted = formatMessage('error', tag, message)
         const { message: errorMsg, stack } = formatError(error)
-        
-        console.groupCollapsed(`%c❌ ${formatted}${errorMsg ? ': ' + errorMsg : ''}`, 
-                              `color: ${levelColors.error}; font-weight: bold`)
-        
+
+        console.groupCollapsed(`%c❌ ${formatted}${errorMsg ? ': ' + errorMsg : ''}`,
+            `color: ${levelColors.error}; font-weight: bold`)
+
         if (stack) {
             console.log('Stack:', stack)
         }
-        
+
         if (context) {
             console.log('Context:', context)
         }
-        
+
         console.groupEnd()
     },
 

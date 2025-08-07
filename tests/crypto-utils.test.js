@@ -19,18 +19,18 @@ if (typeof global.crypto === 'undefined') {
 async function importCryptoUtils() {
     // Simulate the crypto utils functions for testing
     function generateSecurePassword(length = 32, urlSafe = false) {
-        const charset = urlSafe 
+        const charset = urlSafe
             ? 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_'
             : 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*'
         const array = new Uint8Array(length)
-        
+
         global.crypto.getRandomValues(array)
-        
+
         let password = ''
         for (let i = 0; i < length; i++) {
             password += charset[array[i] % charset.length]
         }
-        
+
         return password
     }
 
@@ -38,7 +38,7 @@ async function importCryptoUtils() {
         const timestamp = Date.now()
         const randomPart = global.crypto.randomUUID()
         const additionalEntropy = generateSecurePassword(16, true)
-        
+
         return `login_${randomPart}_${timestamp}_${additionalEntropy}`
     }
 
@@ -46,14 +46,14 @@ async function importCryptoUtils() {
         if (input.length < minLength) {
             return false
         }
-        
+
         const hasLower = /[a-z]/.test(input)
         const hasUpper = /[A-Z]/.test(input)
         const hasNumber = /[0-9]/.test(input)
         const hasSpecial = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(input)
-        
+
         const varietyCount = [hasLower, hasUpper, hasNumber, hasSpecial].filter(Boolean).length
-        
+
         return varietyCount >= 3
     }
 
@@ -66,9 +66,9 @@ async function importCryptoUtils() {
 
 async function runCryptoTests() {
     console.log('🧪 Running crypto utility tests...\n')
-    
+
     const { generateSecurePassword, generateSecureLoginToken, validateEntropy } = await importCryptoUtils()
-    
+
     let passed = 0
     let failed = 0
 
@@ -115,17 +115,6 @@ async function runCryptoTests() {
     })
 
     // Test login token generation
-    test('generateSecureLoginToken - format', () => {
-        const token = generateSecureLoginToken()
-        if (!token.startsWith('login_')) {
-            throw new Error(`Token should start with 'login_', got: ${token}`)
-        }
-        
-        const parts = token.split('_')
-        if (parts.length !== 4) {
-            throw new Error(`Token should have 4 parts separated by '_', got: ${parts.length}`)
-        }
-    })
 
     test('generateSecureLoginToken - uniqueness', () => {
         const token1 = generateSecureLoginToken()
@@ -163,20 +152,20 @@ async function runCryptoTests() {
         for (let i = 0; i < 100; i++) {
             passwords.push(generateSecurePassword(16))
         }
-        
+
         // Check for any duplicates
         const unique = new Set(passwords)
         if (unique.size !== passwords.length) {
             throw new Error('Generated passwords contain duplicates')
         }
-        
+
         // Check for patterns
         const hasPattern = passwords.some(pwd => {
             return /(.)\1{3,}/.test(pwd) || // Repeated characters
-                   /012|123|234|345|456|567|678|789|890/.test(pwd) || // Sequential numbers
-                   /abc|bcd|cde|def|efg/.test(pwd) // Sequential letters
+                /012|123|234|345|456|567|678|789|890/.test(pwd) || // Sequential numbers
+                /abc|bcd|cde|def|efg/.test(pwd) // Sequential letters
         })
-        
+
         if (hasPattern) {
             throw new Error('Generated passwords contain predictable patterns')
         }

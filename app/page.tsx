@@ -59,7 +59,7 @@ export default function HomePage() {
         // The auth hook handles its own loading, we just need to wait for it
         
       } catch (error) {
-        logger.error('App initialization failed', error)
+        logger.error('APP', 'App initialization failed', error)
         stagingState.setError(error instanceof Error ? error.message : 'Initialization failed')
       }
     }
@@ -77,7 +77,7 @@ export default function HomePage() {
           stagingState.setStage('loading-posts')
           
           if (posts.length === 0 && !postsLoading) {
-            logger.info('📱 Loading initial posts')
+            logger.info('APP', '📱 Loading initial posts')
             await loadPosts()
             return // Let the next effect handle comment loading
           }
@@ -85,7 +85,7 @@ export default function HomePage() {
           stagingState.setStage('complete')
         }
       } catch (error) {
-        logger.error('Failed to load initial data', error)
+        logger.error('APP', 'Failed to load initial data', error)
         stagingState.setError(error instanceof Error ? error.message : 'Failed to load data')
       }
     }
@@ -100,11 +100,11 @@ export default function HomePage() {
         try {
           stagingState.setStage('loading-comments')
           const postIds = posts.map(p => p.id)
-          logger.info('💬 Loading comments for posts', { count: postIds.length })
+          logger.info('APP', 'Loading comments for posts', { count: postIds.length })
           await loadComments(postIds)
           stagingState.setStage('complete')
         } catch (error) {
-          logger.error('Failed to load comments', error)
+          logger.error('APP', 'Failed to load comments', error)
           stagingState.setError(error instanceof Error ? error.message : 'Failed to load comments')
         }
       }
@@ -121,7 +121,7 @@ export default function HomePage() {
         const startups = await getUserStartups(user.id)
         setUserStartups(startups)
       } catch (err) {
-        logger.error('Failed to load user startups', err)
+        logger.error('APP', 'Failed to load user startups', err)
       }
     }
     
@@ -141,11 +141,11 @@ export default function HomePage() {
           const startups = await getUserStartups(user.id)
           setUserStartups(startups)
         } catch (err) {
-          logger.error('Failed to reload user startups after creating idea', err)
+          logger.error('APP', 'Failed to reload user startups after creating idea', err)
         }
       }
     } catch (err) {
-      logger.error("Error creating post:", err)
+      logger.error('APP', 'Error creating post', err)
       
       // The API now handles all error categorization, so just pass through the message
       const errorMessage = err instanceof Error ? err.message : String(err)

@@ -25,7 +25,7 @@ export function useDataLoader() {
             const postsData = await getPostsDirect(user?.id)
             setPosts(postsData)
 
-            logger.debug('useDataLoader: Loaded posts', { count: postsData.length })
+            logger.debug('API', 'useDataLoader: Loaded posts', { count: postsData.length })
         } catch (error) {
             logger.error('useDataLoader: Error loading posts', error)
             hasLoaded.current = false // Allow retry

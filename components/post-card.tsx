@@ -189,12 +189,12 @@ function PostCardComponent({ post, comments, onLike, onComment, clickable = true
               variant="ghost"
               size="sm"
               onClick={() => {
-                logger.debug('Like button clicked', { postId: post.id, userExists: !!user })
+                logger.debug('UI', 'Like button clicked', { postId: post.id, userExists: !!user })
                 if (user) {
-                  logger.debug('Calling onLike function')
+                  logger.debug('UI', 'Calling onLike function')
                   onLike(post.id)
                 } else {
-                  logger.debug('No user, cannot like')
+                  logger.debug('UI', 'No user, cannot like')
                 }
               }}
               disabled={!user}

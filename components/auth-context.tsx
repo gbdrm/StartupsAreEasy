@@ -16,7 +16,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const auth = useSimpleAuth()
   
   // Debug logging - only shows in development
-  logger.debug("AuthProvider: auth state", auth)
+  logger.debug('AUTH', 'AuthProvider: auth state', auth)
   
   return <AuthContext.Provider value={auth}>{children}</AuthContext.Provider>
 }

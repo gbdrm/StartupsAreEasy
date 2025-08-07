@@ -26,13 +26,13 @@ function setGlobalUser(user: User | null) {
 }
 
 function setGlobalLoading(loading: boolean) {
-    logger.debug(`useSimpleAuth: Setting global loading to ${loading}`)
+    logger.debug('AUTH', `Setting global loading to ${loading}`)
     globalLoading = loading
     notifySubscribers()
 }
 
 function resetAuth() {
-    logger.debug("useSimpleAuth: Resetting auth state")
+    logger.debug('AUTH', 'Resetting auth state')
 
     // Use storage manager for consistent cleanup
     if (typeof window !== 'undefined') {
@@ -47,7 +47,7 @@ function resetAuth() {
 
 // Emergency auth reset for stuck states
 export function emergencyAuthReset() {
-    logger.warn("emergencyAuthReset: Forcing complete auth reset")
+    logger.warn('AUTH', 'Forcing complete auth reset')
     resetAuth()
 
     // Clear any remaining localStorage items
@@ -108,7 +108,7 @@ export function emergencyAuthReset() {
             return
         }
 
-        logger.debug("useSimpleAuth: Initializing auth (singleton)...")
+        logger.debug('AUTH', 'Initializing auth (singleton)')
         isAuthInitialized = true
         hasInitialized.current = true
 
@@ -117,12 +117,12 @@ export function emergencyAuthReset() {
             try {
                 // Check if we're in the middle of an auth reload
                 if (typeof window !== 'undefined' && localStorage.getItem("auth-reload-pending")) {
-                    logger.info("useSimpleAuth: Auth reload pending, waiting for page reload...")
+                    logger.info('AUTH', 'Auth reload pending, waiting for page reload')
 
                     // Failsafe: Clear the reload state after 5 seconds if page doesn't reload
                     setTimeout(() => {
                         if (localStorage.getItem("auth-reload-pending")) {
-                            logger.warn("useSimpleAuth: Reload state timeout, clearing and continuing")
+                            logger.warn('AUTH', 'Reload state timeout, clearing and continuing')
                             localStorage.removeItem("auth-reload-pending")
                             setGlobalLoading(false)
                         }
@@ -134,33 +134,33 @@ export function emergencyAuthReset() {
                     return
                 }
 
-                logger.debug("useSimpleAuth: Getting initial session...")
+                logger.debug('AUTH', 'Getting initial session')
 
                 // TEMPORARY: Skip session check only in production due to hanging issue
                 const isProduction = process.env.NODE_ENV === 'production'
                 if (isProduction) {
-                    logger.info("useSimpleAuth: Bypassing session check due to production hanging issue")
+                    logger.info('AUTH', 'Bypassing session check due to production hanging issue')
 
                     // Check if we have stored tokens from a successful login
                     const hasStoredToken = localStorage.getItem("sb-access-token")
                     const loginComplete = localStorage.getItem("telegram-login-complete")
 
                     if (hasStoredToken && loginComplete) {
-                        logger.info("useSimpleAuth: Found stored tokens, loading user profile")
+                        logger.info('AUTH', 'Found stored tokens, loading user profile')
                         try {
                             const profile = await getCurrentUser()
                             if (profile) {
-                                logger.info("useSimpleAuth: Successfully loaded profile from stored tokens")
+                                logger.info('AUTH', 'Successfully loaded profile from stored tokens')
                                 setGlobalUser(profile)
                                 setGlobalLoading(false)
                                 return
                             }
                         } catch (profileError) {
-                            logger.error("useSimpleAuth: Error loading profile from stored tokens:", profileError)
+                            logger.error('AUTH', 'Error loading profile from stored tokens', profileError)
                         }
                     }
 
-                    logger.debug("useSimpleAuth: Starting with clean auth state")
+                    logger.debug('AUTH', 'Starting with clean auth state')
                     setGlobalUser(null)
                     setGlobalLoading(false)
                     return
@@ -176,7 +176,7 @@ export function emergencyAuthReset() {
                         })
                         return await Promise.race([quickPromise, quickTimeout])
                     } catch (quickError) {
-                        logger.debug("useSimpleAuth: Quick session check failed, checking stored tokens...")
+                        logger.debug('AUTH', 'Quick session check failed, checking stored tokens')
 
                         // Immediate fallback: Check if we have valid stored tokens
                         const storedToken = localStorage.getItem("sb-access-token")
@@ -186,7 +186,7 @@ export function emergencyAuthReset() {
                                 const now = Math.floor(Date.now() / 1000)
 
                                 if (payload.exp && payload.exp > now) {
-                                    logger.info("useSimpleAuth: Using valid stored token in development")
+                                    logger.info('AUTH', 'Using valid stored token in development')
                                     const profile = await getCurrentUser()
                                     if (profile) {
                                         setGlobalUser(profile)
@@ -195,7 +195,7 @@ export function emergencyAuthReset() {
                                     }
                                 }
                             } catch (tokenError) {
-                                logger.error("useSimpleAuth: Stored token validation failed:", tokenError)
+                                logger.error('AUTH', 'Stored token validation failed', tokenError)
                             }
                         }
 
@@ -203,7 +203,7 @@ export function emergencyAuthReset() {
                     }
                 }
 
-                logger.debug("useSimpleAuth: Starting smart session check...")
+                logger.debug('AUTH', 'Starting smart session check')
                 let sessionResult
                 try {
                     const result = await getSessionWithQuickFallback()
@@ -212,7 +212,7 @@ export function emergencyAuthReset() {
                     }
                     sessionResult = result
                 } catch (timeoutError) {
-                    logger.debug("useSimpleAuth: Session check timed out, proceeding with no session")
+                    logger.debug('AUTH', 'Session check timed out, proceeding with no session')
                     setGlobalUser(null)
                     setGlobalLoading(false)
                     return
@@ -221,21 +221,21 @@ export function emergencyAuthReset() {
                 const { data: { session } } = sessionResult
 
                 if (session?.user) {
-                    logger.info("useSimpleAuth: Found existing session for user", { userId: session.user.id })
+                    logger.info('AUTH', 'Found existing session for user', { userId: session.user.id })
                     const profile = await getCurrentUser()
                     logger.debug("useSimpleAuth: Got profile", {
                         profile: profile ? `${profile.first_name} ${profile.last_name} (@${profile.username})` : 'null'
                     })
                     setGlobalUser(profile)
                 } else {
-                    logger.debug("useSimpleAuth: No existing session")
+                    logger.debug('AUTH', 'No existing session')
                     setGlobalUser(null)
                 }
             } catch (error) {
-                logger.error("useSimpleAuth: Error getting session", error)
+                logger.error('AUTH', 'Error getting session', error)
                 setGlobalUser(null)
             } finally {
-                logger.debug("useSimpleAuth: Setting loading to false")
+                logger.debug('AUTH', 'Setting loading to false')
                 setGlobalLoading(false)
             }
         })()
@@ -248,7 +248,7 @@ export function emergencyAuthReset() {
         // Failsafe: Ensure loading is set to false after maximum timeout
         const failsafeTimeout = setTimeout(() => {
             if (globalLoading) {
-                logger.warn("useSimpleAuth: Failsafe timeout - forcing loading to false")
+                logger.warn('AUTH', 'Failsafe timeout - forcing loading to false')
                 setGlobalLoading(false)
             }
         }, 10000) // 10 second maximum
@@ -257,13 +257,13 @@ export function emergencyAuthReset() {
         if (!authSubscription) {
             const { data: { subscription } } = supabase.auth.onAuthStateChange(
                 async (event, session) => {
-                    logger.info("useSimpleAuth: Auth event", { event })
+                    logger.info('AUTH', 'Auth event', { event })
 
                     if (event === 'SIGNED_OUT') {
-                        logger.info("useSimpleAuth: User signed out")
+                        logger.info('AUTH', 'User signed out')
                         resetAuth()
                     } else if (event === 'SIGNED_IN' && session?.user) {
-                        logger.info("useSimpleAuth: User signed in", {
+                        logger.info('AUTH', 'User signed in', {
                             userId: session.user.id,
                             email: session.user.email
                         })
@@ -282,19 +282,19 @@ export function emergencyAuthReset() {
                             // Note: Don't reload here - auth.ts already handles the reload
                             // This prevents double-reloading which causes auth loops
                         } catch (error) {
-                            logger.error("useSimpleAuth: Error getting profile", error)
+                            logger.error('AUTH', 'Error getting profile', error)
                             setGlobalUser(null)
                         } finally {
                             // Ensure loading is set to false after SIGNED_IN event
-                            logger.debug("useSimpleAuth: SIGNED_IN complete, setting loading to false")
+                            logger.debug('AUTH', 'SIGNED_IN complete, setting loading to false')
                             setGlobalLoading(false)
                         }
                     } else if (event === 'TOKEN_REFRESHED') {
                         // Don't change loading state for token refresh
-                        logger.debug("useSimpleAuth: Token refreshed")
+                        logger.debug('AUTH', 'Token refreshed')
                     } else {
                         // For any other event, ensure loading is false
-                        logger.debug(`useSimpleAuth: Other auth event (${event}), ensuring loading is false`)
+                        logger.debug('AUTH', `Other auth event (${event}), ensuring loading is false`)
                         setGlobalLoading(false)
                     }
                 }
@@ -304,7 +304,7 @@ export function emergencyAuthReset() {
 
         // Listen for manual signout events (since we bypass supabase.auth.signOut)
         const handleManualSignout = () => {
-            logger.info("useSimpleAuth: Manual signout event detected")
+            logger.info('AUTH', 'Manual signout event detected')
             resetAuth()
         }
         window.addEventListener('manual-signout', handleManualSignout)
@@ -317,7 +317,7 @@ export function emergencyAuthReset() {
             
             // Clean up subscription when last component unmounts
             if (subscribers.length <= 1 && authSubscription) {
-                logger.debug("useSimpleAuth: Last subscriber unmounting, cleaning up auth subscription")
+                logger.debug('AUTH', 'Last subscriber unmounting, cleaning up auth subscription')
                 authSubscription.unsubscribe()
                 authSubscription = null
                 isAuthInitialized = false
@@ -327,7 +327,7 @@ export function emergencyAuthReset() {
                     try {
                         cleanup()
                     } catch (error) {
-                        logger.warn("Error during cleanup:", error)
+                        logger.warn('AUTH', 'Error during cleanup', error)
                     }
                 })
                 cleanupCallbacks = []
@@ -337,29 +337,29 @@ export function emergencyAuthReset() {
 
 
     const logout = async () => {
-        logger.info('🚪 LOGOUT: Starting logout process...')
+        logger.info('AUTH', 'Starting logout process')
         try {
             // Set a flag to prevent page visibility from interfering
             localStorage.setItem('logout-in-progress', 'true')
-            logger.debug('🚪 LOGOUT: Set logout flag')
+            logger.debug('AUTH', 'Set logout flag')
 
-            logger.debug('🚪 LOGOUT: Calling signOut()...')
+            logger.debug('AUTH', 'Calling signOut()')
             await signOut()
-            logger.debug('🚪 LOGOUT: signOut() completed')
+            logger.debug('AUTH', 'signOut() completed')
 
-            logger.debug('🚪 LOGOUT: Calling resetAuth()...')
+            logger.debug('AUTH', 'Calling resetAuth()')
             resetAuth()
-            logger.debug('🚪 LOGOUT: resetAuth() completed')
+            logger.debug('AUTH', 'resetAuth() completed')
 
             // Force reload to ensure all state is cleared and UI updates
             if (typeof window !== 'undefined') {
-                logger.debug('🚪 LOGOUT: Triggering page reload...')
+                logger.debug('AUTH', 'Triggering page reload')
                 window.location.reload()
             }
         } catch (error) {
             // Clear the flag if logout fails
             localStorage.removeItem('logout-in-progress')
-            logger.error('🚪 LOGOUT: Logout failed:', error)
+            logger.error('AUTH', 'Logout failed', error)
             throw error
         }
     }

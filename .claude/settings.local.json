@@ -14,7 +14,9 @@
       "Bash(supabase functions deploy:*)",
       "Bash(pnpm dev:*)",
       "Bash(mkdir:*)",
-      "Bash(mv:*)"
+      "Bash(mv:*)",
+      "Bash(pnpm build:*)",
+      "Bash(pnpm lint:*)"
     ],
     "deny": []
   }

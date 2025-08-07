@@ -13,10 +13,10 @@ export type TelegramUser = {
 };
 
 export async function signOut(): Promise<void> {
-  logger.info('🚪 signOut: Starting signOut process...')
+  logger.info('AUTH', 'Starting signOut process')
 
   // Use storage manager for consistent cleanup
-  logger.debug('🚪 signOut: Clearing localStorage tokens...')
+  logger.debug('AUTH', 'Clearing localStorage tokens')
   const { clearAuthStorage, setStorageItem } = await import('./storage-utils')
   setStorageItem('logout-in-progress', 'true')
 
@@ -24,7 +24,7 @@ export async function signOut(): Promise<void> {
   const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production' || window.location.hostname !== 'localhost'
 
   if (isProduction) {
-    logger.info('🚨 PRODUCTION BYPASS: Skipping supabase.auth.signOut()')
+    logger.info('AUTH', 'PRODUCTION BYPASS: Skipping supabase.auth.signOut()')
     // Clear all auth storage using storage manager
     clearAuthStorage()
 
@@ -37,7 +37,7 @@ export async function signOut(): Promise<void> {
 
   // BYPASS: Skip supabase.auth.signOut due to hanging issues
   // Apply same bypass as getSession - Supabase auth calls are unreliable
-  logger.info('🚨 BYPASS: Skipping supabase.auth.signOut() due to hanging issues (both prod and dev)')
+  logger.info('AUTH', 'BYPASS: Skipping supabase.auth.signOut() due to hanging issues (both prod and dev)')
 
   // Clear all auth storage using storage manager
   clearAuthStorage()
@@ -48,69 +48,69 @@ export async function signOut(): Promise<void> {
     window.dispatchEvent(new CustomEvent('manual-signout', { detail: { timestamp: Date.now() } }));
   }
 
-  logger.debug('🚪 signOut: Manual signout completed successfully')
+  logger.debug('AUTH', 'Manual signout completed successfully')
 }
 
 // Token validation and utilities
 export async function getCurrentUserToken(): Promise<string | null> {
   const timestamp = new Date().toISOString()
-  logger.info(`🔍 [${timestamp}] getCurrentUserToken: Starting token retrieval`)
+  logger.info('AUTH', `[${timestamp}] getCurrentUserToken: Starting token retrieval`)
 
   try {
     // In production, read from localStorage directly
     const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production' || window.location.hostname !== 'localhost'
-    logger.debug(`🔍 [${timestamp}] getCurrentUserToken: Environment check - isProduction: ${isProduction}`)
+    logger.debug('AUTH', `[${timestamp}] getCurrentUserToken: Environment check - isProduction: ${isProduction}`)
 
     if (isProduction) {
       const token = localStorage.getItem("sb-access-token");
-      logger.info(`🔍 [${timestamp}] getCurrentUserToken: PRODUCTION BYPASS - token found: ${!!token}`)
+      logger.info('AUTH', `[${timestamp}] getCurrentUserToken: PRODUCTION BYPASS - token found: ${!!token}`)
       if (token) {
-        logger.debug('🚨 PRODUCTION BYPASS: Found token in localStorage')
+        logger.debug('AUTH', 'PRODUCTION BYPASS: Found token in localStorage')
         return token;
       }
-      logger.debug('🚨 PRODUCTION BYPASS: No token found in localStorage')
+      logger.debug('AUTH', 'PRODUCTION BYPASS: No token found in localStorage')
       return null;
     }
 
     // Development: Use proper Supabase session
-    logger.info(`🔍 [${timestamp}] getCurrentUserToken: DEVELOPMENT - calling supabase.auth.getSession()`)
+    logger.info('AUTH', `[${timestamp}] getCurrentUserToken: DEVELOPMENT - calling supabase.auth.getSession()`)
     const sessionStartTime = Date.now()
 
     const { data, error } = await supabase.auth.getSession();
     const sessionEndTime = Date.now()
     const sessionDuration = sessionEndTime - sessionStartTime
 
-    logger.info(`🔍 [${timestamp}] getCurrentUserToken: getSession completed in ${sessionDuration}ms`)
+    logger.info('AUTH', `[${timestamp}] getCurrentUserToken: getSession completed in ${sessionDuration}ms`)
 
     if (error) {
-      logger.error(`🔍 [${timestamp}] getCurrentUserToken: Error getting current session:`, error);
+      logger.error('AUTH', `[${timestamp}] getCurrentUserToken: Error getting current session`, error);
       return null;
     }
 
     const token = data.session?.access_token;
-    logger.info(`🔍 [${timestamp}] getCurrentUserToken: Session result - hasSession: ${!!data.session}, hasToken: ${!!token}`)
-    logger.debug('getCurrentUserToken result:', { hasToken: !!token });
+    logger.info('AUTH', `[${timestamp}] getCurrentUserToken: Session result - hasSession: ${!!data.session}, hasToken: ${!!token}`)
+    logger.debug('AUTH', 'getCurrentUserToken result', { hasToken: !!token });
     return token || null;
   } catch (error) {
-    logger.error(`🔍 [${timestamp}] getCurrentUserToken: EXCEPTION caught:`, error);
+    logger.error('AUTH', `[${timestamp}] getCurrentUserToken: EXCEPTION caught`, error);
     return null;
   }
 }
 
 export async function getCurrentUser(): Promise<User | null> {
-  logger.debug('getCurrentUser called')
+  logger.debug('AUTH', 'getCurrentUser called')
 
   try {
     // In production, bypass Supabase and use localStorage
     const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production' || window.location.hostname !== 'localhost'
 
     if (isProduction) {
-      logger.info('🚨 PRODUCTION BYPASS: getCurrentUser bypassing Supabase')
+      logger.info('AUTH', 'PRODUCTION BYPASS: getCurrentUser bypassing Supabase')
 
       // Check if we have stored tokens
       const hasToken = localStorage.getItem("sb-access-token");
       if (!hasToken) {
-        logger.debug('🚨 PRODUCTION BYPASS: No access token found')
+        logger.debug('AUTH', 'PRODUCTION BYPASS: No access token found')
         return null;
       }
 
@@ -119,21 +119,21 @@ export async function getCurrentUser(): Promise<User | null> {
       if (cachedUser) {
         try {
           const user = JSON.parse(cachedUser);
-          logger.debug('🚨 PRODUCTION BYPASS: Returning cached user')
+          logger.debug('AUTH', 'PRODUCTION BYPASS: Returning cached user')
           return user;
         } catch (e) {
-          logger.debug('🚨 PRODUCTION BYPASS: Failed to parse cached user')
+          logger.debug('AUTH', 'PRODUCTION BYPASS: Failed to parse cached user')
         }
       }
 
-      logger.debug('🚨 PRODUCTION BYPASS: No cached user, returning null (auth hook will handle)')
+      logger.debug('AUTH', 'PRODUCTION BYPASS: No cached user, returning null (auth hook will handle)')
       return null;
     }
 
     // Development: Use proper Supabase authentication
     const { data: userData, error: userError } = await supabase.auth.getUser();
     if (userError || !userData?.user) {
-      logger.debug('No authenticated user:', userError?.message);
+      logger.debug('AUTH', 'No authenticated user', userError);
       return null;
     }
 
@@ -144,7 +144,7 @@ export async function getCurrentUser(): Promise<User | null> {
       .single();
 
     if (profileError || !profile) {
-      logger.error('Profile fetch failed:', profileError);
+      logger.error('AUTH', 'Profile fetch failed', profileError);
       return null;
     }
 
@@ -162,21 +162,21 @@ export async function getCurrentUser(): Promise<User | null> {
       joined_at: profile.created_at
     };
 
-    logger.debug('getCurrentUser success:', { userId: user.id, username: user.username });
+    logger.debug('AUTH', 'getCurrentUser success', { userId: user.id, username: user.username });
     return user;
   } catch (error) {
-    logger.error('getCurrentUser error:', error);
+    logger.error('AUTH', 'getCurrentUser error', error);
     return null;
   }
 }
 
 export async function refreshAuthSession(): Promise<boolean> {
-  logger.debug('refreshAuthSession called');
+  logger.debug('AUTH', 'refreshAuthSession called');
 
   const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production' || window.location.hostname !== 'localhost'
 
   if (isProduction) {
-    logger.info('🚨 PRODUCTION BYPASS: Skipping session refresh')
+    logger.info('AUTH', 'PRODUCTION BYPASS: Skipping session refresh')
     return false;
   }
 
@@ -184,19 +184,19 @@ export async function refreshAuthSession(): Promise<boolean> {
   try {
     const { data, error } = await supabase.auth.refreshSession();
     if (error) {
-      logger.error('Session refresh failed:', error);
+      logger.error('AUTH', 'Session refresh failed', error);
       return false; // Return false to indicate failure
     }
-    logger.debug('Session refreshed successfully');
+    logger.debug('AUTH', 'Session refreshed successfully');
     return true; // Return true to indicate success
   } catch (error) {
-    logger.error('refreshAuthSession error:', error);
+    logger.error('AUTH', 'refreshAuthSession error', error);
     return false;
   }
 }
 
 export async function handleAuthError(error: any): Promise<boolean> {
-  logger.debug('handleAuthError called', { error });
+  logger.debug('AUTH', 'handleAuthError called', { error });
 
   // Check if this is an auth-related error
   if (
@@ -206,7 +206,7 @@ export async function handleAuthError(error: any): Promise<boolean> {
     error?.message?.includes('unauthorized') ||
     error?.message?.includes('Unauthorized')
   ) {
-    logger.info('🔧 Auth error detected, attempting recovery');
+    logger.info('AUTH', 'Auth error detected, attempting recovery');
 
     try {
       // Try to refresh the session first
@@ -221,14 +221,14 @@ export async function handleAuthError(error: any): Promise<boolean> {
         if (userConfirmed) {
           window.location.reload();
         } else {
-          logger.info('User declined page reload for auth recovery');
+          logger.info('AUTH', 'User declined page reload for auth recovery');
           return false; // User declined, don't handle the error
         }
       }
 
       return true; // Indicate we handled the error
     } catch (refreshError) {
-      logger.error('Auth recovery failed:', refreshError);
+      logger.error('AUTH', 'Auth recovery failed', refreshError);
       
       // Ask user before forcing reload as last resort
       const userConfirmed = confirm(
@@ -246,18 +246,18 @@ export async function handleAuthError(error: any): Promise<boolean> {
 }
 
 export async function validateAuthState(): Promise<boolean> {
-  logger.debug('validateAuthState called');
+  logger.debug('AUTH', 'validateAuthState called');
 
   try {
     const token = await getCurrentUserToken();
     const user = await getCurrentUser();
 
     const isValid = !!(token && user);
-    logger.debug('Auth state validation:', { hasToken: !!token, hasUser: !!user, isValid });
+    logger.debug('AUTH', 'Auth state validation', { hasToken: !!token, hasUser: !!user, isValid });
 
     return isValid;
   } catch (error) {
-    logger.error('validateAuthState error:', error);
+    logger.error('AUTH', 'validateAuthState error', error);
     return false;
   }
 }
