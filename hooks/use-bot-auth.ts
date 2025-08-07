@@ -5,6 +5,7 @@ import { useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
 import { generateSecureLoginToken } from '@/lib/crypto-utils';
+import { getCurrentUser } from '@/lib/auth';
 
 interface AuthState {
     isLoading: boolean;

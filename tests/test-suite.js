@@ -5,6 +5,8 @@ const fs = require('fs');
 const path = require('path');
 const { runCryptoTests } = require('./crypto-utils.test.js');
 const { runApiSecurityTests } = require('./api-security.test.js');
+const { runAuthFlowTests } = require('./auth-flow.test.js');
+const { runApiEndpointsTests } = require('./api-endpoints.test.js');
 
 // Load environment variables from .env.local
 const envPath = path.join(process.cwd(), '.env.local');
@@ -210,8 +212,18 @@ async function runTests() {
     const securitySuccess = await runApiSecurityTests()
     
     if (!cryptoSuccess || !securitySuccess) {
-        console.log('❌ Security tests failed - aborting integration tests')
+        console.log('❌ Security tests failed - aborting other tests')
         process.exit(1)
+    }
+    
+    // Run authentication flow tests
+    const authSuccess = await runAuthFlowTests()
+    
+    // Run API endpoints tests
+    const apiSuccess = await runApiEndpointsTests()
+    
+    if (!authSuccess || !apiSuccess) {
+        console.log('❌ Some test suites failed')
     }
     
     console.log('\n🌐 Running Integration Tests...')

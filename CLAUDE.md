@@ -105,3 +105,54 @@ NEXT_PUBLIC_DEV_PASSWORD=secure-dev-password
 - Make API calls in loops (causes N+1 problems)
 - Bypass RLS by using service role key in client code
 - Add SSR or server components (keep client-side only)
+
+## 🚀 Claude Code Efficiency Guidelines
+
+**MANDATORY: Always run build/tests before completing work**
+- Run `npx tsc --noEmit` to check TypeScript errors quickly
+- Run `pnpm lint` to catch ESLint issues  
+- Run `npm test` to verify functionality
+- Only mark work complete after all checks pass
+
+**Systematic Debugging Approach:**
+1. **Import Analysis**: When adding function calls, systematically check all imports in the file
+2. **Pattern Matching**: If fixing one file, search for similar patterns in other files using Grep
+3. **Error Cascade**: Fix errors in dependency order (types → imports → logic)
+4. **Verification**: Test fixes immediately, don't batch multiple changes
+
+**Common Issue Patterns to Check:**
+- Logger calls missing tag parameter: `logger.error('message', error)` → `logger.error('TAG', 'message', error)`
+- Missing imports when adding new function calls
+- Response body cloning for cached API calls to prevent "stream already read" errors
+- Production vs development environment detection in auth flows
+
+**Debugging Production Issues:**
+- Check production bypasses in auth system for token storage issues
+- Look for "body stream already read" errors in concurrent API calls
+- Verify localStorage token storage for production authentication
+- Use `/diagnostics` page for step-by-step debugging
+
+**Testing Strategy:**
+- Add comprehensive test coverage for new features
+- Include edge cases and error scenarios
+- Test authentication flows with production bypasses
+- Verify API response caching and deduplication
+- Mock external services for reliable testing
+
+**Performance Considerations:**
+- Use `logger.time()` and `logger.timeEnd()` for performance monitoring
+- Implement response caching with proper cloning
+- Use bulk API calls to prevent N+1 queries
+- Monitor response times in test suite
+
+**Build Process Optimization:**
+- Clean `.next` directory if permission issues arise
+- Use TypeScript compilation separate from Next.js build for faster error checking
+- Address ESLint configuration conflicts early
+- Ensure all dependencies are properly installed
+
+**Documentation Updates:**
+- Update this file with new patterns and solutions discovered
+- Document production-specific configurations
+- Record common debugging approaches
+- Note architectural decisions and their reasoning
