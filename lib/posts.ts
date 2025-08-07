@@ -5,7 +5,7 @@ import type { Post, Comment, PostType } from "./types"
 // Simple REST API version for posts to avoid auth conflicts
 export async function getPostsSimple(userId?: string): Promise<Post[]> {
   try {
-    logger.debug("getPostsSimple: Starting direct REST API call...")
+    logger.debug('API', 'getPostsSimple: Starting direct REST API call...')
 
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
     const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -26,7 +26,7 @@ export async function getPostsSimple(userId?: string): Promise<Post[]> {
     }
 
     const posts = await response.json()
-    logger.debug("getPostsSimple: Loaded posts", { count: posts.length })
+    logger.debug('API', 'getPostsSimple: Loaded posts', { count: posts.length })
 
     // For now, return simplified posts without complex joins
     return posts.map((post: any) => ({
@@ -47,7 +47,7 @@ export async function getPostsSimple(userId?: string): Promise<Post[]> {
       liked_by_user: false,
     })) as Post[]
   } catch (error) {
-    logger.error("Error fetching posts (simple)", error)
+    logger.error('API', 'Error fetching posts (simple)', error)
     throw error
   }
 }
@@ -85,7 +85,7 @@ export async function getPosts(userId?: string) {
       liked_by_user: post.liked_by_user,
     })) as Post[]
   } catch (error) {
-    logger.error("Error fetching posts", error)
+    logger.error('API', 'Error fetching posts', error)
     // Fall back to basic query if RPC fails
     return await getPostsBasic(userId)
   }
@@ -178,7 +178,7 @@ export async function createPost(data: {
     if (error) throw error
     return post
   } catch (error) {
-    logger.error("Error creating post", error)
+    logger.error('API', 'Error creating post', error)
     throw error
   }
 }
@@ -210,7 +210,7 @@ export async function toggleLike(postId: string, userId: string) {
       return true
     }
   } catch (error) {
-    logger.error("Error toggling like", error)
+    logger.error('API', 'Error toggling like', error)
     throw error
   }
 }
@@ -261,7 +261,7 @@ export async function getComments(postId: string) {
       }
     }) as Comment[]
   } catch (error) {
-    logger.error("Error fetching comments", error)
+    logger.error('API', 'Error fetching comments', error)
     throw error
   }
 }
@@ -285,7 +285,7 @@ export async function createComment(data: {
     if (error) throw error
     return comment
   } catch (error) {
-    logger.error("Error creating comment", error)
+    logger.error('API', 'Error creating comment', error)
     throw error
   }
 }
@@ -337,7 +337,7 @@ export async function getPostById(postId: string, userId?: string): Promise<Post
       } : null,
     } as Post
   } catch (error) {
-    logger.error("Error fetching post by ID", error)
+    logger.error('API', 'Error fetching post by ID', error)
     // Fall back to basic query if RPC fails
     return await getPostByIdBasic(postId, userId)
   }
@@ -451,7 +451,7 @@ export async function getPostsByType(postType: PostType, userId?: string) {
       } : null,
     })) as Post[]
   } catch (error) {
-    logger.error("Error fetching posts by type", error)
+    logger.error('API', 'Error fetching posts by type', error)
     // Fall back to basic query if RPC fails
     return await getPostsByTypeBasic(postType, userId)
   }

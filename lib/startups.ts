@@ -3,11 +3,11 @@ import { logger } from "./logger"
 import type { Startup, StartupStage, User } from "./types"
 
 export async function getStartups(userId?: string): Promise<Startup[]> {
-    logger.info("getStartups: Starting database query...")
+    logger.info('API', 'getStartups: Starting database query...')
 
     try {
         // Use direct REST API approach to bypass auth client conflicts
-        logger.info("getStartups: Using direct REST API approach...")
+        logger.info('API', 'getStartups: Using direct REST API approach...')
 
         const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
         const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -25,20 +25,20 @@ export async function getStartups(userId?: string): Promise<Startup[]> {
             }
         })
 
-        logger.debug("getStartups: HTTP response status:", response.status)
+        logger.debug('API', 'getStartups: HTTP response status:', response.status)
 
         if (!response.ok) {
             const errorText = await response.text()
-            logger.error("getStartups: HTTP error:", errorText)
+            logger.error('API', 'getStartups: HTTP error:', errorText)
             throw new Error(`HTTP ${response.status}: ${errorText}`)
         }
 
         const data = await response.json()
-        logger.info(`getStartups: Successfully loaded ${data.length} startups`)
+        logger.info('API', `getStartups: Successfully loaded ${data.length} startups`)
 
         return data || []
     } catch (err) {
-        logger.error("getStartups: Exception caught:", err)
+        logger.error('API', 'getStartups: Exception caught:', err)
         throw err
     }
 }
@@ -52,7 +52,7 @@ export async function getStartupsByStage(stage: StartupStage): Promise<Startup[]
         .order("created_at", { ascending: false })
 
     if (error) {
-        logger.error("Error fetching startups by stage:", error)
+        logger.error('API', 'Error fetching startups by stage:', error)
         throw error
     }
 
@@ -67,7 +67,7 @@ export async function getUserStartups(userId: string): Promise<Startup[]> {
         .order("created_at", { ascending: false })
 
     if (error) {
-        logger.error("Error fetching user startups:", error)
+        logger.error('API', 'Error fetching user startups:', error)
         throw error
     }
 
@@ -112,7 +112,7 @@ export async function updateStartup(
         .single()
 
     if (error) {
-        logger.error("Error updating startup:", error)
+        logger.error('API', 'Error updating startup:', error)
         throw error
     }
 
@@ -126,7 +126,7 @@ export async function deleteStartup(startupId: string): Promise<void> {
         .eq("id", startupId)
 
     if (error) {
-        logger.error("Error deleting startup:", error)
+        logger.error('API', 'Error deleting startup:', error)
         throw error
     }
 }
@@ -143,7 +143,7 @@ export async function getStartupBySlug(slug: string): Promise<Startup | null> {
         if (error.code === "PGRST116") {
             return null // Not found
         }
-        logger.error("Error fetching startup by slug:", error)
+        logger.error('API', 'Error fetching startup by slug:', error)
         throw error
     }
 

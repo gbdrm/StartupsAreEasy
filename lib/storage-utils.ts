@@ -47,7 +47,7 @@ export class StorageManager {
                 try {
                     callback(event.newValue)
                 } catch (error) {
-                    logger.error(`Error in storage listener for ${event.key}:`, error)
+                    logger.error('UI', `Error in storage listener for ${event.key}:`, error)
                 }
             })
         }
@@ -59,9 +59,9 @@ export class StorageManager {
             // Suppress the storage event for this tab since we're the source
             this.suppressNextEvent.add(key)
             localStorage.setItem(key, value)
-            logger.debug(`Storage: Set ${key}`)
+            logger.debug('UI', `Storage: Set ${key}`)
         } catch (error) {
-            logger.error(`Storage: Failed to set ${key}:`, error)
+            logger.error('UI', `Storage: Failed to set ${key}:`, error)
         }
     }
 
@@ -70,7 +70,7 @@ export class StorageManager {
         try {
             return localStorage.getItem(key)
         } catch (error) {
-            logger.error(`Storage: Failed to get ${key}:`, error)
+            logger.error('UI', `Storage: Failed to get ${key}:`, error)
             return null
         }
     }
@@ -80,9 +80,9 @@ export class StorageManager {
         try {
             this.suppressNextEvent.add(key)
             localStorage.removeItem(key)
-            logger.debug(`Storage: Removed ${key}`)
+            logger.debug('UI', `Storage: Removed ${key}`)
         } catch (error) {
-            logger.error(`Storage: Failed to remove ${key}:`, error)
+            logger.error('UI', `Storage: Failed to remove ${key}:`, error)
         }
     }
 
@@ -122,7 +122,7 @@ export class StorageManager {
             }
         })
 
-        logger.info('Storage: Cleared all auth-related storage')
+        logger.info('UI', 'Storage: Cleared all auth-related storage')
     }
 
     // Check if storage is available

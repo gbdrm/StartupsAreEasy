@@ -122,7 +122,7 @@ export default function IdeasPage() {
       const startups = await getUserStartups(currentUser.id)
       setUserStartups(startups)
     } catch (err) {
-      logger.error("Error loading user startups for ideas page:", err)
+      logger.error('API', 'Error loading user startups for ideas page:', err)
     }
   }
 
@@ -147,7 +147,7 @@ export default function IdeasPage() {
       // Reload user startups in case new ones were created
       await loadUserStartups()
     } catch (err) {
-      logger.error("Error creating idea post:", err)
+      logger.error('API', 'Error creating idea post:', err)
       setError("Failed to create idea. Please try again.")
     } finally {
       setIsCreatingPost(false)
