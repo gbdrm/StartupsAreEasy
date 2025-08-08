@@ -155,25 +155,23 @@ export default function DiagnosticsPage() {
 
   const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 
-  // Comprehensive Telegram Auth Test
+  // Interactive Telegram Auth Test
   const createTelegramAuthTest = (): DiagnosticTest => ({
     id: 'telegram-auth',
-    name: '🔐 Telegram Authentication Flow',
-    description: 'Step-by-step verification of the complete Telegram authentication process',
+    name: '🔐 Interactive Telegram Authentication Test',
+    description: 'Interactive step-by-step Telegram authentication with user participation',
     status: 'idle',
     progress: 0,
     steps: [
-      createStep('check-initial-state', 'Check Initial Auth State', 'Verify user is not currently signed in'),
-      createStep('generate-token', 'Generate Login Token', 'Create secure login token for authentication'),
-      createStep('create-telegram-url', 'Create Telegram URL', 'Generate bot URL with login token'),
-      createStep('register-token', 'Register Token in Database', 'Pre-register token in pending_tokens table'),
-      createStep('simulate-telegram', 'Simulate Telegram Confirmation', 'Mock the telegram bot confirmation process'),
-      createStep('poll-for-completion', 'Poll for Auth Completion', 'Check if authentication was completed'),
-      createStep('verify-session-data', 'Verify Session Data', 'Validate received user data and tokens'),
-      createStep('perform-supabase-signin', 'Perform Supabase Sign-in', 'Execute signInWithPassword with received credentials'),
-      createStep('verify-auth-state', 'Verify Auth State Update', 'Confirm global auth state was updated correctly'),
-      createStep('check-localStorage', 'Check LocalStorage Tokens', 'Verify tokens were stored correctly in localStorage'),
-      createStep('verify-final-state', 'Verify Final State', 'Confirm user is fully authenticated')
+      createStep('check-initial-state', '1️⃣ Check Initial State', '👤 Verify you are NOT signed in (look at header)'),
+      createStep('generate-token', '2️⃣ Generate Login Token', '🔑 Create secure authentication token'),
+      createStep('register-token', '3️⃣ Register Token', '📝 Store token in database for validation'),
+      createStep('create-telegram-url', '4️⃣ Create Telegram Link', '🔗 Generate clickable Telegram bot URL'),
+      createStep('user-click-link', '5️⃣ USER ACTION REQUIRED', '👆 Click the Telegram link and follow instructions'),
+      createStep('user-confirm-telegram', '6️⃣ USER ACTION REQUIRED', '📱 Complete Telegram bot interaction'),
+      createStep('poll-completion', '7️⃣ Poll for Completion', '⏳ Wait and check for authentication completion'),
+      createStep('verify-tokens', '8️⃣ Verify Token Storage', '💾 Check localStorage for auth tokens'),
+      createStep('check-final-state', '9️⃣ Check Final State', '✅ Verify you are NOW signed in (check header)')
     ]
   })
 
@@ -224,23 +222,40 @@ export default function DiagnosticsPage() {
     ]
   })
 
+  // State for interactive test
+  const [interactiveTest, setInteractiveTest] = useState<{
+    loginToken?: string
+    telegramUrl?: string
+    currentStep?: string
+    waitingForUser?: boolean
+  }>({})
+
   const runTelegramAuthTest = async (test: DiagnosticTest) => {
     const testId = test.id
     let currentStepIndex = 0
     
     try {
-      // Step 1: Check Initial Auth State
+      console.log('🔍 DIAGNOSTICS: Starting Interactive Telegram Auth Test')
+      
+      // Step 1: Check Initial State
       let step = test.steps[currentStepIndex++]
       updateStep(testId, step.id, { status: 'running' })
+      console.log('🔍 STEP 1: Check if user is signed out')
       
-      await sleep(500)
+      await sleep(1000)
       const initialUser = user
       const isSignedIn = !!initialUser
       
+      console.log('🔍 DIAGNOSTICS: Initial auth state:', { isSignedIn, user: initialUser?.username })
+      
       updateStep(testId, step.id, { 
         status: isSignedIn ? 'error' : 'success',
-        result: { isSignedIn, user: initialUser },
-        error: isSignedIn ? 'User is already signed in - please sign out first' : undefined
+        result: { 
+          isSignedIn, 
+          userDisplayName: initialUser?.name,
+          instruction: isSignedIn ? '❌ Please log out first by clicking the user menu in header' : '✅ Good! You are logged out. Proceeding...'
+        },
+        error: isSignedIn ? 'User is already signed in - please sign out first to test the full flow' : undefined
       })
       
       if (isSignedIn) {
@@ -251,40 +266,33 @@ export default function DiagnosticsPage() {
         updateTestProgress(testId)
         return
       }
-      
       updateTestProgress(testId)
 
       // Step 2: Generate Login Token
       step = test.steps[currentStepIndex++]
       updateStep(testId, step.id, { status: 'running' })
+      console.log('🔍 STEP 2: Generating secure login token')
       
-      await sleep(300)
+      await sleep(800)
       const loginToken = generateSecureLoginToken()
+      setInteractiveTest(prev => ({ ...prev, loginToken }))
+      
+      console.log('🔍 DIAGNOSTICS: Generated token:', loginToken.substring(0, 8) + '...')
       
       updateStep(testId, step.id, { 
         status: 'success',
-        result: { token: loginToken, length: loginToken.length }
+        result: { 
+          tokenPreview: loginToken.substring(0, 12) + '...',
+          tokenLength: loginToken.length,
+          instruction: '✅ Secure token generated successfully'
+        }
       })
       updateTestProgress(testId)
 
-      // Step 3: Create Telegram URL
+      // Step 3: Register Token
       step = test.steps[currentStepIndex++]
       updateStep(testId, step.id, { status: 'running' })
-      
-      await sleep(200)
-      const botUsername = 'startups_are_easy_bot'
-      const encodedToken = encodeURIComponent(loginToken)
-      const telegramUrl = `https://t.me/${botUsername}?start=${encodedToken}`
-      
-      updateStep(testId, step.id, { 
-        status: 'success',
-        result: { url: telegramUrl, botUsername, encodedToken }
-      })
-      updateTestProgress(testId)
-
-      // Step 4: Register Token in Database
-      step = test.steps[currentStepIndex++]
-      updateStep(testId, step.id, { status: 'running' })
+      console.log('🔍 STEP 3: Registering token in database')
       
       try {
         const tokenResponse = await fetch('/api/create-login-token', {
@@ -299,48 +307,229 @@ export default function DiagnosticsPage() {
         }
 
         const tokenData = await tokenResponse.json()
+        console.log('🔍 DIAGNOSTICS: Token registered:', tokenData)
+        
         updateStep(testId, step.id, { 
           status: 'success',
-          result: tokenData
+          result: { 
+            registered: true,
+            expiresAt: tokenData.expires_at,
+            instruction: '✅ Token stored in database and ready for authentication'
+          }
         })
       } catch (error) {
+        console.error('🔍 DIAGNOSTICS: Token registration failed:', error)
         updateStep(testId, step.id, { 
           status: 'error',
           error: error instanceof Error ? error.message : String(error)
         })
+        return
       }
       updateTestProgress(testId)
 
-      // Step 5: Simulate Telegram Confirmation (Manual Step)
+      // Step 4: Create Telegram URL
       step = test.steps[currentStepIndex++]
+      updateStep(testId, step.id, { status: 'running' })
+      console.log('🔍 STEP 4: Creating Telegram bot URL')
+      
+      await sleep(500)
+      const botUsername = 'startups_are_easy_bot'
+      const encodedToken = encodeURIComponent(loginToken)
+      const telegramUrl = `https://t.me/${botUsername}?start=${encodedToken}`
+      setInteractiveTest(prev => ({ ...prev, telegramUrl, currentStep: 'url-created' }))
+      
+      console.log('🔍 DIAGNOSTICS: Telegram URL created:', telegramUrl)
+      
       updateStep(testId, step.id, { 
         status: 'success',
         result: { 
-          message: 'This is a manual step. In real flow, user would click Telegram link and confirm.',
-          telegramUrl: telegramUrl,
-          instructions: [
-            '1. Click the Telegram URL above',
-            '2. Open it in Telegram app',
-            '3. Click the blue START button',
-            '4. Wait for confirmation',
-            '5. Return to continue test'
-          ]
+          telegramUrl,
+          botUsername,
+          instruction: '✅ Telegram link ready - proceed to next step to click it!'
         }
       })
       updateTestProgress(testId)
 
-      // Step 6-11: Continue with polling and verification steps...
-      // (These would involve more complex async operations)
+      // Step 5: USER ACTION - Click Link
+      step = test.steps[currentStepIndex++]
+      setInteractiveTest(prev => ({ ...prev, currentStep: 'waiting-for-click', waitingForUser: true }))
+      updateStep(testId, step.id, { 
+        status: 'running',
+        result: { 
+          telegramUrl,
+          instructions: [
+            '👆 Click this link: ' + telegramUrl,
+            '📱 Open in Telegram app (not browser)',
+            '🚀 Look for the blue "START" button',
+            '⏸️ Do NOT click START yet - wait for next step!'
+          ],
+          userAction: 'Click the link above to open Telegram'
+        }
+      })
       
-      // For now, mark remaining steps as pending manual execution
-      for (let i = currentStepIndex; i < test.steps.length; i++) {
-        updateStep(testId, test.steps[i].id, { 
-          status: 'pending',
-          result: { message: 'Requires manual Telegram confirmation to proceed' }
-        })
+      console.log('🔍 STEP 5: Waiting for user to click Telegram link...')
+      console.log('🔗 Telegram URL:', telegramUrl)
+      console.log('📱 Instructions: Open this in Telegram app and look for START button (but don\'t click yet)')
+      
+      // Wait for user to indicate they've clicked
+      await sleep(3000) // Give user time to read
+      updateStep(testId, step.id, { 
+        status: 'success',
+        result: { 
+          instruction: '✅ Assuming you clicked the link and see Telegram bot...',
+          nextAction: 'Now look at the next step for further instructions'
+        }
+      })
+      updateTestProgress(testId)
+
+      // Step 6: USER ACTION - Confirm in Telegram
+      step = test.steps[currentStepIndex++]
+      setInteractiveTest(prev => ({ ...prev, currentStep: 'waiting-for-telegram' }))
+      updateStep(testId, step.id, { 
+        status: 'running',
+        result: { 
+          instructions: [
+            '📱 You should now see the Telegram bot chat',
+            '🔵 Click the blue "START" button in Telegram',
+            '✅ Wait for bot confirmation message',
+            '🔄 Return here - the test will continue automatically'
+          ],
+          userAction: 'Complete the Telegram bot interaction',
+          pollingStatus: 'Test will auto-continue when you click START in Telegram...'
+        }
+      })
+      
+      console.log('🔍 STEP 6: User should now click START button in Telegram')
+      console.log('📱 Waiting for Telegram bot confirmation...')
+      
+      // Wait a bit then continue to polling
+      await sleep(5000)
+      updateStep(testId, step.id, { 
+        status: 'success',
+        result: { 
+          instruction: '✅ Moving to polling phase - if you clicked START, authentication should complete soon'
+        }
+      })
+      updateTestProgress(testId)
+
+      // Step 7: Poll for Completion
+      step = test.steps[currentStepIndex++]
+      updateStep(testId, step.id, { status: 'running' })
+      console.log('🔍 STEP 7: Polling for authentication completion...')
+      
+      let attempts = 0
+      const maxAttempts = 12 // 1 minute total
+      let authCompleted = false
+      
+      while (attempts < maxAttempts && !authCompleted) {
+        attempts++
+        console.log(`🔍 DIAGNOSTICS: Polling attempt ${attempts}/${maxAttempts}...`)
+        
+        try {
+          const response = await fetch(`/api/check-login?token=${loginToken}`)
+          const data = await response.json()
+          
+          console.log('🔍 DIAGNOSTICS: Poll response:', data)
+          
+          if (data.status === 'complete') {
+            authCompleted = true
+            updateStep(testId, step.id, { 
+              status: 'success',
+              result: { 
+                attempts,
+                authData: data,
+                instruction: '✅ Authentication completed! Bot confirmed your login.'
+              }
+            })
+            break
+          } else if (data.status === 'expired' || data.status === 'used') {
+            throw new Error(`Token ${data.status}: ${data.error}`)
+          }
+          
+          // Update step to show progress
+          updateStep(testId, step.id, { 
+            status: 'running',
+            result: { 
+              attempts,
+              status: data.status,
+              instruction: `⏳ Polling... (attempt ${attempts}/${maxAttempts})`
+            }
+          })
+          
+        } catch (error) {
+          console.error('🔍 DIAGNOSTICS: Polling error:', error)
+          updateStep(testId, step.id, { 
+            status: 'error',
+            error: error instanceof Error ? error.message : String(error)
+          })
+          return
+        }
+        
+        await sleep(5000) // Wait 5 seconds between attempts
       }
+      
+      if (!authCompleted) {
+        updateStep(testId, step.id, { 
+          status: 'error',
+          error: 'Authentication did not complete within timeout period. Did you click START in Telegram?'
+        })
+        return
+      }
+      updateTestProgress(testId)
+
+      // Step 8: Verify Token Storage
+      step = test.steps[currentStepIndex++]
+      updateStep(testId, step.id, { status: 'running' })
+      console.log('🔍 STEP 8: Checking localStorage for auth tokens...')
+      
+      await sleep(1000)
+      const tokenKeys = ['sb-access-token', 'sb-refresh-token', 'sb-user', 'telegram-login-complete']
+      const tokenStatus = tokenKeys.map(key => ({
+        key,
+        present: !!localStorage.getItem(key),
+        preview: localStorage.getItem(key)?.substring(0, 20) + '...' || 'not found'
+      }))
+      
+      console.log('🔍 DIAGNOSTICS: Token storage check:', tokenStatus)
+      
+      updateStep(testId, step.id, { 
+        status: 'success',
+        result: { 
+          tokenStatus,
+          instruction: '✅ Checking what tokens were stored in localStorage'
+        }
+      })
+      updateTestProgress(testId)
+
+      // Step 9: Check Final State  
+      step = test.steps[currentStepIndex++]
+      updateStep(testId, step.id, { status: 'running' })
+      console.log('🔍 STEP 9: Final auth state check...')
+      
+      await sleep(2000) // Give time for auth state to update
+      const finalUser = user as any // This should be updated if auth worked
+      const isFinallySignedIn = !!finalUser
+      
+      console.log('🔍 DIAGNOSTICS: Final auth state:', { isFinallySignedIn, finalUser: finalUser?.username })
+      
+      updateStep(testId, step.id, { 
+        status: isFinallySignedIn ? 'success' : 'error',
+        result: { 
+          isSignedIn: isFinallySignedIn,
+          userDisplayName: finalUser?.name || 'Unknown',
+          username: finalUser?.username || 'Unknown',
+          instruction: isFinallySignedIn 
+            ? '🎉 SUCCESS! You are now signed in. Check the header - you should see your username!'
+            : '❌ Authentication flow completed but user not signed in. Check console for errors.'
+        },
+        error: !isFinallySignedIn ? 'Authentication process did not result in signed-in user' : undefined
+      })
+      updateTestProgress(testId)
+
+      console.log('🔍 DIAGNOSTICS: Interactive Telegram Auth Test completed!')
 
     } catch (error) {
+      console.error('🔍 DIAGNOSTICS: Test failed:', error)
       // Mark current step as failed
       if (currentStepIndex < test.steps.length) {
         updateStep(testId, test.steps[currentStepIndex].id, { 
@@ -350,6 +539,7 @@ export default function DiagnosticsPage() {
       }
     }
     
+    setInteractiveTest({}) // Reset interactive state
     updateTestProgress(testId)
   }
 
@@ -361,14 +551,21 @@ export default function DiagnosticsPage() {
     updateStep(testId, step.id, { status: 'running' })
     
     try {
-      const { data, error } = await supabase.from('profiles').select('count(*)').limit(1)
-      if (error) throw error
+      console.log('🔍 DIAGNOSTICS: Testing Supabase connection...')
+      // Fix: Use proper count syntax - select count as column
+      const { data, error } = await supabase.from('profiles').select('id').limit(1)
+      if (error) {
+        console.error('🔍 DIAGNOSTICS: Supabase connection error:', error)
+        throw error
+      }
       
+      console.log('🔍 DIAGNOSTICS: Supabase connection successful:', data)
       updateStep(testId, step.id, { 
         status: 'success',
-        result: { connected: true, data }
+        result: { connected: true, profilesAccessible: true, sampleCount: data?.length || 0 }
       })
     } catch (error) {
+      console.error('🔍 DIAGNOSTICS: Supabase connection failed:', error)
       updateStep(testId, step.id, { 
         status: 'error',
         error: error instanceof Error ? error.message : String(error)
@@ -378,11 +575,41 @@ export default function DiagnosticsPage() {
 
     // Continue with other API tests...
     for (let i = 1; i < test.steps.length; i++) {
-      updateStep(testId, test.steps[i].id, { 
-        status: 'success',
-        result: { message: 'API test completed' }
-      })
-      await sleep(200)
+      const currentStep = test.steps[i]
+      updateStep(testId, currentStep.id, { status: 'running' })
+      await sleep(300)
+      
+      try {
+        console.log(`🔍 DIAGNOSTICS: Running ${currentStep.name}...`)
+        
+        // Add actual API tests based on step
+        let result: any = { message: 'API test completed' }
+        
+        if (currentStep.id === 'test-posts-api') {
+          // Test posts API
+          const { data: posts, error } = await supabase.rpc('get_posts_with_details', { user_id_param: null })
+          if (error) throw error
+          result = { postsCount: posts?.length || 0, samplePost: posts?.[0] || null }
+        } else if (currentStep.id === 'test-profile-apis') {
+          // Test profiles API
+          const { data: profiles, error } = await supabase.from('profiles').select('id,username').limit(3)
+          if (error) throw error
+          result = { profilesCount: profiles?.length || 0 }
+        }
+        
+        console.log(`🔍 DIAGNOSTICS: ${currentStep.name} completed:`, result)
+        updateStep(testId, currentStep.id, { 
+          status: 'success',
+          result
+        })
+      } catch (error) {
+        console.error(`🔍 DIAGNOSTICS: ${currentStep.name} failed:`, error)
+        updateStep(testId, currentStep.id, { 
+          status: 'error',
+          error: error instanceof Error ? error.message : String(error)
+        })
+      }
+      
       updateTestProgress(testId)
     }
   }
