@@ -29,7 +29,7 @@ function UserLinkComponent({
       <Link href={`/profile/${user.username}`} className={className}>
         <Avatar className={`${AVATAR_SIZES[avatarSize]} cursor-pointer hover:opacity-80 transition-opacity`}>
           <AvatarImage src={user.avatar || undefined} alt={user.name} />
-          <AvatarFallback name={user.name} userId={user.id} />
+          <AvatarFallback username={user.username} name={user.name} userId={user.id} />
         </Avatar>
       </Link>
     )

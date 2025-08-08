@@ -55,10 +55,16 @@ export function StartupForm({ user, onSubmit, isSubmitting, onLoginRequired }: S
 
     if (!formData.name.trim() || !formData.description.trim()) return
 
+    // Add any remaining text in the input as a final tag before submission
+    const finalTags = [...tags]
+    if (formData.industry.trim() && !finalTags.includes(formData.industry.trim())) {
+      finalTags.push(formData.industry.trim())
+    }
+
     // Join tags with commas for submission
     const submissionData = {
       ...formData,
-      industry: tags.join(', ')
+      industry: finalTags.join(', ')
     }
 
     const success = await onSubmit(submissionData)
@@ -80,6 +86,17 @@ export function StartupForm({ user, onSubmit, isSubmitting, onLoginRequired }: S
       setFormData(prev => ({ ...prev, industry: '' }))
     } else {
       setFormData(prev => ({ ...prev, industry: value }))
+    }
+  }
+
+  const handleTagKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' || e.key === 'Tab') {
+      e.preventDefault()
+      const value = formData.industry.trim()
+      if (value && !tags.includes(value)) {
+        setTags(prev => [...prev, value])
+        setFormData(prev => ({ ...prev, industry: '' }))
+      }
     }
   }
 
@@ -170,9 +187,10 @@ export function StartupForm({ user, onSubmit, isSubmitting, onLoginRequired }: S
             <Label htmlFor="industry">Industry / Tags</Label>
             <Input
               id="industry"
-              placeholder="e.g., FinTech, HealthTech, SaaS (separate with commas)"
+              placeholder="e.g., FinTech, HealthTech, SaaS (press Enter or Tab to add tag)"
               value={formData.industry}
               onChange={e => handleTagInput(e.target.value)}
+              onKeyDown={handleTagKeyDown}
             />
             {tags.length > 0 && (
               <div className="flex flex-wrap gap-2 mt-2">

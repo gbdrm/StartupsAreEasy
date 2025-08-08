@@ -13,6 +13,24 @@ function getInitials(name?: string) {
   return (parts[0][0] + (parts[1]?.[0] || "")).toUpperCase();
 }
 
+// Utility to construct consistent user display name
+function getUserDisplayName(profile: { first_name?: string | null; last_name?: string | null; username?: string | null }): string {
+  const firstName = profile.first_name?.trim();
+  const lastName = profile.last_name?.trim();
+  const username = profile.username?.trim();
+  
+  if (firstName && lastName) {
+    return `${firstName} ${lastName}`;
+  }
+  if (firstName) {
+    return firstName;
+  }
+  if (username) {
+    return username;
+  }
+  return 'User';
+}
+
 // Utility to generate a color from a string (user id or name)
 function stringToColor(str: string) {
   let hash = 0;
@@ -55,11 +73,14 @@ const AvatarFallback = React.forwardRef<
   React.ElementRef<typeof AvatarPrimitive.Fallback>,
   React.ComponentPropsWithoutRef<typeof AvatarPrimitive.Fallback> & {
     name?: string;
+    username?: string;
     userId?: string;
   }
->(({ className, name, userId, style, children, ...props }, ref) => {
-  const initials = children || getInitials(name);
-  const bgColor = userId || name ? stringToColor(userId || name || "") : undefined;
+>(({ className, name, username, userId, style, children, ...props }, ref) => {
+  // Prioritize username for consistency, fallback to name
+  const displayText = username || name;
+  const initials = children || getInitials(displayText);
+  const bgColor = userId || displayText ? stringToColor(userId || displayText || "") : undefined;
   return (
     <AvatarPrimitive.Fallback
       ref={ref}
@@ -76,4 +97,4 @@ const AvatarFallback = React.forwardRef<
 });
 AvatarFallback.displayName = AvatarPrimitive.Fallback.displayName
 
-export { Avatar, AvatarImage, AvatarFallback, getInitials, stringToColor }
+export { Avatar, AvatarImage, AvatarFallback, getInitials, stringToColor, getUserDisplayName }

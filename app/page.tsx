@@ -75,13 +75,11 @@ export default function HomePage() {
         if (stagingState.stage === 'checking-auth' || stagingState.stage === 'initializing') {
           stagingState.setStage('loading-posts')
           
-          if (posts.length === 0 && !postsLoading) {
+          if (!postsLoading) {
             logger.info('APP', '📱 Loading initial posts')
             await loadPosts()
             return // Let the next effect handle comment loading
           }
-
-          stagingState.setStage('complete')
         }
       } catch (error) {
         logger.error('APP', 'Failed to load initial data', error)
@@ -92,15 +90,19 @@ export default function HomePage() {
     loadInitialData()
   }, [authLoading, postsLoading, loadPosts, stagingState, posts.length])
 
-  // Separate effect to load comments when posts are available
+  // Separate effect to load comments when posts are loaded (even if empty)
   useEffect(() => {
-    if (posts.length > 0 && stagingState.stage === 'loading-posts') {
+    if (!postsLoading && stagingState.stage === 'loading-posts') {
       async function loadCommentsForPosts() {
         try {
-          stagingState.setStage('loading-comments')
-          const postIds = posts.map(p => p.id)
-          logger.info('APP', 'Loading comments for posts', { count: postIds.length })
-          await loadComments(postIds)
+          if (posts.length > 0) {
+            stagingState.setStage('loading-comments')
+            const postIds = posts.map(p => p.id)
+            logger.info('APP', 'Loading comments for posts', { count: postIds.length })
+            await loadComments(postIds)
+          } else {
+            logger.info('APP', 'No posts found, skipping comment loading')
+          }
           stagingState.setStage('complete')
         } catch (error) {
           logger.error('APP', 'Failed to load comments', error)
@@ -110,7 +112,7 @@ export default function HomePage() {
       
       loadCommentsForPosts()
     }
-  }, [posts.length, posts, loadComments, stagingState])
+  }, [postsLoading, posts.length, posts, loadComments, stagingState])
 
   // Load user startups when user changes
   useEffect(() => {

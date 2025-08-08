@@ -46,6 +46,7 @@ interface DbStartup extends Omit<Startup, 'created_at' | 'updated_at'> {
 import { logger } from './logger'
 import { isAuthError, handleApiError } from './auth-utils'
 import { getCurrentUserToken } from "./auth"
+import { getUserDisplayName } from "@/components/ui/avatar"
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -198,7 +199,7 @@ async function getPostsWithDetailsInternal(currentUserId?: string, filterByUserI
             id: post.id,
             user: {
                 id: post.user_id,
-                name: post.first_name && post.last_name ? `${post.first_name} ${post.last_name}`.trim() : post.username || 'User',
+                name: getUserDisplayName({ first_name: post.first_name, last_name: post.last_name, username: post.username }),
                 username: post.username || 'user',
                 avatar: post.avatar_url || '',
             },
@@ -249,7 +250,7 @@ export async function getBuildersDirect(): Promise<User[]> {
 
         return profiles.map((profile: DbProfile) => ({
             id: profile.id,
-            name: `${profile.first_name} ${profile.last_name || ""}`.trim(),
+            name: getUserDisplayName({ first_name: profile.first_name, last_name: profile.last_name, username: profile.username }),
             username: profile.username,
             avatar: profile.avatar_url,
         })) as User[]
@@ -626,7 +627,7 @@ export async function getCommentsDirect(postId: string): Promise<Comment[]> {
             post_id: comment.post_id,
             user: {
                 id: comment.user_id,
-                name: comment.profiles ? `${comment.profiles.first_name || ''} ${comment.profiles.last_name || ''}`.trim() || 'User' : 'User',
+                name: comment.profiles ? getUserDisplayName({ first_name: comment.profiles.first_name, last_name: comment.profiles.last_name, username: comment.profiles.username }) : 'User',
                 username: comment.profiles?.username || 'user',
                 avatar: comment.profiles?.avatar_url || '',
             },
@@ -665,7 +666,7 @@ export async function getBulkCommentsDirect(postIds: string[]): Promise<Comment[
             post_id: comment.post_id,
             user: {
                 id: comment.user_id,
-                name: comment.profiles ? `${comment.profiles.first_name || ''} ${comment.profiles.last_name || ''}`.trim() || 'User' : 'User',
+                name: comment.profiles ? getUserDisplayName({ first_name: comment.profiles.first_name, last_name: comment.profiles.last_name, username: comment.profiles.username }) : 'User',
                 username: comment.profiles?.username || 'user',
                 avatar: comment.profiles?.avatar_url || '',
             },
@@ -901,7 +902,7 @@ export async function getUserProfileDirect(username: string): Promise<User | nul
         const profile = profiles[0]
         return {
             id: profile.id,
-            name: `${profile.first_name} ${profile.last_name || ""}`.trim(),
+            name: getUserDisplayName({ first_name: profile.first_name, last_name: profile.last_name, username: profile.username }),
             username: profile.username,
             avatar: profile.avatar_url || "",
             bio: profile.bio,

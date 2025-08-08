@@ -36,9 +36,7 @@ export function BuilderCard({ builder, onClick }: BuilderCardProps) {
         <div className="flex items-start gap-3">
           <Avatar className="h-12 w-12">
             <AvatarImage src={builder.avatar} alt={builder.name} />
-            <AvatarFallback>
-              {builder.name.split(" ").map(n => n[0]).join("").toUpperCase()}
-            </AvatarFallback>
+            <AvatarFallback username={builder.username} name={builder.name} userId={builder.id} />
           </Avatar>
           
           <div className="flex-1 min-w-0">

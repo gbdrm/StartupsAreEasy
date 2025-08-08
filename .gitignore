@@ -40,6 +40,8 @@ yarn-error.log*
 /docs/
 /scripts/
 .github/copilot-instructions.md
+CLAUDE.md
+.local-commands.md
 
 # vercel
 .vercel
