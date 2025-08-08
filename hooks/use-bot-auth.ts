@@ -27,13 +27,13 @@ export function useBotAuth(): UseBotkAuth {
     });
 
     // Polling function with exponential backoff (ChatGPT suggestion)
-    const pollForToken = useCallback(async (loginToken: string): Promise<{ email: string; user_id: string; telegram_data?: any } | null> => {
+    const pollForToken = useCallback(async (loginToken: string): Promise<{ email: string; user_id: string; secure_password?: string; telegram_data?: any } | null> => {
         let attempts = 0;
         const maxAttempts = 30; // 5 minutes max
 
         setAuthState(prev => ({ ...prev, isPolling: true }));
 
-        const poll = async (): Promise<{ email: string; user_id: string; telegram_data?: any } | null> => {
+        const poll = async (): Promise<{ email: string; user_id: string; secure_password?: string; telegram_data?: any } | null> => {
             if (attempts++ > maxAttempts) {
                 throw new Error('Login timeout - please try again');
             }
@@ -57,6 +57,7 @@ export function useBotAuth(): UseBotkAuth {
                     return {
                         email: data.email,
                         user_id: data.user_id,
+                        secure_password: data.secure_password,
                         telegram_data: data.telegram_data
                     };
                 }
@@ -176,8 +177,16 @@ export function useBotAuth(): UseBotkAuth {
                 // Use the secure password that was generated server-side during user creation
                 // Fall back by fetching from user metadata if not in pending_tokens
                 let password: string | undefined;
+                
+                // Check if we received a secure password from the polling response
+                if (sessionData && 'secure_password' in sessionData && sessionData.secure_password) {
+                    password = sessionData.secure_password;
+                    logger.info('BOT-AUTH', 'Using secure password from polling response');
+                }
+                
+                // If we still don't have a password, try to get it from user metadata
                 if (!password) {
-                    logger.warn('BOT-AUTH', 'No secure password in pending_tokens, fetching from user metadata');
+                    logger.warn('BOT-AUTH', 'No secure password in polling response, fetching from user metadata');
                     
                     // Try to get the password from user metadata via API route
                     try {
@@ -212,9 +221,17 @@ export function useBotAuth(): UseBotkAuth {
                     passwordType: password.startsWith('telegram_') ? 'legacy' : 'secure'
                 });
                 
+                const signInStartTime = Date.now();
                 const { data: signInResult, error: signInError } = await supabase.auth.signInWithPassword({
                     email: sessionData.email,
                     password: password
+                });
+                const signInEndTime = Date.now();
+                
+                logger.info('BOT-AUTH', `Password sign-in completed in ${signInEndTime - signInStartTime}ms`, {
+                    hasSession: !!signInResult?.session,
+                    hasUser: !!signInResult?.user,
+                    hasError: !!signInError
                 });
 
                 if (signInError) {
@@ -231,18 +248,26 @@ export function useBotAuth(): UseBotkAuth {
                 }
 
                 // PRODUCTION FIX: Ensure tokens are stored in localStorage for production bypass
-                if (signInResult.session) {
-                    logger.info('BOT-AUTH', 'Storing session tokens for production compatibility');
+                if (signInResult?.session) {
+                    logger.info('BOT-AUTH', 'Starting localStorage token storage', {
+                        hasAccessToken: !!signInResult.session.access_token,
+                        hasRefreshToken: !!signInResult.session.refresh_token,
+                        accessTokenLength: signInResult.session.access_token?.length || 0
+                    });
                     
                     // Store tokens that production bypass expects
                     if (signInResult.session.access_token) {
                         localStorage.setItem('sb-access-token', signInResult.session.access_token);
-                        logger.debug('BOT-AUTH', 'Stored access token');
+                        logger.info('BOT-AUTH', 'Successfully stored access token in localStorage');
+                    } else {
+                        logger.error('BOT-AUTH', 'No access token to store!');
                     }
                     
                     if (signInResult.session.refresh_token) {
                         localStorage.setItem('sb-refresh-token', signInResult.session.refresh_token);
-                        logger.debug('BOT-AUTH', 'Stored refresh token');
+                        logger.info('BOT-AUTH', 'Successfully stored refresh token in localStorage');
+                    } else {
+                        logger.error('BOT-AUTH', 'No refresh token to store!');
                     }
                     
                     // Store user data for production bypass
@@ -271,7 +296,11 @@ export function useBotAuth(): UseBotkAuth {
                                     joined_at: profile.created_at
                                 };
                                 localStorage.setItem('sb-user', JSON.stringify(userProfile));
-                                logger.debug('BOT-AUTH', 'Stored user profile for production bypass');
+                                logger.info('BOT-AUTH', 'Successfully stored user profile in localStorage', {
+                                    userId: userProfile.id,
+                                    username: userProfile.username,
+                                    telegramId: userProfile.telegram_id
+                                });
                             }
                         } catch (profileError) {
                             logger.warn('BOT-AUTH', 'Failed to fetch profile for storage', profileError);
@@ -280,27 +309,45 @@ export function useBotAuth(): UseBotkAuth {
                     
                     // Mark login as complete for production bypass detection
                     localStorage.setItem('telegram-login-complete', 'true');
-                    logger.info('BOT-AUTH', 'Marked telegram login as complete');
+                    logger.info('BOT-AUTH', 'Successfully marked telegram login as complete');
+                    
+                    // Verify tokens are actually stored
+                    const storedAccessToken = localStorage.getItem('sb-access-token');
+                    const storedRefreshToken = localStorage.getItem('sb-refresh-token');
+                    const storedUser = localStorage.getItem('sb-user');
+                    
+                    logger.info('BOT-AUTH', 'Final token storage verification', {
+                        hasStoredAccessToken: !!storedAccessToken,
+                        hasStoredRefreshToken: !!storedRefreshToken,
+                        hasStoredUser: !!storedUser,
+                        accessTokenLength: storedAccessToken?.length || 0
+                    });
+                    
+                    // Reset auth state before cleanup and reload
+                    setAuthState({
+                        isLoading: false,
+                        error: null,
+                        isPolling: false
+                    });
+
+                    // Clean up temporary localStorage items
+                    localStorage.removeItem('pending_login_token');
+                    localStorage.removeItem('login_started_at');
+
+                    logger.info('BOT-AUTH', 'Authentication completed successfully, triggering reload');
+
+                    // Trigger page reload for auth state consistency (per instructions)
+                    // Extended delay to ensure localStorage operations complete before reload
+                    setTimeout(() => {
+                        logger.info('BOT-AUTH', 'About to reload page - all auth processes complete');
+                        window.location.reload();
+                    }, 500); // Extended delay to ensure all storage operations complete
+                    
+                    logger.info('BOT-AUTH', 'setTimeout for page reload has been set');
+                } else {
+                    logger.error('BOT-AUTH', 'No session returned from sign-in - authentication may have failed!');
+                    throw new Error('Authentication failed: No session created');
                 }
-
-                // Reset auth state before cleanup and reload
-                setAuthState({
-                    isLoading: false,
-                    error: null,
-                    isPolling: false
-                });
-
-                // Clean up temporary localStorage items
-                localStorage.removeItem('pending_login_token');
-                localStorage.removeItem('login_started_at');
-
-                logger.info('BOT-AUTH', 'Authentication completed successfully, triggering reload');
-
-                // Trigger page reload for auth state consistency (per instructions)
-                // Increase delay to allow token storage to complete
-                setTimeout(() => {
-                    window.location.reload();
-                }, 300); // Increased delay to allow all storage operations
 
                 } catch (pollError) {
                     logger.error('BOT-AUTH', 'Polling failed', pollError);

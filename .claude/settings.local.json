@@ -18,7 +18,9 @@
       "Bash(pnpm build:*)",
       "Bash(pnpm lint:*)",
       "Bash(npx next build:*)",
-      "Bash(timeout 60 pnpm build)"
+      "Bash(timeout 60 pnpm build)",
+      "Bash(supabase status:*)",
+      "Bash(cat:*)"
     ],
     "deny": []
   }
