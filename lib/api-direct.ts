@@ -735,8 +735,8 @@ export async function getPostsByTypeDirect(type: string): Promise<Post[]> {
             },
             type: post.type,
             content: post.content,
-            link: post.link_url,
-            image: post.image_url,
+            link: post.link,
+            image: post.image,
             created_at: post.created_at,
             likes_count: 0, // Simplified for now
             comments_count: 0,

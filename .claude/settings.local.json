@@ -21,7 +21,9 @@
       "Bash(timeout 60 pnpm build)",
       "Bash(supabase status:*)",
       "Bash(cat:*)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(pnpm add:*)",
+      "Bash(pnpm run:*)"
     ],
     "deny": []
   }
