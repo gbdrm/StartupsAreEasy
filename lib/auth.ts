@@ -105,7 +105,7 @@ export async function getCurrentUser(): Promise<User | null> {
     const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production' || window.location.hostname !== 'localhost'
 
     if (isProduction) {
-      logger.info('AUTH', 'PRODUCTION BYPASS: getCurrentUser bypassing Supabase')
+      logger.debug('AUTH', 'PRODUCTION BYPASS: getCurrentUser bypassing Supabase')
 
       // Check if we have stored tokens
       const hasToken = localStorage.getItem("sb-access-token");
@@ -130,40 +130,71 @@ export async function getCurrentUser(): Promise<User | null> {
       return null;
     }
 
-    // Development: Use proper Supabase authentication
-    const { data: userData, error: userError } = await supabase.auth.getUser();
-    if (userError || !userData?.user) {
-      logger.debug('AUTH', 'No authenticated user', userError);
-      return null;
+    // Development: Use proper Supabase authentication with shorter timeout
+    logger.debug('AUTH', 'Development mode: starting Supabase auth check')
+    
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error('getCurrentUser timeout after 5 seconds')), 5000)
+    })
+
+    const authPromise = async () => {
+      logger.debug('AUTH', 'Getting Supabase user...')
+      const startTime = Date.now()
+      
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      logger.debug('AUTH', `getUser() took ${Date.now() - startTime}ms`)
+      
+      if (userError || !userData?.user) {
+        logger.debug('AUTH', 'No authenticated user', userError);
+        return null;
+      }
+
+      logger.debug('AUTH', 'Got user, fetching profile...', { userId: userData.user.id })
+      const profileStartTime = Date.now()
+      
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", userData.user.id)
+        .single();
+        
+      logger.debug('AUTH', `Profile query took ${Date.now() - profileStartTime}ms`)
+
+      if (profileError || !profile) {
+        logger.error('AUTH', 'Profile fetch failed', profileError);
+        return null;
+      }
+
+      logger.debug('AUTH', 'Successfully got user profile')
+      return { userData, profile };
     }
 
-    const { data: profile, error: profileError } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", userData.user.id)
-      .single();
+    try {
+      const result = await Promise.race([authPromise(), timeoutPromise])
+      if (!result) return null
 
-    if (profileError || !profile) {
-      logger.error('AUTH', 'Profile fetch failed', profileError);
+      const { userData, profile } = result
+
+      const user: User = {
+        id: profile.id,
+        name: `${profile.first_name ?? ""} ${profile.last_name ?? ""}`.trim(),
+        username: profile.username ?? "",
+        avatar: profile.avatar_url ?? "",
+        telegram_id: profile.telegram_id,
+        first_name: profile.first_name,
+        last_name: profile.last_name,
+        bio: profile.bio,
+        location: profile.location,
+        website: profile.website,
+        joined_at: profile.created_at
+      };
+
+      logger.debug('AUTH', 'getCurrentUser success', { userId: user.id, username: user.username });
+      return user;
+    } catch (timeoutError) {
+      logger.warn('AUTH', 'getCurrentUser timed out or failed', timeoutError);
       return null;
     }
-
-    const user: User = {
-      id: profile.id,
-      name: `${profile.first_name ?? ""} ${profile.last_name ?? ""}`.trim(),
-      username: profile.username ?? "",
-      avatar: profile.avatar_url ?? "",
-      telegram_id: profile.telegram_id,
-      first_name: profile.first_name,
-      last_name: profile.last_name,
-      bio: profile.bio,
-      location: profile.location,
-      website: profile.website,
-      joined_at: profile.created_at
-    };
-
-    logger.debug('AUTH', 'getCurrentUser success', { userId: user.id, username: user.username });
-    return user;
   } catch (error) {
     logger.error('AUTH', 'getCurrentUser error', error);
     return null;

@@ -111,6 +111,7 @@ NEXT_PUBLIC_DEV_PASSWORD=secure-dev-password
 **MANDATORY: Always run build/tests before completing work**
 - Run `npx tsc --noEmit` to check TypeScript errors quickly
 - Run `pnpm lint` to catch ESLint issues  
+- Run `npm build` to verify build, ask user to stop localhost if port 3000 is busy
 - Run `npm test` to verify functionality
 - Only mark work complete after all checks pass
 

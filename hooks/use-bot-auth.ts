@@ -247,11 +247,30 @@ export function useBotAuth(): UseBotkAuth {
                     
                     // Store user data for production bypass
                     if (signInResult.user) {
-                        // Get and store user profile for production bypass
+                        // Store basic user data directly to avoid getCurrentUser() dependency
                         try {
-                            const profile = await getCurrentUser();
-                            if (profile) {
-                                localStorage.setItem('sb-user', JSON.stringify(profile));
+                            // First try to get the profile data directly from Supabase
+                            const { data: profile, error: profileError } = await supabase
+                                .from('profiles')
+                                .select('*')
+                                .eq('id', signInResult.user.id)
+                                .single();
+
+                            if (!profileError && profile) {
+                                const userProfile = {
+                                    id: profile.id,
+                                    name: `${profile.first_name ?? ""} ${profile.last_name ?? ""}`.trim(),
+                                    username: profile.username ?? "",
+                                    avatar: profile.avatar_url ?? "",
+                                    telegram_id: profile.telegram_id,
+                                    first_name: profile.first_name,
+                                    last_name: profile.last_name,
+                                    bio: profile.bio,
+                                    location: profile.location,
+                                    website: profile.website,
+                                    joined_at: profile.created_at
+                                };
+                                localStorage.setItem('sb-user', JSON.stringify(userProfile));
                                 logger.debug('BOT-AUTH', 'Stored user profile for production bypass');
                             }
                         } catch (profileError) {
