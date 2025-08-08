@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "prebuild": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"if (Test-Path .next) { try { Remove-Item -Recurse -Force .next -ErrorAction Stop } catch {} }; exit 0\"",
     "build": "next build",
     "dev": "next dev",
     "lint": "next lint",

@@ -17,8 +17,8 @@ interface DbPost {
     user_id: string;
     type: string;
     content: string;
-    link_url?: string;
-    image_url?: string;
+    link?: string;
+    image?: string;
     created_at: string;
     startup_id?: string;
     likes_count?: number;
@@ -46,7 +46,7 @@ interface DbStartup extends Omit<Startup, 'created_at' | 'updated_at'> {
 import { logger } from './logger'
 import { isAuthError, handleApiError } from './auth-utils'
 import { getCurrentUserToken } from "./auth"
-import { getUserDisplayName } from "@/components/ui/avatar"
+import { getUserDisplayName } from "@/lib/user-utils"
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -205,8 +205,8 @@ async function getPostsWithDetailsInternal(currentUserId?: string, filterByUserI
             },
             type: post.type,
             content: post.content,
-            link: post.link_url,
-            image: post.image_url,
+            link: post.link,
+            image: post.image,
             created_at: post.created_at,
             likes_count: post.likes_count || 0,
             comments_count: post.comments_count || 0,
@@ -529,8 +529,8 @@ export async function createPostDirect(data: {
             },
             type: post.type,
             content: post.content,
-            link: post.link_url,
-            image: post.image_url,
+            link: post.link,
+            image: post.image,
             created_at: post.created_at,
             likes_count: 0,
             comments_count: 0,
@@ -751,16 +751,109 @@ export async function getPostsByTypeDirect(type: string): Promise<Post[]> {
 // Get single post by ID with full details (same as other post functions)
 export async function getPostByIdDirect(id: string, currentUserId?: string): Promise<Post | null> {
     try {
-        logger.debug('API', "getPostByIdDirect: Starting", { id, currentUserId })
+        logger.debug('API', "getPostByIdDirect: Starting direct fetch", { id, currentUserId })
 
-        // Use the same internal function to get consistent data
-        const allPosts = await getPostsWithDetailsInternal(currentUserId)
+        // 1) Fetch the post with embedded profile info
+        const postUrl = `${supabaseUrl}/rest/v1/posts?id=eq.${id}` +
+            `&select=id,user_id,type,content,link,image,created_at,startup_id,` +
+            `profiles!user_id(id,first_name,last_name,username,avatar_url)`
 
-        // Find the specific post by ID
-        const post = allPosts.find(p => p.id === id)
+        const postRes = await fetch(postUrl, { headers })
+        if (!postRes.ok) {
+            const errorText = await postRes.text()
+            logger.error('API', 'getPostByIdDirect: Post fetch failed', { status: postRes.status, error: errorText })
+            throw new Error(`HTTP ${postRes.status}: ${errorText}`)
+        }
 
-        logger.debug('API', "getPostByIdDirect: Found post", { found: !!post })
-        return post || null
+        const postRows = await postRes.json()
+        if (!Array.isArray(postRows) || postRows.length === 0) {
+            logger.debug('API', 'getPostByIdDirect: No post found')
+            return null
+        }
+
+        const dbPost = postRows[0] as DbPost & { profiles?: DbProfile }
+
+        // 2) Likes count and liked_by_user
+        let likesCount = 0
+        let likedByUser = false
+        try {
+            const likesUrl = `${supabaseUrl}/rest/v1/likes?post_id=eq.${id}&select=id`
+            const likesRes = await fetch(likesUrl, { headers })
+            if (likesRes.ok) {
+                const likes = await likesRes.json()
+                likesCount = Array.isArray(likes) ? likes.length : 0
+            }
+
+            if (currentUserId) {
+                const likedUrl = `${supabaseUrl}/rest/v1/likes?post_id=eq.${id}&user_id=eq.${currentUserId}&select=id&limit=1`
+                const likedRes = await fetch(likedUrl, { headers })
+                if (likedRes.ok) {
+                    const liked = await likedRes.json()
+                    likedByUser = Array.isArray(liked) && liked.length > 0
+                }
+            }
+        } catch (e) {
+            logger.warn('API', 'getPostByIdDirect: Likes fetch warning', e)
+        }
+
+        // 3) Comments count
+        let commentsCount = 0
+        try {
+            const commentsUrl = `${supabaseUrl}/rest/v1/comments?post_id=eq.${id}&select=id`
+            const commentsRes = await fetch(commentsUrl, { headers })
+            if (commentsRes.ok) {
+                const comments = await commentsRes.json()
+                commentsCount = Array.isArray(comments) ? comments.length : 0
+            }
+        } catch (e) {
+            logger.warn('API', 'getPostByIdDirect: Comments count fetch warning', e)
+        }
+
+        // 4) Startup details (optional)
+        let startup: DbStartup | null = null
+        if (dbPost.startup_id) {
+            try {
+                const startupUrl = `${supabaseUrl}/rest/v1/startups?id=eq.${dbPost.startup_id}` +
+                    `&select=id,name,slug,description,website_url,logo_url,industry,stage,founded_date,location,team_size,funding_raised,target_market,estimated_timeline,looking_for,launch_date,is_public,created_at,updated_at,user_id`
+                const startupRes = await fetch(startupUrl, { headers })
+                if (startupRes.ok) {
+                    const rows = await startupRes.json()
+                    startup = Array.isArray(rows) && rows.length > 0 ? rows[0] : null
+                }
+            } catch (e) {
+                logger.warn('API', 'getPostByIdDirect: Startup fetch warning', e)
+            }
+        }
+
+        // 5) Transform to Post
+        const userName = getUserDisplayName({
+            first_name: (dbPost as any).profiles?.first_name,
+            last_name: (dbPost as any).profiles?.last_name,
+            username: (dbPost as any).profiles?.username,
+        })
+
+        const post: Post = {
+            id: dbPost.id,
+            user: {
+                id: dbPost.user_id,
+                name: userName,
+                username: (dbPost as any).profiles?.username || 'user',
+                avatar: (dbPost as any).profiles?.avatar_url || '',
+            },
+            type: dbPost.type as any,
+            content: dbPost.content,
+            link: dbPost.link,
+            image: dbPost.image,
+            startup_id: dbPost.startup_id,
+            startup: startup || undefined,
+            created_at: dbPost.created_at,
+            likes_count: likesCount,
+            comments_count: commentsCount,
+            liked_by_user: likedByUser,
+        }
+
+        logger.debug('API', 'getPostByIdDirect: Post loaded', { id: post.id, likesCount, commentsCount })
+        return post
     } catch (error) {
         logger.error('API', "Error fetching post by ID:", error)
         throw error

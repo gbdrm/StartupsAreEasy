@@ -13,23 +13,8 @@ function getInitials(name?: string) {
   return (parts[0][0] + (parts[1]?.[0] || "")).toUpperCase();
 }
 
-// Utility to construct consistent user display name
-function getUserDisplayName(profile: { first_name?: string | null; last_name?: string | null; username?: string | null }): string {
-  const firstName = profile.first_name?.trim();
-  const lastName = profile.last_name?.trim();
-  const username = profile.username?.trim();
-  
-  if (firstName && lastName) {
-    return `${firstName} ${lastName}`;
-  }
-  if (firstName) {
-    return firstName;
-  }
-  if (username) {
-    return username;
-  }
-  return 'User';
-}
+// Import shared user display name utility
+import { getUserDisplayName } from "@/lib/user-utils"
 
 // Utility to generate a color from a string (user id or name)
 function stringToColor(str: string) {
