@@ -28,6 +28,9 @@ import { generateSecureLoginToken } from "@/lib/crypto-utils"
 import { getCurrentUserToken, getCurrentUser } from "@/lib/auth"
 import { supabase } from "@/lib/supabase"
 
+import type { DiagnosticTest, TestStep } from './diagnostics-types'
+import { createStep, sleep } from './diagnostics-utils'
+
 interface LogEntry {
   id: string
   timestamp: string
@@ -37,28 +40,11 @@ interface LogEntry {
   data?: any
 }
 
-interface TestStep {
-  id: string
-  name: string
-  description: string
-  status: 'pending' | 'running' | 'success' | 'error' | 'skipped'
-  result?: any
-  error?: string
-  logs: LogEntry[]
-  duration?: number
-}
-
-interface DiagnosticTest {
-  id: string
-  name: string
-  description: string
-  steps: TestStep[]
-  status: 'idle' | 'running' | 'completed' | 'failed'
-  progress: number
-}
-
 export default function DiagnosticsPage() {
   const { user, loading: authLoading } = useSimpleAuth()
+  // Track latest user in a ref to avoid stale closure snapshots inside long-running async test sequences
+  const latestUserRef = useRef<typeof user>(user)
+  useEffect(() => { latestUserRef.current = user }, [user])
   const { authState, loginWithTelegramBot, cancelLogin } = useBotAuth()
   
   const [logs, setLogs] = useState<LogEntry[]>([])
@@ -117,13 +103,8 @@ export default function DiagnosticsPage() {
     }
   }, [])
 
-  const createStep = (id: string, name: string, description: string): TestStep => ({
-    id,
-    name,
-    description,
-    status: 'pending',
-    logs: []
-  })
+  // createStep now imported; extend with logs field here when instantiating
+  const wrapStep = (id: string, name: string, description: string): TestStep => ({ ...createStep(id, name, description), status: 'pending', logs: [] })
 
   const updateStep = (testId: string, stepId: string, updates: Partial<TestStep>) => {
     setTests(prev => prev.map(test => 
@@ -162,7 +143,7 @@ export default function DiagnosticsPage() {
             ...test,
             steps: test.steps.map(step => 
               step.id === stepId 
-                ? { ...step, logs: [...step.logs, log] }
+                ? { ...step, logs: [...(step.logs || []), log] }
                 : step
             )
           }
@@ -180,21 +161,21 @@ export default function DiagnosticsPage() {
     status: 'idle',
     progress: 0,
     steps: [
-      createStep('check-initial-state', '1️⃣ Check Initial State', '👤 Verify you are NOT signed in (look at header)'),
-      createStep('clear-storage', '2️⃣ Clear Previous Auth', '🧹 Clean any previous auth tokens'),
-      createStep('generate-token', '3️⃣ Generate Login Token', '🔑 Create secure authentication token'),
-      createStep('register-token', '4️⃣ Register Token', '📝 Store token in database for validation'),
-      createStep('create-telegram-url', '5️⃣ Create Telegram Link', '🔗 Generate clickable Telegram bot URL'),
-      createStep('user-click-link', '6️⃣ USER ACTION REQUIRED', '👆 Click the Telegram link and open in app'),
-      createStep('user-confirm-telegram', '7️⃣ USER ACTION REQUIRED', '📱 Click START in Telegram bot'),
-      createStep('manual-poll', '8️⃣ Manual Auth Check', '🔄 User clicks button to check auth status'),
-      createStep('verify-server-response', '9️⃣ Verify Server Response', '📡 Check what server returns from auth'),
-      createStep('attempt-token-storage', '🔟 Wait for Auth Flow', '⏳ Let normal auth system handle token storage'),
-      createStep('verify-storage-success', '1️⃣1️⃣ Verify Storage Success', '✅ Check if tokens were actually stored'),
-      createStep('test-auth-functions', '1️⃣2️⃣ Test Auth Functions', '🔧 Test getCurrentUser and other auth functions'),
-      createStep('check-supabase-session', '1️⃣3️⃣ Check Supabase Session', '🗄️ Verify Supabase auth state'),
-      createStep('test-react-state-update', '1️⃣4️⃣ Test React State Update', '⚛️ Check if useSimpleAuth hook updates'),
-      createStep('final-state-verification', '1️⃣5️⃣ Final State Verification', '🎯 Complete end-to-end verification')
+  wrapStep('check-initial-state', '1️⃣ Check Initial State', '👤 Verify you are NOT signed in (look at header)'),
+  wrapStep('clear-storage', '2️⃣ Clear Previous Auth', '🧹 Clean any previous auth tokens'),
+  wrapStep('generate-token', '3️⃣ Generate Login Token', '🔑 Create secure authentication token'),
+  wrapStep('register-token', '4️⃣ Register Token', '📝 Store token in database for validation'),
+  wrapStep('create-telegram-url', '5️⃣ Create Telegram Link', '🔗 Generate clickable Telegram bot URL'),
+  wrapStep('user-click-link', '6️⃣ USER ACTION REQUIRED', '👆 Click the Telegram link and open in app'),
+  wrapStep('user-confirm-telegram', '7️⃣ USER ACTION REQUIRED', '📱 Click START in Telegram bot'),
+  wrapStep('manual-poll', '8️⃣ Manual Auth Check', '🔄 User clicks button to check auth status'),
+  wrapStep('verify-server-response', '9️⃣ Verify Server Response', '📡 Check what server returns from auth'),
+  wrapStep('attempt-token-storage', '🔟 Wait for Auth Flow', '⏳ Let normal auth system handle token storage'),
+  wrapStep('verify-storage-success', '1️⃣1️⃣ Verify Storage Success', '✅ Check if tokens were actually stored'),
+  wrapStep('test-auth-functions', '1️⃣2️⃣ Test Auth Functions', '🔧 Test getCurrentUser and other auth functions'),
+  wrapStep('check-supabase-session', '1️⃣3️⃣ Check Supabase Session', '🗄️ Verify Supabase auth state'),
+  wrapStep('test-react-state-update', '1️⃣4️⃣ Test React State Update', '⚛️ Check if useSimpleAuth hook updates'),
+  wrapStep('final-state-verification', '1️⃣5️⃣ Final State Verification', '🎯 Complete end-to-end verification')
     ]
   })
 
@@ -206,12 +187,12 @@ export default function DiagnosticsPage() {
     status: 'idle',
     progress: 0,
     steps: [
-      createStep('test-supabase-connection', 'Test Supabase Connection', 'Verify connection to Supabase backend'),
-      createStep('test-posts-api', 'Test Posts API', 'Check posts retrieval and creation'),
-      createStep('test-auth-apis', 'Test Auth APIs', 'Verify authentication endpoints'),
-      createStep('test-profile-apis', 'Test Profile APIs', 'Check profile loading and updates'),
-      createStep('test-response-caching', 'Test Response Caching', 'Verify dedupedFetch works correctly'),
-      createStep('test-rate-limiting', 'Test Rate Limiting', 'Check rate limiting functionality')
+  wrapStep('test-supabase-connection', 'Test Supabase Connection', 'Verify connection to Supabase backend'),
+  wrapStep('test-posts-api', 'Test Posts API', 'Check posts retrieval and creation'),
+  wrapStep('test-auth-apis', 'Test Auth APIs', 'Verify authentication endpoints'),
+  wrapStep('test-profile-apis', 'Test Profile APIs', 'Check profile loading and updates'),
+  wrapStep('test-response-caching', 'Test Response Caching', 'Verify dedupedFetch works correctly'),
+  wrapStep('test-rate-limiting', 'Test Rate Limiting', 'Check rate limiting functionality')
     ]
   })
 
@@ -223,10 +204,10 @@ export default function DiagnosticsPage() {
     status: 'idle',
     progress: 0,
     steps: [
-      createStep('test-localStorage', 'Test LocalStorage', 'Verify localStorage read/write operations'),
-      createStep('test-storage-manager', 'Test Storage Manager', 'Check StorageManager functionality'),
-      createStep('test-auth-storage', 'Test Auth Storage', 'Verify auth token storage and cleanup'),
-      createStep('test-cross-tab', 'Test Cross-tab Communication', 'Check storage events across tabs')
+  wrapStep('test-localStorage', 'Test LocalStorage', 'Verify localStorage read/write operations'),
+  wrapStep('test-storage-manager', 'Test Storage Manager', 'Check StorageManager functionality'),
+  wrapStep('test-auth-storage', 'Test Auth Storage', 'Verify auth token storage and cleanup'),
+  wrapStep('test-cross-tab', 'Test Cross-tab Communication', 'Check storage events across tabs')
     ]
   })
 
@@ -238,10 +219,10 @@ export default function DiagnosticsPage() {
     status: 'idle',
     progress: 0,
     steps: [
-      createStep('scan-telegram-widget', 'Scan for Telegram Widget Code', 'Look for leftover Telegram widget references'),
-      createStep('check-auth-methods', 'Check Auth Methods', 'Verify only bot auth is available'),
-      createStep('test-auth-cleanup', 'Test Auth Cleanup', 'Verify proper cleanup on logout'),
-      createStep('check-production-bypasses', 'Check Production Bypasses', 'Review production auth bypasses')
+  wrapStep('scan-telegram-widget', 'Scan for Telegram Widget Code', 'Look for leftover Telegram widget references'),
+  wrapStep('check-auth-methods', 'Check Auth Methods', 'Verify only bot auth is available'),
+  wrapStep('test-auth-cleanup', 'Test Auth Cleanup', 'Verify proper cleanup on logout'),
+  wrapStep('check-production-bypasses', 'Check Production Bypasses', 'Review production auth bypasses')
     ]
   })
 
@@ -253,13 +234,13 @@ export default function DiagnosticsPage() {
     status: 'idle',
     progress: 0,
     steps: [
-      createStep('detect-environment', 'Detect Environment', 'Identify if running on localhost vs production'),
-      createStep('check-env-variables', 'Check Environment Variables', 'Verify all required env vars are present'),
-      createStep('test-supabase-connection', 'Test Supabase Connection', 'Verify database connection in current environment'),
-      createStep('check-cors-headers', 'Check CORS Headers', 'Verify cross-origin request settings'),
-      createStep('test-telegram-bot-reachability', 'Test Telegram Bot Reachability', 'Check if bot can reach callback URLs'),
-      createStep('check-auth-hook-behavior', 'Check Auth Hook Behavior', 'Analyze useSimpleAuth hook in current environment'),
-      createStep('compare-storage-behavior', 'Compare Storage Behavior', 'Check localStorage behavior differences')
+  wrapStep('detect-environment', 'Detect Environment', 'Identify if running on localhost vs production'),
+  wrapStep('check-env-variables', 'Check Environment Variables', 'Verify all required env vars are present'),
+  wrapStep('test-supabase-connection', 'Test Supabase Connection', 'Verify database connection in current environment'),
+  wrapStep('check-cors-headers', 'Check CORS Headers', 'Verify cross-origin request settings'),
+  wrapStep('test-telegram-bot-reachability', 'Test Telegram Bot Reachability', 'Check if bot can reach callback URLs'),
+  wrapStep('check-auth-hook-behavior', 'Check Auth Hook Behavior', 'Analyze useSimpleAuth hook in current environment'),
+  wrapStep('compare-storage-behavior', 'Compare Storage Behavior', 'Check localStorage behavior differences')
     ]
   })
 
@@ -271,12 +252,12 @@ export default function DiagnosticsPage() {
     status: 'idle',
     progress: 0,
     steps: [
-      createStep('test-internet-connectivity', 'Test Internet Connectivity', 'Check basic internet access'),
-      createStep('test-supabase-api-reachability', 'Test Supabase API Reachability', 'Verify Supabase endpoints are accessible'),
-      createStep('test-telegram-api-connectivity', 'Test Telegram API Connectivity', 'Check if Telegram Bot API is reachable'),
-      createStep('test-auth-api-endpoints', 'Test Auth API Endpoints', 'Verify local auth API endpoints'),
-      createStep('measure-response-times', 'Measure Response Times', 'Check API response performance'),
-      createStep('test-cors-and-headers', 'Test CORS and Headers', 'Verify cross-origin and header configurations')
+  wrapStep('test-internet-connectivity', 'Test Internet Connectivity', 'Check basic internet access'),
+  wrapStep('test-supabase-api-reachability', 'Test Supabase API Reachability', 'Verify Supabase endpoints are accessible'),
+  wrapStep('test-telegram-api-connectivity', 'Test Telegram API Connectivity', 'Check if Telegram Bot API is reachable'),
+  wrapStep('test-auth-api-endpoints', 'Test Auth API Endpoints', 'Verify local auth API endpoints'),
+  wrapStep('measure-response-times', 'Measure Response Times', 'Check API response performance'),
+  wrapStep('test-cors-and-headers', 'Test CORS and Headers', 'Verify cross-origin and header configurations')
     ]
   })
 
@@ -288,12 +269,30 @@ export default function DiagnosticsPage() {
     status: 'idle',
     progress: 0,
     steps: [
-      createStep('analyze-usebot-auth-hook', 'Analyze useBotAuth Hook', 'Check current state of useBotAuth hook'),
-      createStep('test-login-token-generation', 'Test Login Token Generation', 'Verify token generation functions'),
-      createStep('test-auth-state-management', 'Test Auth State Management', 'Check auth state transitions'),
-      createStep('test-production-bypasses', 'Test Production Bypasses', 'Analyze production auth bypass mechanisms'),
-      createStep('check-storage-manager', 'Check Storage Manager', 'Verify StorageManager functionality'),
-      createStep('test-cross-tab-communication', 'Test Cross-tab Communication', 'Check auth sync across browser tabs')
+  wrapStep('analyze-usebot-auth-hook', 'Analyze useBotAuth Hook', 'Check current state of useBotAuth hook'),
+  wrapStep('test-login-token-generation', 'Test Login Token Generation', 'Verify token generation functions'),
+  wrapStep('test-auth-state-management', 'Test Auth State Management', 'Check auth state transitions'),
+  wrapStep('test-production-bypasses', 'Test Production Bypasses', 'Analyze production auth bypass mechanisms'),
+  wrapStep('check-storage-manager', 'Check Storage Manager', 'Verify StorageManager functionality'),
+  wrapStep('test-cross-tab-communication', 'Test Cross-tab Communication', 'Check auth sync across browser tabs')
+    ]
+  })
+
+  // Auth Timeout Stress / Root Cause Test
+  const createAuthTimeoutTest = (): DiagnosticTest => ({
+    id: 'auth-timeout',
+    name: '⏱️ Auth Timeout Stress Test',
+    description: 'Measure and analyze getSession/getUser/profile timings & duplicate SIGNED_IN events',
+    status: 'idle',
+    progress: 0,
+    steps: [
+  wrapStep('baseline-session', 'Baseline Session Timing', 'Measure getSession vs getUser latency & token presence'),
+  wrapStep('warm-profile', 'Warm Profile Cache', 'Prime profile cache via getCurrentUser()'),
+  wrapStep('rapid-calls', 'Rapid Sequential Calls', 'Run multiple getCurrentUser() calls to test de-dupe & caching'),
+  wrapStep('manual-background-instruction', 'Manual Background Phase', 'Switch to another tab for 12+ seconds, then return and click Resume'),
+  wrapStep('post-background-check', 'Post-Background Timing', 'Re-measure timings after throttling'),
+  wrapStep('auth-events-monitor', 'Auth Events Monitor', 'Capture SIGNED_IN/TOKEN_REFRESHED counts for 10s'),
+  wrapStep('summary', 'Summary & Indicators', 'Aggregate data & root cause hints')
     ]
   })
 
@@ -305,6 +304,8 @@ export default function DiagnosticsPage() {
     waitingForUser?: boolean
     manualPollEnabled?: boolean
   }>({})
+  // Generic resume state for timeout test
+  const [pendingResume, setPendingResume] = useState<{ testId: string; stepId: string } | null>(null)
 
   // Manual polling handler
   const handleManualPoll = async () => {
@@ -374,24 +375,107 @@ export default function DiagnosticsPage() {
       updateTestProgress(testId)
       await sleep(1000)
 
-      // Step 10: Wait for Normal Auth Flow
+      // Step 10: Perform Client Sign-In (previously just "wait")
       step = telegramTest.steps[currentStepIndex++]
       updateStep(testId, step.id, { status: 'running' })
-      console.log('🔍 STEP 10: Waiting for normal auth flow to complete...')
-      
-      // Don't manually store tokens - let the normal auth system handle it
-      console.log('🔍 DIAGNOSTICS: Auth completed server-side, waiting for normal auth flow...')
-      
-      updateStep(testId, step.id, { 
-        status: 'success',
-        result: {
-          message: '✅ Letting normal authentication system handle token storage',
-          serverAuthComplete: true,
-          instruction: 'Normal auth flow should now process the authentication'
+      console.log('🔍 STEP 10: Performing client sign-in (auth system does NOT auto-login) ...')
+
+      let signInResultSummary: any = {}
+      try {
+        const email = authData?.email
+        let password = authData?.secure_password as string | undefined
+        const user_id = authData?.user_id
+
+        if (!email) {
+          throw new Error('Auth data missing email – cannot sign in client-side')
         }
-      })
+
+        // Fallback: fetch password from metadata API if not returned
+        if (!password) {
+          console.log('🔍 DIAGNOSTICS: secure_password missing in poll response – fetching via API')
+          try {
+            const pwResp = await fetch('/api/get-user-password', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user_id }) })
+            if (pwResp.ok) {
+              const pwData = await pwResp.json()
+              password = pwData.secure_password || undefined
+            }
+          } catch (pwErr) {
+            console.log('🔍 DIAGNOSTICS: Password metadata fetch failed', pwErr)
+          }
+        }
+
+        if (!password) {
+          console.log('🔍 DIAGNOSTICS: Still no secure password – using legacy deterministic fallback')
+          password = `telegram_${user_id}_secure`
+        }
+
+        const signInStart = performance.now()
+        const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({ email, password })
+        const signInMs = Math.round(performance.now() - signInStart)
+
+        signInResultSummary = {
+          attempted: true,
+          durationMs: signInMs,
+          error: signInError ? { message: signInError.message, status: (signInError as any).status } : null,
+          hasSession: !!signInData?.session,
+          hasUser: !!signInData?.user
+        }
+
+        if (signInError) {
+          throw new Error(`signInWithPassword failed: ${signInError.message}`)
+        }
+
+        // Manual storage (mirrors useBotAuth) to satisfy production bypass & deterministic diagnostics
+        if (signInData?.session) {
+          try {
+            localStorage.setItem('sb-access-token', signInData.session.access_token)
+            if (signInData.session.refresh_token) localStorage.setItem('sb-refresh-token', signInData.session.refresh_token)
+            // Fetch profile for local cache (used by getCurrentUser production bypass path)
+            try {
+              const { data: profile } = await supabase.from('profiles').select('*').eq('id', signInData.session.user.id).single()
+              if (profile) {
+                const userProfile = {
+                  id: profile.id,
+                  name: `${profile.first_name ?? ''} ${profile.last_name ?? ''}`.trim(),
+                  username: profile.username ?? '',
+                  avatar: profile.avatar_url ?? '',
+                  telegram_id: profile.telegram_id,
+                  first_name: profile.first_name,
+                  last_name: profile.last_name,
+                  bio: profile.bio,
+                  location: profile.location,
+                  website: profile.website,
+                  joined_at: profile.created_at
+                }
+                localStorage.setItem('sb-user', JSON.stringify(userProfile))
+              }
+            } catch {/* swallow profile fetch issues */}
+            localStorage.setItem('telegram-login-complete', 'true')
+          } catch (storageErr) {
+            signInResultSummary.storageError = String(storageErr)
+          }
+        }
+
+        updateStep(testId, step.id, {
+          status: 'success',
+          result: {
+            message: '✅ Client sign-in executed',
+            ...signInResultSummary,
+            instruction: 'Proceeding to verify token storage'
+          }
+        })
+      } catch (signInErr) {
+        updateStep(testId, step.id, {
+          status: 'error',
+          error: signInErr instanceof Error ? signInErr.message : String(signInErr),
+          result: { signInResultSummary }
+        })
+        updateTestProgress(testId)
+        return // Cannot continue without sign-in
+      }
       updateTestProgress(testId)
-      await sleep(3000) // Give normal auth flow time to complete
+      // Brief pause to allow auth events / storage propagation
+      await sleep(800)
 
       // Step 11: Verify Storage Success (with retry)
       step = telegramTest.steps[currentStepIndex++]
@@ -550,23 +634,31 @@ export default function DiagnosticsPage() {
       updateStep(testId, step.id, { status: 'running' })
       console.log('🔍 STEP 14: Testing React state update...')
       
+      // Retry a few times (short) because React state propagation can lag behind storage & session verification
+      let reactUser: any = latestUserRef.current
+      let reactAttempts = 0
+      const maxReactAttempts = 5
+      while (!reactUser && reactAttempts < maxReactAttempts) {
+        reactAttempts++
+        await sleep(250)
+        reactUser = latestUserRef.current
+      }
       const reactStateCheck = {
-        userFromHook: user,
+        userFromHook: reactUser || null,
         loadingState: authLoading,
-        isSignedIn: !!user,
-        userDetails: user ? {
-          id: user.id,
-          username: user.username,
-          name: user.name
+        isSignedIn: !!reactUser,
+        attemptsNeeded: reactAttempts,
+        userDetails: reactUser ? {
+          id: reactUser.id,
+          username: reactUser.username,
+          name: reactUser.name
         } : null
       }
-      
       console.log('🔍 DIAGNOSTICS: React state check:', reactStateCheck)
-      
-      updateStep(testId, step.id, { 
+      updateStep(testId, step.id, {
         status: reactStateCheck.isSignedIn ? 'success' : 'error',
         result: reactStateCheck,
-        error: !reactStateCheck.isSignedIn ? 'React auth state not updated despite successful token storage' : undefined
+        error: !reactStateCheck.isSignedIn ? 'React auth state not updated (after short retry window)' : undefined
       })
       updateTestProgress(testId)
       await sleep(1000)
@@ -576,20 +668,28 @@ export default function DiagnosticsPage() {
       updateStep(testId, step.id, { status: 'running' })
       console.log('🔍 STEP 15: Final comprehensive verification...')
       
+      // Allow a brief grace period for auth hook to finalize (if not already)
+      let finalHookUser = latestUserRef.current
+      if (!finalHookUser) {
+        for (let i=0;i<4 && !finalHookUser;i++) {
+          await sleep(200)
+          finalHookUser = latestUserRef.current
+        }
+      }
       const finalVerification = {
         tokensInStorage: !!localStorage.getItem('sb-access-token'),
         authFunctionsWork: !!authFunctionTests.getCurrentUserResult && !authFunctionTests.getCurrentUserResult.error,
         supabaseSessionActive: !!sessionData?.session,
-        reactStateUpdated: !!user,
-        overallSuccess: !!localStorage.getItem('sb-access-token') && !!user
+        reactStateUpdated: !!finalHookUser,
+        overallSuccess: !!localStorage.getItem('sb-access-token') && !!finalHookUser
       }
       
       console.log('🔍 DIAGNOSTICS: Final verification:', finalVerification)
       
-      updateStep(testId, step.id, { 
+      updateStep(testId, step.id, {
         status: finalVerification.overallSuccess ? 'success' : 'error',
         result: finalVerification,
-        error: !finalVerification.overallSuccess ? 'Authentication flow completed but some components are not working properly' : undefined
+        error: !finalVerification.overallSuccess ? 'Authentication flow completed but some components are not working properly (React state lag)' : undefined
       })
       updateTestProgress(testId)
 
@@ -1371,6 +1471,133 @@ export default function DiagnosticsPage() {
     }
   }
 
+  // Auth Timeout Stress Test Runner (part 1 & full when no manual pause)
+  // Generic perf helper defined outside to avoid JSX generic parsing issues
+  type PerfResult<T> = { ms: number; value: T; error?: string }
+  async function perfMeasure<T>(fn: () => Promise<T>): Promise<PerfResult<T>> {
+    const t0 = performance.now()
+    try {
+      const value = await fn()
+      return { ms: +(performance.now() - t0).toFixed(1), value }
+    } catch (e: any) {
+      return { ms: +(performance.now() - t0).toFixed(1), value: null as unknown as T, error: e?.message || String(e) }
+    }
+  }
+
+  const runAuthTimeoutTest = async (test: DiagnosticTest, resumeFrom?: string) => {
+    const testId = test.id
+    const steps = test.steps
+    const findStep = (id: string) => steps.find(s => s.id === id)!
+    const mark = (id: string, status: TestStep['status'], result?: any, error?: string) => {
+      updateStep(testId, id, { status, result, error })
+      updateTestProgress(testId)
+    }
+    const alreadyRanManual = resumeFrom === 'after-background'
+    try {
+      if (!resumeFrom) {
+        // Step 1 baseline-session
+        mark('baseline-session', 'running')
+        const sessionTiming = await perfMeasure(() => supabase.auth.getSession())
+        const userTiming = await perfMeasure(() => supabase.auth.getUser())
+        const tokenPreview = localStorage.getItem('sb-access-token')?.slice(0,20) + '...' || null
+        mark('baseline-session', 'success', { sessionTiming, userTiming, hasAccessToken: !!tokenPreview, tokenPreview })
+
+        // Step 2 warm-profile
+        mark('warm-profile', 'running')
+        const warmTiming = await perfMeasure(() => getCurrentUser())
+        mark('warm-profile', warmTiming.error ? 'error':'success', { warmTiming })
+
+        // Step 3 rapid-calls
+        mark('rapid-calls', 'running')
+        const rapid: any[] = []
+        for (let i=0;i<5;i++) {
+          rapid.push(await perfMeasure(() => getCurrentUser()))
+        }
+        mark('rapid-calls', 'success', { rapidCalls: rapid })
+
+        // Step 4 manual background instruction
+        mark('manual-background-instruction', 'running', {
+          instruction: 'Switch to another browser tab/window for at least 12 seconds (Chrome throttles background timers). Then return here and click Resume Background Step.',
+          expected: 'Next step will compare timings & detect duplicate SIGNED_IN events.',
+          note: 'Do not interact with this tab during the wait.'
+        })
+        setPendingResume({ testId, stepId: 'manual-background-instruction' })
+        return
+      }
+
+      if (alreadyRanManual) {
+        // Step 5 post-background-check
+        mark('post-background-check', 'running')
+  const postSession = await perfMeasure(() => supabase.auth.getSession())
+  const postUser = await perfMeasure(() => supabase.auth.getUser())
+  const postProfile = await perfMeasure(() => getCurrentUser())
+        mark('post-background-check', 'success', { postSession, postUser, postProfile })
+
+        // Step 6 auth-events-monitor
+        mark('auth-events-monitor', 'running')
+        let eventCounts: Record<string, number> = { SIGNED_IN:0, TOKEN_REFRESHED:0, SIGNED_OUT:0, OTHER:0 }
+        const start = performance.now()
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((evt) => {
+          if (evt in eventCounts) eventCounts[evt]++; else eventCounts.OTHER++
+        })
+        await new Promise(r => setTimeout(r, 10000))
+        subscription.unsubscribe()
+        const duration = +(performance.now()-start).toFixed(1)
+        mark('auth-events-monitor', 'success', { eventCounts, monitorDurationMs: duration })
+
+        // Step 7 summary
+        mark('summary', 'running')
+        const baseStep = findStep('baseline-session')
+        const postStep = findStep('post-background-check')
+        const warmStep = findStep('warm-profile')
+        const eventsStep = findStep('auth-events-monitor')
+        const base = baseStep?.result || {}
+        const post = postStep?.result || {}
+        const warmTimingMs = warmStep?.result?.warmTiming?.ms ?? 0
+
+        const indicators = {
+          sessionDelayIncrease: (post.postSession?.ms ?? 0) - (base.sessionTiming?.ms ?? 0),
+          userDelayIncrease: (post.postUser?.ms ?? 0) - (base.userTiming?.ms ?? 0),
+          profileDelayIncrease: (post.postProfile?.ms ?? 0) - warmTimingMs,
+          duplicateSignedInLikely: (eventsStep?.result?.eventCounts?.SIGNED_IN || 0) > 1,
+          dataCompleteness: {
+            hasBaseline: !!baseStep?.status && baseStep.status !== 'error',
+            hasPost: !!postStep?.status && postStep.status !== 'error',
+            hasEvents: !!eventsStep?.status && eventsStep.status !== 'error'
+          }
+        }
+        const rootCauseHints: string[] = []
+        if (indicators.sessionDelayIncrease > 3000) rootCauseHints.push('Background timer throttling or network resume latency')
+        if (indicators.userDelayIncrease > 3000 && indicators.profileDelayIncrease > 3000) rootCauseHints.push('getUser path still incurring network / refresh cycle')
+        if (indicators.duplicateSignedInLikely) rootCauseHints.push('Multiple auth state emissions (token refresh) -> consider ignoring duplicate SIGNED_IN')
+        if (!rootCauseHints.length) {
+          if (!indicators.dataCompleteness.hasBaseline || !indicators.dataCompleteness.hasPost) {
+            rootCauseHints.push('Insufficient data: some earlier steps failed or were skipped')
+          } else {
+            rootCauseHints.push('No significant degradation detected')
+          }
+        }
+        mark('summary', 'success', { indicators, rootCauseHints })
+      }
+    } catch (e:any) {
+      logger.error('DIAGNOSTICS', 'Auth timeout test failed', e)
+      const failing = steps.find(s => s.status==='running' || s.status==='pending')
+      if (failing) mark(failing.id, 'error', undefined, e?.message||String(e))
+    } finally {
+      updateTestProgress(testId)
+      if (pendingResume && pendingResume.testId === testId) setPendingResume(null)
+    }
+  }
+
+  const resumeAuthTimeoutTest = async () => {
+    if (!pendingResume) return
+    // Mark manual step success then continue
+    updateStep(pendingResume.testId, pendingResume.stepId, { status: 'success' })
+    updateTestProgress(pendingResume.testId)
+    // Continue with remaining steps
+    await runAuthTimeoutTest(tests.find(t => t.id === pendingResume.testId)!, 'after-background')
+  }
+
   const runTest = async (testId: string) => {
     const test = tests.find(t => t.id === testId)
     if (!test || isRunning) return
@@ -1409,6 +1636,9 @@ export default function DiagnosticsPage() {
           break
         case 'bot-auth-flow':
           await runBotAuthFlowTest(resetTest)
+          break
+        case 'auth-timeout':
+          await runAuthTimeoutTest(resetTest)
           break
       }
     } catch (error) {
@@ -1463,7 +1693,8 @@ export default function DiagnosticsPage() {
       createAuthCleanupTest(),
       createAuthEnvironmentTest(),
       createNetworkTest(),
-      createBotAuthFlowTest()
+  createBotAuthFlowTest(),
+  createAuthTimeoutTest()
     ])
   }, [])
 
@@ -1478,14 +1709,20 @@ export default function DiagnosticsPage() {
   }
 
   const getStatusBadge = (status: DiagnosticTest['status']) => {
-    const variants = {
+    const variants: Record<string,string> = {
       idle: 'secondary',
+      pending: 'secondary',
       running: 'default',
+      success: 'success',
       completed: 'success',
-      failed: 'destructive'
-    } as const
+      partial: 'default',
+      error: 'destructive',
+      failed: 'destructive',
+      skipped: 'secondary'
+    }
     
-    return <Badge variant={variants[status] || 'secondary'}>{status}</Badge>
+  const v = (variants[status] || 'secondary') as any
+  return <Badge variant={v}>{status}</Badge>
   }
 
   return (
@@ -1693,6 +1930,11 @@ export default function DiagnosticsPage() {
                             )}
                             {step.error && (
                               <p className="text-xs text-red-600 mt-1">{step.error}</p>
+                            )}
+                            {test.id==='auth-timeout' && step.id==='manual-background-instruction' && step.status==='running' && pendingResume?.testId===test.id && (
+                              <Button size="sm" className="mt-2" onClick={resumeAuthTimeoutTest} disabled={isRunning===false && !pendingResume}>
+                                Resume Background Step
+                              </Button>
                             )}
                           </div>
                         </div>

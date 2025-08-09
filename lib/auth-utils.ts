@@ -51,8 +51,8 @@ export async function getValidToken(): Promise<string | null> {
         }
 
         if (isTokenExpired(token)) {
-            logger.warn('AUTH', 'getValidToken: Token is expired, triggering refresh')
-            window.location.reload()
+            logger.warn('AUTH', 'getValidToken: Token is expired, clearing token')
+            localStorage.removeItem("sb-access-token")
             return null
         }
 
@@ -61,8 +61,9 @@ export async function getValidToken(): Promise<string | null> {
         logger.error('AUTH', 'getValidToken: Error getting token:', error)
 
         if (isAuthError(error)) {
-            logger.info('AUTH', 'getValidToken: Auth error detected, triggering page reload')
-            window.location.reload()
+            logger.info('AUTH', 'getValidToken: Auth error detected, clearing tokens')
+            localStorage.removeItem("sb-access-token")
+            localStorage.removeItem("telegram-login-complete")
         }
 
         return null
@@ -76,8 +77,9 @@ export function handleApiError(error: unknown, operation: string): never {
     logger.error('API', `API Error in ${operation}:`, error)
 
     if (isAuthError(error)) {
-        logger.info('AUTH', `Auth error detected in ${operation}, triggering page reload`)
-        window.location.reload()
+        logger.info('AUTH', `Auth error detected in ${operation}, clearing auth state`)
+        localStorage.removeItem("sb-access-token")
+        localStorage.removeItem("telegram-login-complete")
     }
 
     throw error

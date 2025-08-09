@@ -86,8 +86,9 @@ export function useComments(
                     errorMessage.includes('row-level security policy') ||
                     errorMessage.includes('403')) {
 
-                    logger.info('AUTH', 'Auth error detected while commenting, triggering page reload')
-                    window.location.reload()
+                    logger.info('AUTH', 'Auth error detected while commenting, clearing auth state')
+                    localStorage.removeItem("sb-access-token")
+                    localStorage.removeItem("telegram-login-complete")
                     return false
                 }
             }
@@ -126,9 +127,10 @@ export function useComments(
                 // Revert optimistic update
                 updatePostLikeOptimistically?.(postId, currentLiked, currentCount)
 
-                // Try to refresh the session and get a new token
-                logger.info('AUTH', 'Attempting to refresh session')
-                window.location.reload() // Simple solution: reload to re-authenticate
+                // Clear token and let user manually sign in again
+                logger.info('AUTH', 'Clearing auth tokens - user needs to sign in again')
+                localStorage.removeItem("sb-access-token")
+                localStorage.removeItem("telegram-login-complete")
                 return null
             }
 
@@ -154,8 +156,9 @@ export function useComments(
                     errorMessage.includes('row-level security policy') ||
                     errorMessage.includes('403')) {
 
-                    logger.info('AUTH', 'Auth error detected, triggering page reload for fresh auth')
-                    window.location.reload()
+                    logger.info('AUTH', 'Auth error detected, clearing auth state')
+                    localStorage.removeItem("sb-access-token")
+                    localStorage.removeItem("telegram-login-complete")
                     return null
                 }
             }

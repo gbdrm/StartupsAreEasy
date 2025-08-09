@@ -93,7 +93,7 @@ export function EnhancedPostForm({ onSubmit, userStartups, isSubmitting, onCance
               <div className="flex gap-2">
                 <Button
                   type="button"
-                  variant={formData.existing_startup_id ? "default" : "outline"}
+                  variant={formData.existing_startup_id !== undefined ? "default" : "outline"}
                   onClick={() => setFormData({ ...formData, existing_startup_id: "", startup_name: "", startup_description: "" })}
                   disabled={ideas.length === 0}
                 >
@@ -101,8 +101,8 @@ export function EnhancedPostForm({ onSubmit, userStartups, isSubmitting, onCance
                 </Button>
                 <Button
                   type="button"
-                  variant={!formData.existing_startup_id ? "default" : "outline"}
-                  onClick={() => setFormData({ ...formData, existing_startup_id: undefined })}
+                  variant={formData.existing_startup_id === undefined ? "default" : "outline"}
+                  onClick={() => setFormData({ ...formData, existing_startup_id: undefined, startup_name: "", startup_description: "" })}
                 >
                   Launch New Startup
                 </Button>
@@ -246,7 +246,7 @@ export function EnhancedPostForm({ onSubmit, userStartups, isSubmitting, onCance
         return !!(formData.startup_name?.trim() && formData.startup_description?.trim())
       case "launch":
         if (formData.existing_startup_id !== undefined) {
-          return !!(formData.existing_startup_id && formData.content?.trim() && formData.link?.trim())
+          return !!(formData.existing_startup_id?.trim() && formData.content?.trim() && formData.link?.trim())
         }
         return !!(formData.startup_name?.trim() && formData.startup_description?.trim() && formData.content?.trim() && formData.link?.trim())
       case "progress":

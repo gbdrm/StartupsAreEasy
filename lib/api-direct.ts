@@ -581,10 +581,25 @@ export async function createPostFromFormDirect(formData: {
             postContent = formData.content || ""
 
             logger.debug('API', "Created startup for idea post", { startupId, name: formData.startup_name })
-        }        // For launch posts using existing startup, update startup stage
-        if (formData.type === "launch" && formData.existing_startup_id) {
-            await updateStartupStageDirect(formData.existing_startup_id, "launched", userToken)
-            logger.debug('API', "Updated startup stage to launched", { startupId: formData.existing_startup_id })
+        }        // For launch posts, handle both existing and new startups
+        if (formData.type === "launch") {
+            if (formData.existing_startup_id) {
+                // Update existing startup to launched stage
+                await updateStartupStageDirect(formData.existing_startup_id, "launched", userToken)
+                logger.debug('API', "Updated startup stage to launched", { startupId: formData.existing_startup_id })
+            } else if (formData.startup_name && formData.startup_description) {
+                // Create new startup for launch post
+                const startupData = {
+                    userId: userId,
+                    name: formData.startup_name,
+                    description: formData.startup_description,
+                    stage: "launched" as const
+                }
+
+                const createdStartup = await createStartupDirect(startupData, userToken)
+                startupId = createdStartup.id
+                logger.debug('API', "Created new startup for launch post", { startupId, name: formData.startup_name })
+            }
         }
 
         // Create the post

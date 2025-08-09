@@ -2,13 +2,15 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import { getCurrentUser, signOut } from '@/lib/auth'
+import { getCurrentUser, signOut, wasLastGetCurrentUserTimeout } from '@/lib/auth'
 import { logger } from '@/lib/logger'
 import type { User } from '@/lib/types'
 
 // Global state with proper cleanup tracking
 let isAuthInitialized = false
 let authSubscription: any = null
+let lastSignedInUserId: string | null = null
+let lastSignedInAt = 0
 let globalUser: User | null = null
 let globalLoading = true
 let subscribers: Array<(user: User | null, loading: boolean) => void> = []
@@ -136,57 +138,44 @@ export function emergencyAuthReset() {
 
                 logger.debug('AUTH', 'Getting initial session')
 
-                // TEMPORARY: Skip session check only in production due to hanging issue
-                const isProduction = process.env.NODE_ENV === 'production'
-                if (isProduction) {
-                    logger.info('AUTH', 'Bypassing session check due to production hanging issue')
+                // Check if we have stored tokens from a successful login first
+                const hasStoredToken = localStorage.getItem("sb-access-token")
+                const loginComplete = localStorage.getItem("telegram-login-complete")
 
-                    // Check if we have stored tokens from a successful login
-                    const hasStoredToken = localStorage.getItem("sb-access-token")
-                    const loginComplete = localStorage.getItem("telegram-login-complete")
-
-                    if (hasStoredToken && loginComplete) {
-                        logger.info('AUTH', 'Found stored tokens, loading user profile')
-                        try {
-                            const profile = await getCurrentUser()
-                            if (profile) {
-                                logger.info('AUTH', 'Successfully loaded profile from stored tokens')
-                                setGlobalUser(profile)
-                                setGlobalLoading(false)
-                                return
-                            }
-                        } catch (profileError) {
-                            logger.error('AUTH', 'Error loading profile from stored tokens', profileError)
+                if (hasStoredToken && loginComplete) {
+                    logger.info('AUTH', 'Found stored tokens, loading user profile')
+                    try {
+                        const profile = await getCurrentUser()
+                        if (profile) {
+                            logger.info('AUTH', 'Successfully loaded profile from stored tokens')
+                            setGlobalUser(profile)
+                            setGlobalLoading(false)
+                            return
                         }
+                    } catch (profileError) {
+                        logger.error('AUTH', 'Error loading profile from stored tokens', profileError)
                     }
-
-                    logger.debug('AUTH', 'Starting with clean auth state')
-                    setGlobalUser(null)
-                    setGlobalLoading(false)
-                    return
                 }
 
                 // Smart session check for development with quick fallback
-                const getSessionWithQuickFallback = async () => {
-                    // First try: Quick session check (2 seconds)
+                const getSessionWithAdaptiveTimeout = async () => {
+                    // Background tabs can throttle; give more time (6s) before falling back
+                    const QUICK_TIMEOUT_MS = 6000
                     try {
-                        const quickPromise = supabase.auth.getSession()
-                        const quickTimeout = new Promise<never>((_, reject) => {
-                            setTimeout(() => reject(new Error('Quick timeout')), 2000)
+                        const sessionPromise = supabase.auth.getSession()
+                        const timeout = new Promise<never>((_, reject) => {
+                            setTimeout(() => reject(new Error('session check timeout')), QUICK_TIMEOUT_MS)
                         })
-                        return await Promise.race([quickPromise, quickTimeout])
-                    } catch (quickError) {
-                        logger.debug('AUTH', 'Quick session check failed, checking stored tokens')
-
-                        // Immediate fallback: Check if we have valid stored tokens
-                        const storedToken = localStorage.getItem("sb-access-token")
+                        return await Promise.race([sessionPromise, timeout])
+                    } catch (err) {
+                        logger.debug('AUTH', 'Session check race timed out – attempting token-based fallback', { err: (err as Error)?.message })
+                        const storedToken = localStorage.getItem('sb-access-token')
                         if (storedToken) {
                             try {
                                 const payload = JSON.parse(atob(storedToken.split('.')[1]))
                                 const now = Math.floor(Date.now() / 1000)
-
                                 if (payload.exp && payload.exp > now) {
-                                    logger.info('AUTH', 'Using valid stored token in development')
+                                    logger.info('AUTH', 'Token still valid after session timeout; will lazy-load profile')
                                     const profile = await getCurrentUser()
                                     if (profile) {
                                         setGlobalUser(profile)
@@ -194,27 +183,39 @@ export function emergencyAuthReset() {
                                         return { success: true }
                                     }
                                 }
-                            } catch (tokenError) {
-                                logger.error('AUTH', 'Stored token validation failed', tokenError)
+                            } catch (tokenParseError) {
+                                logger.warn('AUTH', 'Token parse failed during fallback', tokenParseError)
                             }
                         }
-
-                        throw quickError
+                        throw err
                     }
                 }
 
-                logger.debug('AUTH', 'Starting smart session check')
+                logger.debug('AUTH', 'Starting adaptive session check')
                 let sessionResult
                 try {
-                    const result = await getSessionWithQuickFallback()
+                    const result = await getSessionWithAdaptiveTimeout()
                     if (result && 'success' in result) {
                         return // Already handled by stored token path
                     }
                     sessionResult = result
                 } catch (timeoutError) {
-                    logger.debug('AUTH', 'Session check timed out, proceeding with no session')
-                    setGlobalUser(null)
+                    logger.warn('AUTH', 'Session check timed out (not clearing existing user); scheduling deferred revalidation')
+                    // Don't nuke existing user; just mark loading complete and schedule a retry if we have a token
                     setGlobalLoading(false)
+                    const token = localStorage.getItem('sb-access-token')
+                    if (!globalUser && token) {
+                        setTimeout(async () => {
+                            if (!globalUser) {
+                                logger.debug('AUTH', 'Deferred revalidation running')
+                                const profile = await getCurrentUser()
+                                if (profile) {
+                                    logger.info('AUTH', 'Deferred revalidation restored user')
+                                    setGlobalUser(profile)
+                                }
+                            }
+                        }, 1500)
+                    }
                     return
                 }
 
@@ -251,7 +252,7 @@ export function emergencyAuthReset() {
                 logger.warn('AUTH', 'Failsafe timeout - forcing loading to false')
                 setGlobalLoading(false)
             }
-        }, 10000) // 10 second maximum
+        }, 5000) // 5 second maximum
 
         // Listen for auth changes (only once globally)
         if (!authSubscription) {
@@ -263,6 +264,15 @@ export function emergencyAuthReset() {
                         logger.info('AUTH', 'User signed out')
                         resetAuth()
                     } else if (event === 'SIGNED_IN' && session?.user) {
+                        const now = Date.now()
+                        const duplicate = lastSignedInUserId === session.user.id && (now - lastSignedInAt) < 60000
+                        if (duplicate) {
+                            logger.debug('AUTH', 'Duplicate SIGNED_IN event suppressed', { userId: session.user.id })
+                            setGlobalLoading(false)
+                            return
+                        }
+                        lastSignedInUserId = session.user.id
+                        lastSignedInAt = now
                         logger.info('AUTH', 'User signed in', {
                             userId: session.user.id,
                             email: session.user.email
@@ -277,7 +287,29 @@ export function emergencyAuthReset() {
                             logger.debug('AUTH', "useSimpleAuth: Got profile after sign in", {
                                 profile: profile ? `${profile.first_name} ${profile.last_name} (@${profile.username})` : 'null'
                             })
-                            setGlobalUser(profile)
+
+                            if (profile) {
+                                setGlobalUser(profile)
+                            } else if (wasLastGetCurrentUserTimeout()) {
+                                logger.debug('AUTH', 'Profile null after SIGNED_IN due to soft timeout; scheduling deferred retry')
+                                const token = typeof window !== 'undefined' ? localStorage.getItem('sb-access-token') : null
+                                if (token) {
+                                    setTimeout(async () => {
+                                        if (!globalUser) {
+                                            logger.debug('AUTH', 'Deferred SIGNED_IN profile retry running')
+                                            const retryProfile = await getCurrentUser()
+                                            if (retryProfile) {
+                                                logger.info('AUTH', 'Deferred SIGNED_IN retry restored user profile')
+                                                setGlobalUser(retryProfile)
+                                            } else {
+                                                logger.debug('AUTH', 'Deferred SIGNED_IN retry still no profile')
+                                            }
+                                        }
+                                    }, 1500)
+                                }
+                            } else {
+                                logger.warn('AUTH', 'Profile retrieval returned null after SIGNED_IN (no timeout flag); scheduling retry')
+                            }
 
                             // Note: Don't reload here - auth.ts already handles the reload
                             // This prevents double-reloading which causes auth loops
@@ -290,8 +322,9 @@ export function emergencyAuthReset() {
                             setGlobalLoading(false)
                         }
                     } else if (event === 'TOKEN_REFRESHED') {
-                        // Don't change loading state for token refresh
-                        logger.debug('AUTH', 'Token refreshed')
+                        // Token refresh should not force extra network calls; keep current state
+                        logger.debug('AUTH', 'Token refreshed - maintaining current auth state')
+                        return
                     } else {
                         // For any other event, ensure loading is false
                         logger.debug('AUTH', `Other auth event (${event}), ensuring loading is false`)
@@ -309,19 +342,20 @@ export function emergencyAuthReset() {
         }
         window.addEventListener('manual-signout', handleManualSignout)
 
+
         return () => {
             // Clear failsafe timeout
             clearTimeout(failsafeTimeout)
             // Remove manual signout listener
             window.removeEventListener('manual-signout', handleManualSignout)
-            
+
             // Clean up subscription when last component unmounts
             if (subscribers.length <= 1 && authSubscription) {
                 logger.debug('AUTH', 'Last subscriber unmounting, cleaning up auth subscription')
                 authSubscription.unsubscribe()
                 authSubscription = null
                 isAuthInitialized = false
-                
+
                 // Run all cleanup callbacks
                 cleanupCallbacks.forEach(cleanup => {
                     try {
