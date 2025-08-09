@@ -23,7 +23,8 @@
       "Bash(cat:*)",
       "Bash(curl:*)",
       "Bash(pnpm add:*)",
-      "Bash(pnpm run:*)"
+      "Bash(pnpm run:*)",
+      "Bash(where pnpm)"
     ],
     "deny": []
   }

@@ -2,6 +2,21 @@
 // Tests for the complete authentication system including production bypasses
 
 const { makeApiCall, TEST_CONFIG } = require('./test-helpers');
+const crypto = require('crypto');
+
+// Copy of generateSecureLoginToken function for testing (Node.js compatible)
+function generateSecureLoginToken() {
+    // Create 36 bytes of random data to get exactly 48 base64url chars
+    const randomBytes = crypto.randomBytes(36);
+    
+    // Convert to base64url (no padding, URL-safe)
+    const base64 = randomBytes.toString('base64')
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=+$/, '');
+    
+    return base64;
+}
 
 // Test results storage
 const testResults = []
@@ -24,10 +39,11 @@ function test(name, fn) {
 
 // Test 1: Token creation endpoint
 const testCreateLoginToken = test('Create Login Token API', async () => {
+    const testToken = generateSecureLoginToken()
     const response = await fetch('http://localhost:3000/api/create-login-token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token: 'test-token-' + Date.now() })
+        body: JSON.stringify({ token: testToken })
     })
     
     if (!response.ok) {
@@ -46,7 +62,7 @@ const testCreateLoginToken = test('Create Login Token API', async () => {
 
 // Test 2: Check login endpoint with non-existent token
 const testCheckLoginEndpoint = test('Check Login API - Non-existent Token', async () => {
-    const testToken = 'non-existent-token-' + Date.now()
+    const testToken = generateSecureLoginToken()
     const response = await fetch(`http://localhost:3000/api/check-login?token=${testToken}`)
     
     if (!response.ok) {

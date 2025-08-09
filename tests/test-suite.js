@@ -3,6 +3,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { spawn } = require('child_process');
 const { runCryptoTests } = require('./crypto-utils.test.js');
 const { runApiSecurityTests } = require('./api-security.test.js');
 const { runAuthFlowTests } = require('./auth-flow.test.js');
@@ -202,66 +203,170 @@ const testEnvironment = test('Environment Variables', async () => {
     console.log(`   ✓ Fake login ${fakeLoginAvailable ? 'enabled' : 'disabled'}`)
 })
 
+// Dev server management for tests
+let devServer = null
+let serverStarted = false
+
+async function checkServerRunning() {
+    try {
+        const response = await fetch('http://localhost:3000/api/check-login?token=test-ping')
+        return response.status === 400 // Expect 400 for invalid token, means server is running
+    } catch (error) {
+        return false // Server not running
+    }
+}
+
+async function startDevServer() {
+    console.log('🚀 Starting development server for tests...')
+    
+    // Use npm run dev with shell enabled for Windows compatibility
+    console.log(`   Starting: npm run dev`)
+    devServer = spawn('npm', ['run', 'dev'], {
+        stdio: ['ignore', 'pipe', 'pipe'],
+        detached: false,
+        shell: true // Enable shell for Windows compatibility
+    })
+    
+    return new Promise((resolve, reject) => {
+        
+        let output = ''
+        const timeout = setTimeout(() => {
+            console.log('❌ Server startup timeout - continuing anyway')
+            resolve()
+        }, 15000) // 15 second timeout
+        
+        devServer.stdout.on('data', (data) => {
+            output += data.toString()
+            if (output.includes('Ready') || output.includes('localhost:3000')) {
+                clearTimeout(timeout)
+                console.log('✅ Development server started')
+                serverStarted = true
+                resolve()
+            }
+        })
+        
+        devServer.stderr.on('data', (data) => {
+            const error = data.toString()
+            if (error.includes('EADDRINUSE')) {
+                clearTimeout(timeout)
+                console.log('✅ Development server already running on port 3000')
+                serverStarted = false // Don't need to stop it since we didn't start it
+                resolve()
+            }
+        })
+        
+        devServer.on('error', (error) => {
+            clearTimeout(timeout)
+            console.error('❌ Failed to start dev server:', error.message)
+            reject(error)
+        })
+    })
+}
+
+async function stopDevServer() {
+    if (devServer && serverStarted) {
+        console.log('🛑 Stopping development server...')
+        devServer.kill('SIGTERM')
+        
+        // Give it time to shut down gracefully
+        await new Promise(resolve => setTimeout(resolve, 2000))
+        
+        if (!devServer.killed) {
+            devServer.kill('SIGKILL')
+        }
+        
+        devServer = null
+        serverStarted = false
+        console.log('✅ Development server stopped')
+    }
+}
+
 // Main test runner
 async function runTests() {
     console.log('🚀 Starting StartupsAreEasy Test Suite\n')
     
-    // Run crypto and security tests first
-    console.log('🔐 Running Security & Crypto Tests...')
-    const cryptoSuccess = await runCryptoTests()
-    const securitySuccess = await runApiSecurityTests()
+    let needsServerManagement = false
     
-    if (!cryptoSuccess || !securitySuccess) {
-        console.log('❌ Security tests failed - aborting other tests')
-        process.exit(1)
-    }
-    
-    // Run authentication flow tests
-    const authSuccess = await runAuthFlowTests()
-    
-    // Run API endpoints tests
-    const apiSuccess = await runApiEndpointsTests()
-    
-    if (!authSuccess || !apiSuccess) {
-        console.log('❌ Some test suites failed')
-    }
-    
-    console.log('\n🌐 Running Integration Tests...')
-    
-    const tests = [
-        testEnvironment,
-        testDatabaseConnection,
-        testPostsWithDetails,
-        testPostsWithUserContext,
-        testStartupsData,
-        testPostsWithStartups
-    ]
-    
-    for (const testFn of tests) {
-        await testFn()
-        console.log('') // Empty line between tests
-    }
-    
-    // Summary
-    console.log('📊 Test Results Summary:')
-    console.log('=' .repeat(50))
-    
-    const passed = testResults.filter(r => r.status === 'PASS').length
-    const failed = testResults.filter(r => r.status === 'FAIL').length
-    
-    testResults.forEach(result => {
-        const icon = result.status === 'PASS' ? '✅' : '❌'
-        console.log(`${icon} ${result.name}`)
-        if (result.error) {
-            console.log(`   └─ ${result.error}`)
+    try {
+        // Run crypto and security tests first (these don't need server)
+        console.log('🔐 Running Security & Crypto Tests...')
+        const cryptoSuccess = await runCryptoTests()
+        const securitySuccess = await runApiSecurityTests()
+        
+        if (!cryptoSuccess || !securitySuccess) {
+            console.log('❌ Security tests failed - aborting other tests')
+            process.exit(1)
         }
-    })
-    
-    console.log('=' .repeat(50))
-    console.log(`Total: ${testResults.length} | Passed: ${passed} | Failed: ${failed}`)
-    
-    if (failed > 0) {
-        process.exit(1)
+        
+        // Check if dev server is needed and start if necessary
+        console.log('🔍 Checking if development server is running...')
+        const serverRunning = await checkServerRunning()
+        
+        if (!serverRunning) {
+            needsServerManagement = true
+            await startDevServer()
+            // Wait a bit more for server to be fully ready
+            await new Promise(resolve => setTimeout(resolve, 3000))
+        } else {
+            console.log('✅ Development server already running')
+        }
+        
+        // Run authentication flow tests (these need server)
+        const authSuccess = await runAuthFlowTests()
+        
+        // Run API endpoints tests
+        const apiSuccess = await runApiEndpointsTests()
+        
+        if (!authSuccess || !apiSuccess) {
+            console.log('❌ Some test suites failed')
+        }
+        
+        console.log('\n🌐 Running Integration Tests...')
+        
+        const tests = [
+            testEnvironment,
+            testDatabaseConnection,
+            testPostsWithDetails,
+            testPostsWithUserContext,
+            testStartupsData,
+            testPostsWithStartups
+        ]
+        
+        for (const testFn of tests) {
+            await testFn()
+            console.log('') // Empty line between tests
+        }
+        
+        // Summary
+        console.log('📊 Test Results Summary:')
+        console.log('=' .repeat(50))
+        
+        const passed = testResults.filter(r => r.status === 'PASS').length
+        const failed = testResults.filter(r => r.status === 'FAIL').length
+        
+        testResults.forEach(result => {
+            const icon = result.status === 'PASS' ? '✅' : '❌'
+            console.log(`${icon} ${result.name}`)
+            if (result.error) {
+                console.log(`   └─ ${result.error}`)
+            }
+        })
+        
+        console.log('=' .repeat(50))
+        console.log(`Total: ${testResults.length} | Passed: ${passed} | Failed: ${failed}`)
+        
+        if (failed > 0) {
+            process.exit(1)
+        }
+        
+    } catch (error) {
+        console.error('💥 Test execution failed:', error)
+        throw error
+    } finally {
+        // Always cleanup server if we started it
+        if (needsServerManagement) {
+            await stopDevServer()
+        }
     }
 }
 
