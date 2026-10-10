@@ -19,7 +19,7 @@ Goal: Re‑use the existing authentication bot (already handles /start and /help
 ## Why Each Piece Exists
 | Feature | Why Needed | Risk If Omitted |
 |---------|-----------|-----------------|
-| last_seen_ip / last_seen_at | Basic operational insight & abuse triage | Harder to trace abuse/spam | 
+| last_seen_ip / last_seen_at | Basic operational insight & abuse triage | Harder to trace abuse/spam |
 | bot_opt_in flag | Respect user choice / legal courtesy | Can't selectively disable notifications |
 | Direct send function | Operational backdoor for future targeted test messages without redesign | Would need new work later for any outbound DM |
 | Group announcement on create | Core community visibility driver (immediate feedback loop) | New content less discoverable; group looks idle |
@@ -301,7 +301,7 @@ function extractClientIP(req: Request): string | null {
     hdr('x-real-ip'),                  // nginx
     hdr('x-client-ip')                 // Other proxies
   ]
-  
+
   // Basic IP validation
   function isValidIP(ip: string): boolean {
     if (!ip) return false;
@@ -312,7 +312,7 @@ function extractClientIP(req: Request): string | null {
       return num >= 0 && num <= 255 && !isNaN(num);
     });
   }
-  
+
   return candidates.find(ip => ip && isValidIP(ip)) || null;
 }
 ```
@@ -476,7 +476,7 @@ import { TelegramAPI } from '../_shared/telegram-api.ts';
 export default async (req: Request) => {
   try {
     const { user_id, text } = await req.json();
-    
+
     if (!user_id || !text) {
       return new Response('Missing fields: user_id and text required', { status: 400 });
     }
@@ -486,7 +486,7 @@ export default async (req: Request) => {
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
-    
+
     const telegram = new TelegramAPI(Deno.env.get('TELEGRAM_BOT_TOKEN')!);
 
     // Lookup user
@@ -512,7 +512,7 @@ export default async (req: Request) => {
     }
 
     // Send message with rate limiting
-    const telegramResult = await telegram.withRateLimit(() => 
+    const telegramResult = await telegram.withRateLimit(() =>
       telegram.sendMessage(user.telegram_id, text)
     );
 
@@ -525,9 +525,9 @@ export default async (req: Request) => {
       success: true
     });
 
-    return new Response(JSON.stringify({ 
-      success: true, 
-      message_id: telegramResult.message_id 
+    return new Response(JSON.stringify({
+      success: true,
+      message_id: telegramResult.message_id
     }));
 
   } catch (error) {
@@ -568,7 +568,7 @@ async function logMessage(supabase: any, data: any) {
 BEGIN;
 
 -- Add new columns to profiles
-ALTER TABLE profiles 
+ALTER TABLE profiles
   ADD COLUMN IF NOT EXISTS last_seen_ip inet,
   ADD COLUMN IF NOT EXISTS last_seen_at timestamp DEFAULT now(),
   ADD COLUMN IF NOT EXISTS bot_opt_in boolean DEFAULT true;
@@ -583,7 +583,7 @@ CREATE TABLE IF NOT EXISTS bot_message_logs (
   sent_at timestamp DEFAULT now(),
   success boolean NOT NULL,
   error_text text,
-  
+
   CONSTRAINT content_preview_length CHECK (char_length(content_preview) <= 120)
 );
 
@@ -598,7 +598,7 @@ COMMIT;
 **Testing**:
 ```sql
 -- Test data insertion
-INSERT INTO profiles (id, telegram_id, last_seen_ip, bot_opt_in) 
+INSERT INTO profiles (id, telegram_id, last_seen_ip, bot_opt_in)
 VALUES (gen_random_uuid(), 123456789, '192.168.1.1', true);
 
 -- Test log insertion
@@ -633,7 +633,7 @@ function extractClientIP(req: Request): string | null {
     hdr('x-real-ip'),
     hdr('x-client-ip')
   ]
-  
+
   function isValidIP(ip: string): boolean {
     if (!ip) return false;
     const parts = ip.split('.');
@@ -643,7 +643,7 @@ function extractClientIP(req: Request): string | null {
       return num >= 0 && num <= 255 && !isNaN(num);
     });
   }
-  
+
   return candidates.find(ip => ip && isValidIP(ip)) || null;
 }
 
@@ -655,9 +655,9 @@ const updateData = {
   telegram_id: chat_id,
   username: username || '',
   first_name: first_name || '',
-  ...(clientIP && { 
-    last_seen_ip: clientIP, 
-    last_seen_at: new Date().toISOString() 
+  ...(clientIP && {
+    last_seen_ip: clientIP,
+    last_seen_at: new Date().toISOString()
   })
 };
 
@@ -711,7 +711,7 @@ export class TelegramAPI {
 
   async sendMessage(chatId: string | number, text: string): Promise<TelegramMessage> {
     await this.enforceRateLimit();
-    
+
     const response = await fetch(`https://api.telegram.org/bot${this.botToken}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -723,7 +723,7 @@ export class TelegramAPI {
     });
 
     const result = await response.json();
-    
+
     if (!response.ok || !result.ok) {
       throw new Error(`Telegram API error: ${result.description || 'Unknown error'}`);
     }
@@ -734,23 +734,23 @@ export class TelegramAPI {
   async getMe(): Promise<TelegramBotInfo> {
     const response = await fetch(`https://api.telegram.org/bot${this.botToken}/getMe`);
     const result = await response.json();
-    
+
     if (!result.ok) {
       throw new Error(`Telegram API error: ${result.description}`);
     }
-    
+
     return result;
   }
 
   private async enforceRateLimit(): Promise<void> {
     const now = Date.now();
     const timeSinceLastRequest = now - this.lastRequestTime;
-    
+
     if (timeSinceLastRequest < this.rateLimitDelay) {
       const waitTime = this.rateLimitDelay - timeSinceLastRequest;
       await new Promise(resolve => setTimeout(resolve, waitTime));
     }
-    
+
     this.lastRequestTime = Date.now();
   }
 }
@@ -783,17 +783,17 @@ const TEST_CHAT_ID = Deno.env.get('TELEGRAM_TEST_CHAT_ID')!; // Your own chat ID
 
 async function testTelegramAPI() {
   const telegram = new TelegramAPI(API_TOKEN);
-  
+
   // Test 1: Bot info
   console.log('Testing getMe()...');
   const botInfo = await telegram.getMe();
   console.log('Bot info:', botInfo.result);
-  
+
   // Test 2: Send message
   console.log('Testing sendMessage()...');
   const message = await telegram.sendMessage(TEST_CHAT_ID, '🤖 Test message from API');
   console.log('Message sent:', message.message_id);
-  
+
   // Test 3: Rate limiting (send 3 messages quickly)
   console.log('Testing rate limiting...');
   const start = Date.now();
@@ -874,7 +874,7 @@ export default async (req: Request) => {
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
-    
+
     const telegram = new TelegramAPI(Deno.env.get('TELEGRAM_BOT_TOKEN')!);
 
     // Generate summary data
@@ -886,14 +886,14 @@ export default async (req: Request) => {
     const [newIdeas, newPosts, activeUsers, topContributor] = await Promise.all([
       supabase.from('posts').select('id', { count: 'exact' })
         .eq('type', 'idea').gte('created_at', weekStartISO),
-      
+
       supabase.from('posts').select('id', { count: 'exact' })
         .gte('created_at', weekStartISO),
-      
+
       supabase.from('posts').select('user_id')
         .gte('created_at', weekStartISO)
         .then(result => new Set(result.data?.map(p => p.user_id)).size),
-      
+
       supabase.rpc('get_top_contributor', { since_date: weekStartISO })
     ]);
 
@@ -901,7 +901,7 @@ export default async (req: Request) => {
 🚀 <b>Weekly Summary</b>
 
 💡 New ideas: ${newIdeas.count || 0}
-📝 New posts: ${newPosts.count || 0}  
+📝 New posts: ${newPosts.count || 0}
 👥 Active users: ${activeUsers}
 🏆 Top contributor: ${topContributor.data?.[0]?.username || 'N/A'}
 
@@ -921,8 +921,8 @@ Visit: https://startupsareeasy.com
       sent_at: new Date().toISOString()
     }]);
 
-    return new Response(JSON.stringify({ 
-      success: true, 
+    return new Response(JSON.stringify({
+      success: true,
       message_id: messageResult.message_id,
       stats: {
         new_ideas: newIdeas.count,
@@ -933,17 +933,17 @@ Visit: https://startupsareeasy.com
 
   } catch (error) {
     console.error('Weekly summary error:', error);
-    
+
     // Log error
     try {
       const supabase = createClient(
         Deno.env.get('SUPABASE_URL')!,
         Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
       );
-      
+
       await supabase.from('bot_message_logs').insert([{
         user_id: null,
-        chat_id: Deno.env.get('TELEGRAM_WEEKLY_GROUP_CHAT_ID') ? 
+        chat_id: Deno.env.get('TELEGRAM_WEEKLY_GROUP_CHAT_ID') ?
           parseInt(Deno.env.get('TELEGRAM_WEEKLY_GROUP_CHAT_ID')!) : null,
         message_type: 'weekly_summary',
         content_preview: 'Failed to send weekly summary',
@@ -984,7 +984,7 @@ const { createClient } = require('@supabase/supabase-js');
 
 describe('Telegram Bot Database Tests', () => {
   let supabase;
-  
+
   beforeAll(() => {
     supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -997,7 +997,7 @@ describe('Telegram Bot Database Tests', () => {
       .from('profiles')
       .select('last_seen_ip, last_seen_at, bot_opt_in')
       .limit(1);
-    
+
     expect(error).toBeNull();
     expect(data).toBeDefined();
   });
@@ -1017,7 +1017,7 @@ describe('Telegram Bot Database Tests', () => {
 
     expect(error).toBeNull();
     expect(data[0].id).toBeDefined();
-    
+
     // Cleanup
     await supabase.from('bot_message_logs').delete().eq('id', data[0].id);
   });
@@ -1092,7 +1092,7 @@ describe('Telegram Bot Integration Tests', () => {
         hdr('x-real-ip'),
         hdr('x-client-ip')
       ];
-      
+
       function isValidIP(ip) {
         if (!ip) return false;
         const parts = ip.split('.');
@@ -1102,7 +1102,7 @@ describe('Telegram Bot Integration Tests', () => {
           return num >= 0 && num <= 255 && !isNaN(num);
         });
       }
-      
+
       return candidates.find(ip => ip && isValidIP(ip)) || null;
     }
 
@@ -1135,10 +1135,10 @@ const { runTelegramBotTests } = require('./telegram-bot.test.js');
 
 async function runTests() {
   // ... existing tests ...
-  
+
   console.log('🤖 Running Telegram Bot Tests...');
   const telegramSuccess = await runTelegramBotTests();
-  
+
   // ... rest of tests ...
 }
 ```
@@ -1191,7 +1191,7 @@ export function TelegramBotSettings() {
 
   async function updateBotSettings(optIn: boolean) {
     if (!user) return;
-    
+
     setIsUpdating(true);
     try {
       const { error } = await supabase
@@ -1265,25 +1265,25 @@ Each task can be independently rolled back:
 ### Monitoring
 ```sql
 -- Monitor bot message success rate
-SELECT 
+SELECT
   message_type,
   COUNT(*) as total,
   COUNT(*) FILTER (WHERE success = true) as successful,
   ROUND(COUNT(*) FILTER (WHERE success = true) * 100.0 / COUNT(*), 2) as success_rate
-FROM bot_message_logs 
+FROM bot_message_logs
 WHERE sent_at > now() - interval '24 hours'
 GROUP BY message_type;
 
 -- Check recent failures
-SELECT * FROM bot_message_logs 
-WHERE success = false 
-ORDER BY sent_at DESC 
+SELECT * FROM bot_message_logs
+WHERE success = false
+ORDER BY sent_at DESC
 LIMIT 10;
 ```
 
 ## Timeline Summary
 - **Day 1**: Tasks 1-3 (Database + IP Collection + API Library) = 2.25 hours
-- **Day 2**: Tasks 4-5 (Functions) = 3 hours  
+- **Day 2**: Tasks 4-5 (Functions) = 3 hours
 - **Day 3**: Tasks 6-8 (Testing + Cron + UI) = 3.5 hours
 
 **Total**: 8.75 hours across 3 days (comfortable pace with testing)
