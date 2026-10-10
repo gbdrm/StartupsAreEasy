@@ -128,6 +128,24 @@ function getAuthHeaders(token?: string) {
     }
 }
 
+// Fire-and-forget announcement to the Telegram group bot when a new post or
+// public startup is created. Failures are swallowed by design so the bot
+// (and any outage) never blocks the create flow. See TELEGRAM_BOT_ENHANCEMENTS.md.
+function announceNewItem(type: 'post' | 'startup', id: string, token?: string): void {
+    if (!token || !id) return
+
+    fetch(`${supabaseUrl}/functions/v1/announce-new-item`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ type, id })
+    }).catch((error) => {
+        logger.debug('API', 'announceNewItem: fire-and-forget request failed', { type, id, error })
+    })
+}
+
 // Internal shared function for getting posts with full details
 async function getPostsWithDetailsInternal(currentUserId?: string, filterByUserId?: string): Promise<Post[]> {
     try {
@@ -412,8 +430,14 @@ export async function createStartupDirect(startup: {
         }
 
         const result = JSON.parse(responseText)
+        const createdStartup = result[0] || result
         logger.info('API', 'Startup created successfully')
-        return result[0] || result
+
+        if (insertData.is_public && createdStartup?.id) {
+            announceNewItem('startup', createdStartup.id, token)
+        }
+
+        return createdStartup
     } catch (error) {
         logger.error('API', "Error creating startup:", error)
         throw error
@@ -519,6 +543,11 @@ export async function createPostDirect(data: {
 
         // Return simplified post structure
         const post = result[0] || result
+
+        if (post?.id) {
+            announceNewItem('post', post.id, token)
+        }
+
         return {
             id: post.id,
             user: {
